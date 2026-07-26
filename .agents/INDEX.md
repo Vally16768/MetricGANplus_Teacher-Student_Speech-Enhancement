@@ -16,14 +16,15 @@ This directory is the canonical control plane for the research project.
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
 
-Current release state: **legacy surface removed; validation/commit gate active**.
+Current release state: **legacy surface removed; clean-snapshot pilot audited;
+full campaign pending**.
 
 Open blockers:
 
 - Historical experiment validity and checkpoint ancestry are not yet fully
   reconstructed.
-- The six-cell VoiceBank-only flow is GPU-smoke verified, but the smoke proxy
-  calibration is too small to support scientific claims.
-- Pilot/full runs require the current cleanup to pass tests/audits and be
-  committed as a clean snapshot.
+- The six-cell VoiceBank-only flow is pilot-verified, but the one-seed,
+  256-pair pilot is explicitly non-promotable.
+- The pilot teacher metric branch has a test PESQ warning (-0.0107 versus its
+  paired baseline), while both students gained PESQ; test is not used to tune.
 - There is no promoted end-to-end run produced from the current clean snapshot.

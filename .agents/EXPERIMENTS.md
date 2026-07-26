@@ -62,13 +62,44 @@ experiments/runs/<run_id>/
 | `20260726-verification-smoke-wbnb-s0-a3` | smoke-passed/audited | six cells, WB/NB proxies, dual cache, 36/36 samples, six model hashes, zero audit issues | no |
 | `20260726-postcleanup-smoke-wbnb-s0-a4` | superseded smoke | six cells completed, but ERB extraction changed the working source while the process was active; proxy WB held-out correlation was negative on six smoke records | no |
 | `20260727-postcleanup-smoke-wbnb-s0-a5` | smoke-passed/audited | stable post-cleanup source; six cells, six models, 36/36 reported samples, matched WB/NB protocols, zero audit issues | no |
+| `20260727-pilot-wbnb-s0-a1` | pilot-passed/audited | clean commit `76729f3`; six cells, six models, 72/72 samples, frozen manifests unchanged, zero audit issues; verification-only | no |
 
 There is currently no promoted end-to-end run from the current repository
 snapshot.
 
-The `a3` smoke proves wiring only. It used 8 training pairs and 4 pairs per
-evaluation split for one epoch. Its metric values and proxy calibration are
-not scientific evidence and must not enter the article.
+The smoke runs prove wiring only. The pilot used 256 training pairs and one
+seed; it validates execution and exposes directional warnings, but its metric
+values are not publication evidence and must not enter the article as final
+results.
+
+### Pilot `20260727-pilot-wbnb-s0-a1`
+
+The independent audit found six cells, six hashed model packages, 72 reported
+audio files and zero issues. Profiles were matched: teacher/WB student used
+16 kHz WB references and PESQ-WB; the NB student used 8 kHz NB references and
+PESQ-NB. All four manifest hashes were unchanged and all cross-split overlaps
+were zero.
+
+Held-out proxy calibration was adequate for the engineering pilot:
+
+| Proxy | Records train/validation | MAE | Pearson | Spearman |
+|---|---:|---:|---:|---:|
+| WB | 384 / 96 | 0.2488 | 0.9695 | 0.9022 |
+| NB | 384 / 96 | 0.2437 | 0.9551 | 0.9503 |
+
+True test-metric effects (`METRIC - BASE`, 64 pairs/profile):
+
+| Pair | PESQ | STOI | SI-SDR | delta-SNR |
+|---|---:|---:|---:|---:|
+| teacher WB | -0.0107 | -0.00015 | -0.0309 | -0.0190 |
+| student WB | +0.0344 | -0.00005 | -0.4050 | -0.4557 |
+| student NB | +0.0306 | +0.00065 | +0.5494 | +0.4858 |
+
+`T-WB-METRIC` was selected without test leakage because its val-select PESQ was
+1.58617 versus 1.58553 for `T-WB-BASE`. The margin is only +0.00064 and its
+test PESQ was lower by 0.01072. This is an explicit scientific warning, not a
+reason to tune on the test split. The full, predeclared run is needed to
+determine the teacher effect; no pilot result is promotable.
 
 ## Required reporting
 

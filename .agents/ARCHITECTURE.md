@@ -1,7 +1,6 @@
 # Architecture register
 
-Status: `post-cleanup-GPU-smoke-confirmed`; no clean-snapshot pilot/full run is
-promoted.
+Status: `clean-snapshot-pilot-confirmed`; no full run is promoted.
 
 ## A0 — End-to-end research pipeline
 
@@ -171,6 +170,8 @@ Evidence:
 - configuration: `configs/voicebank_campaign.yaml`;
 - post-cleanup GPU smoke:
   `20260727-postcleanup-smoke-wbnb-s0-a5` (six cells, audit zero issues).
+- clean-snapshot pilot:
+  `20260727-pilot-wbnb-s0-a1` (six cells, 72 samples, audit zero issues).
 
 ## A6 — Selection boundaries
 

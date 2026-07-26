@@ -17,8 +17,8 @@ Update this register whenever a gate changes state.
 | C10 | Implement plots and academic report | curves, calibration, deltas, hashes, report and independent auditor | passed |
 | C11 | Run unit/integration suite | 30/30 tests passed, including WB/NB ERB extraction | passed |
 | C12 | Run GPU end-to-end smoke | stable post-cleanup `...-a5`: six cells, six models, 36/36 samples, zero audit issues | passed |
-| C13 | Run canonical full/pilot experiments | pilot mode/manifests defined; requires clean committed snapshot | in-progress |
-| C14 | Audit and promote only valid outputs | smoke reconciles 0 issues but is explicitly non-promotable; no full result | blocked |
+| C13 | Run canonical full/pilot experiments | pilot `20260727-pilot-wbnb-s0-a1` passed all execution/audit gates from clean commit `76729f3`; full run is next | in-progress |
+| C14 | Audit and promote only valid outputs | pilot reconciles 0 issues but is explicitly non-promotable; teacher test PESQ warning recorded; no full result | blocked |
 | C15 | Remove legacy public surface after verified archive | authorized removal applied; recovery anchors `5129bae` + local archive | passed |
 | C16 | Final docs/privacy/scope audit | project guard passed with zero issues after authorized cleanup | passed |
 

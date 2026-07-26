@@ -70,5 +70,11 @@ metric/reference profile matches the run profile
 - independent smoke package audit: six cells, six models, zero issues.
 - smoke artifacts include true WB/NB metrics, proxy calibration, training
   curves, model hashes, aggregate CSV/JSON, plot and report.
-- full VoiceBank-only pilot/training: blocked until a clean committed source
-  snapshot exists; current smoke remains verification-only.
+- clean-snapshot pilot `20260727-pilot-wbnb-s0-a1`: passed on commit `76729f3`;
+  six cells, six models, 72/72 reported samples and zero audit issues.
+- pilot manifest hashes were identical before/after execution; split audit
+  retained zero pair/clean overlaps.
+- pilot WB/NB metric/reference contracts passed and held-out proxy Pearson
+  correlations were 0.9695/0.9551.
+- pilot is verification-only; full VoiceBank-only training remains the next
+  promotable experiment gate.
