@@ -1,0 +1,10 @@
+*.sh text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.csv text eol=lf
+
+# Historical artifacts must retain their exact bytes and SHA-256 values.
+experiments/** -text

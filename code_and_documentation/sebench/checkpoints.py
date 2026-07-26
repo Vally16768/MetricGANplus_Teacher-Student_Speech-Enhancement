@@ -75,7 +75,7 @@ def save_checkpoint_package(
 
 
 def load_checkpoint_package(path: str | Path, map_location: str | torch.device = "cpu") -> dict[str, Any]:
-    raw = torch.load(Path(path), map_location=map_location)
+    raw = torch.load(Path(path), map_location=map_location, weights_only=True)
     if isinstance(raw, dict) and "state_dict" in raw and "model_family" in raw:
         raw.setdefault("postfilter", {"mode": "none", "preset": "medium"})
         raw.setdefault("train_postfilter", False)

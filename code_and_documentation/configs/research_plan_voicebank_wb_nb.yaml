@@ -1,0 +1,67 @@
+schema_version: 1
+
+dataset:
+  name: "VoiceBank+DEMAND"
+  read_only: true
+  source_identity: "external-frozen-manifests"
+
+teacher:
+  role: "teacher"
+  family: "metricgan_plus_teacher_wb"
+  bandwidth: "wb"
+  sample_rate: 16000
+  n_fft: 512
+  hop_length: 160
+  win_length: 320
+  evaluation_reference_bandwidth: "wb"
+
+students:
+  wb:
+    role: "student_wb"
+    family: "metricgan_plus_student_wb"
+    bandwidth: "wb"
+    sample_rate: 16000
+    n_fft: 512
+    hop_length: 160
+    win_length: 320
+    evaluation_reference_bandwidth: "wb"
+  nb:
+    role: "student_nb"
+    family: "metricgan_plus_student_nb"
+    bandwidth: "nb"
+    sample_rate: 8000
+    n_fft: 256
+    hop_length: 80
+    win_length: 160
+    evaluation_reference_bandwidth: "nb"
+
+metric_discriminator:
+  target_metric: "PESQ"
+  separate_proxy_profiles: ["wb", "nb"]
+  generator_weight: 0.25
+  frozen_during_generator_update: true
+
+ablations:
+  - name: "teacher_baseline"
+    role: "teacher"
+    loss: "T0"
+  - name: "teacher_metric"
+    role: "teacher"
+    loss: "T0_PESQ"
+  - name: "student_wb_baseline"
+    role: "student_wb"
+    loss: "D1"
+  - name: "student_wb_metric"
+    role: "student_wb"
+    loss: "D1_PESQ"
+  - name: "student_nb_baseline"
+    role: "student_nb"
+    loss: "D1"
+  - name: "student_nb_metric"
+    role: "student_nb"
+    loss: "D1_PESQ"
+
+tts_extension:
+  status: "planned_separate_domain_calibration"
+  generator_adapter: "MetricGANGeneratorObjective"
+  rule: "Do not reuse an enhancement-only proxy as TTS evidence."

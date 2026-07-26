@@ -1,0 +1,24 @@
+# Machine-local configuration and mutable work areas
+local/
+workspace/
+
+# Local forensic imports: preserved for audit, never part of the canonical repo
+experiments/historical/
+docs/audits/*-inventory.json
+
+# Python and tools
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
+
+# Interrupted safe-copy temporaries
+*.tmp-copy

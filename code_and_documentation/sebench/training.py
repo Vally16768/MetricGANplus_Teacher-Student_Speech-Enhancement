@@ -30,6 +30,7 @@ from metrics.sisdr import sisdr
 from metrics.snr import delta_snr
 from metrics.stoi import stoi_score
 from sebench.audio import load_mono_audio, loop_to_length, manifest_hash, save_mono_audio, tensor_to_numpy_mono
+from sebench.bandwidth import resolve_bandwidth
 from sebench.checkpoints import load_checkpoint_package, load_model_from_checkpoint, save_checkpoint_package
 from sebench.data import ManifestRow, VoiceBankDemandDataset, read_pair_manifest
 from sebench.losses import CompositeEnhancementLoss, load_pesq_proxy_checkpoint
@@ -44,7 +45,6 @@ from sebench.mlflow_utils import (
 )
 from sebench.models import build_enhancer
 from sebench.runtime import require_cuda_device
-from sebench.stm32sim import simulate_model_fit
 from sebench.teacher_cache import TeacherCacheDataset
 
 
@@ -52,7 +52,7 @@ from sebench.teacher_cache import TeacherCacheDataset
 class ExperimentConfig:
     train_csv: str
     checkpoint_out: str
-    model_family: str = "atennuate"
+    model_family: str = "metricgan_plus_teacher_wb"
     variant: str = "base"
     loss_recipe: str = "R1"
     val_rank_csv: str | None = None
@@ -133,7 +133,6 @@ class ExperimentConfig:
     erb_bands: int = 32
     context_frames: int = 5
     qat: bool = False
-    mcu_profile: str | None = None
     init_checkpoint: str | None = None
     progress_json_out: str | None = None
     sample_rate: int = 16000
@@ -143,6 +142,8 @@ class ExperimentConfig:
     log_torch_model: bool = False
     log_system_metrics: bool = False
     quantize_dynamic: bool = False
+    bandwidth: str | None = None
+    metric_proxy_weight: float = 0.25
 
 
 def _normalize_runtime_devices(device: str, gpu_ids: list[int] | None) -> tuple[str, list[int]]:
@@ -156,6 +157,8 @@ def _normalize_runtime_devices(device: str, gpu_ids: list[int] | None) -> tuple[
                 normalized_gpu_ids.append(gpu_id)
 
     device_obj = torch.device(resolved_device)
+    if device_obj.type == "cuda" and device_obj.index is None:
+        normalized_gpu_ids.insert(0, int(torch.cuda.current_device()))
     if device_obj.type == "cuda" and device_obj.index is not None and device_obj.index not in normalized_gpu_ids:
         normalized_gpu_ids.insert(0, int(device_obj.index))
 
@@ -311,44 +314,20 @@ def suggest_num_workers(cpu_count: int | None = None) -> int:
 def suggest_runtime_profile(model_family: str, variant: str, segment_len: int) -> dict[str, int]:
     short_segment = segment_len <= 16000
 
-    if model_family == "cmgan_small":
-        if variant == "small":
-            batch_size = 3 if short_segment else 2
-        else:
-            batch_size = 2 if short_segment else 1
-    elif model_family == "metricgan_plus":
+    if model_family == "metricgan_plus":
         batch_size = 12 if short_segment else 8
-    elif model_family == "metricgan_plus_refiner":
-        batch_size = 6 if short_segment else 4
-    elif model_family == "metricgan_plus_native8k":
+    elif model_family in {"metricgan_plus_native8k", "metricgan_plus_teacher_wb"}:
         batch_size = 12 if short_segment else 8
-    elif model_family == "metricgan_plus_native8k_causal_s":
+    elif model_family in {
+        "metricgan_plus_native8k_causal_s",
+        "metricgan_plus_student_wb",
+        "metricgan_plus_student_nb",
+    }:
         batch_size = 16 if short_segment else 12
     elif model_family == "metricgan_plus_native8k_causal_xs":
         batch_size = 18 if short_segment else 14
     elif model_family == "metricgan_plus_native8k_causal_n6":
         batch_size = 12 if short_segment else 10
-    elif model_family == "tiny_stm32_fc":
-        batch_size = 16 if short_segment else 12
-    elif model_family == "tiny_stm32_hybrid_sg":
-        batch_size = 14 if short_segment else 10
-    elif model_family == "tiny_stm32_tcn_hybrid":
-        batch_size = 10 if short_segment else 8
-    elif model_family == "atennuate":
-        if variant == "small":
-            batch_size = 8 if short_segment else 5
-        else:
-            batch_size = 6 if short_segment else 4
-    elif model_family == "fullsubnet_plus":
-        if variant == "small":
-            batch_size = 10 if short_segment else 6
-        else:
-            batch_size = 8 if short_segment else 5
-    elif model_family == "mp_senet":
-        if variant == "small":
-            batch_size = 12 if short_segment else 8
-        else:
-            batch_size = 10 if short_segment else 6
     elif variant == "small":
         batch_size = 8 if short_segment else 4
     else:
@@ -356,7 +335,7 @@ def suggest_runtime_profile(model_family: str, variant: str, segment_len: int) -
 
     target_effective_batch = 8
     grad_accum = max(1, (target_effective_batch + batch_size - 1) // batch_size)
-    eval_batch_size = min(16, max(4, batch_size * (2 if model_family != "cmgan_small" else 1)))
+    eval_batch_size = min(16, max(4, batch_size * 2))
     return {
         "batch_size": batch_size,
         "grad_accum": grad_accum,
@@ -1052,6 +1031,7 @@ def evaluate_manifest(
     device: str,
     *,
     sample_rate: int,
+    bandwidth: str | None = None,
     compute_dnsmos: bool,
     compute_composite: bool = True,
     sample_dir: str | Path | None = None,
@@ -1061,6 +1041,7 @@ def evaluate_manifest(
     cache_audio: bool = True,
     progress_callback: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
+    profile = resolve_bandwidth(bandwidth, sample_rate=sample_rate)
     if compute_dnsmos and sample_rate != 16000:
         raise ValueError("DNSMOS evaluation requires 16000 Hz audio.")
     rows = _load_eval_audio_rows(
@@ -1128,7 +1109,12 @@ def evaluate_manifest(
                 noisy_np = tensor_to_numpy_mono(noisy)
                 enhanced_np = tensor_to_numpy_mono(enhanced)
 
-                pesq = pesq_score(clean_np, enhanced_np, sr)
+                pesq = pesq_score(
+                    clean_np,
+                    enhanced_np,
+                    sr,
+                    bandwidth=profile.name,
+                )
                 if np.isfinite(pesq):
                     pesq_values.append(pesq)
                 stoi_value = stoi_score(clean_np, enhanced_np, sr, extended=False)
@@ -1202,6 +1188,10 @@ def evaluate_manifest(
             model.train()
 
     metrics: dict[str, Any] = {
+        "bandwidth": profile.name,
+        "reference_bandwidth": profile.name,
+        "sample_rate": profile.sample_rate,
+        "pesq_mode": profile.pesq_mode,
         "count": len(rows),
         "pesq_count": len(pesq_values),
         "stoi_count": len(stoi_values),
@@ -1363,6 +1353,7 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
         hop_length=config.hop_length,
         win_length=config.win_length,
         pesq_proxy=pesq_proxy_model,
+        metric_proxy_weight=config.metric_proxy_weight,
     )
     trainable_params = [parameter for parameter in model.parameters() if parameter.requires_grad]
     if not trainable_params:
@@ -1473,42 +1464,6 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
         params["teacher_cache_schedule_hashes"] = {path: manifest_hash(path) for path in config.teacher_cache_schedule}
     mlflow.log_params(params)
 
-    stm32_summary: dict[str, Any] | None = None
-    if config.mcu_profile:
-        stm32_summary = simulate_model_fit(model, profile_name=config.mcu_profile)
-        mlflow.log_metrics(
-            {
-                "stm32sim/flash_bytes": stm32_summary["flash_bytes"],
-                "stm32sim/sram_peak_bytes": stm32_summary["sram_peak_bytes"],
-                "stm32sim/macs_per_hop_total": stm32_summary["macs_per_hop_total"],
-                "stm32sim/macs_fc": stm32_summary["macs_fc"],
-                "stm32sim/macs_depthwise_conv1d": stm32_summary["macs_depthwise_conv1d"],
-                "stm32sim/macs_pointwise_conv1d": stm32_summary["macs_pointwise_conv1d"],
-                "stm32sim/macs_lstm": stm32_summary["macs_lstm"],
-                "stm32sim/eltwise_ops": stm32_summary["eltwise_ops"],
-                "stm32sim/lookup_ops": stm32_summary["lookup_ops"],
-                "stm32sim/cycles_per_hop": stm32_summary["cycles_per_hop"],
-                "stm32sim/ms_per_hop_80mhz": stm32_summary["ms_per_hop_80mhz"],
-                "stm32sim/hop_ms": stm32_summary["hop_ms"],
-                "stm32sim/lookahead_ms": stm32_summary["lookahead_ms"],
-                "stm32sim/min_required_mhz": stm32_summary["min_required_mhz"],
-                "stm32sim/recommended_rt_mhz": stm32_summary["recommended_rt_mhz"],
-                "stm32sim/max_profile_mhz": stm32_summary["max_profile_mhz"],
-                "stm32sim/cpu_load_pct": stm32_summary["cpu_load_pct"],
-                "stm32sim/fit_ok": 1.0 if stm32_summary["fit_ok"] else 0.0,
-                "stm32sim/frequency_ok": 1.0 if stm32_summary["frequency_ok"] else 0.0,
-                "stm32sim/realtime_ok": 1.0 if stm32_summary["realtime_ok"] else 0.0,
-                "stm32sim/latency_ok": 1.0 if stm32_summary["latency_ok"] else 0.0,
-                "stm32sim/avg_power_mw": stm32_summary["avg_power_mw"],
-                "stm32sim/avg_power_mw_at_recommended_mhz": stm32_summary["avg_power_mw_at_recommended_mhz"],
-                "stm32sim/energy_uj_per_hop": stm32_summary["energy_uj_per_hop"],
-                "stm32sim/energy_uj_per_hop_at_recommended_mhz": stm32_summary["energy_uj_per_hop_at_recommended_mhz"],
-                "stm32sim/power_ok": 1.0 if stm32_summary["power_ok"] else 0.0,
-                "stm32sim/deployment_ok": 1.0 if stm32_summary["deployment_ok"] else 0.0,
-            }
-        )
-        log_dict_artifact(stm32_summary, "reports/stm32sim.json")
-
     sample_manifest_candidates = list(rank_eval_manifests.values()) or list(select_eval_manifests.values()) or [config.train_csv]
     sample_path = read_pair_manifest(sample_manifest_candidates[0])[0].noisy
 
@@ -1531,8 +1486,6 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
         "erb_bands": config.erb_bands,
         "context_frames": config.context_frames,
         "qat": config.qat,
-        "mcu_profile": config.mcu_profile,
-        "stm32sim": stm32_summary or {},
         "quantize_dynamic": config.quantize_dynamic,
         "selection_metric": config.selection_metric,
         "selection_guardrail_metric": config.selection_guardrail_metric,
@@ -1669,6 +1622,7 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                 manifest_path,
                 config.device,
                 sample_rate=config.sample_rate,
+                bandwidth=config.bandwidth,
                 compute_dnsmos=compute_dnsmos,
                 compute_composite=compute_composite,
                 sample_dir=(sample_root / label) if sample_root is not None else None,
@@ -2100,7 +2054,6 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
             )
             if sample_dir.exists():
                 mlflow.log_artifacts(sample_dir.as_posix(), artifact_path="samples")
-                shutil.rmtree(sample_dir, ignore_errors=True)
             mlflow.log_metrics({f"best/{key}": value for key, value in select_flat.items()})
             log_dict_artifact(select_metrics_by_split, "reports/best_val_select_metrics_by_split.json")
 
@@ -2120,7 +2073,6 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
             )
             if test_sample_dir.exists():
                 mlflow.log_artifacts(test_sample_dir.as_posix(), artifact_path="test_samples")
-                shutil.rmtree(test_sample_dir, ignore_errors=True)
             mlflow.log_metrics({f"test/{key}": value for key, value in test_flat.items()})
             log_dict_artifact(test_metrics_by_split, "reports/test_metrics_by_split.json")
 
@@ -2240,37 +2192,7 @@ def summary_from_existing(existing: dict[str, Any]) -> dict[str, Any]:
         "erb_bands": int(params["erb_bands"]) if "erb_bands" in params and params["erb_bands"] not in {"null", ""} else None,
         "context_frames": int(params["context_frames"]) if "context_frames" in params and params["context_frames"] not in {"null", ""} else None,
         "qat": params.get("qat"),
-        "mcu_profile": params.get("mcu_profile"),
         "quantize_dynamic": params.get("quantize_dynamic"),
-        "stm32sim": {
-            "flash_bytes": metrics.get("stm32sim/flash_bytes"),
-            "sram_peak_bytes": metrics.get("stm32sim/sram_peak_bytes"),
-            "macs_per_hop_total": metrics.get("stm32sim/macs_per_hop_total"),
-            "macs_fc": metrics.get("stm32sim/macs_fc"),
-            "macs_depthwise_conv1d": metrics.get("stm32sim/macs_depthwise_conv1d"),
-            "macs_pointwise_conv1d": metrics.get("stm32sim/macs_pointwise_conv1d"),
-            "macs_lstm": metrics.get("stm32sim/macs_lstm"),
-            "eltwise_ops": metrics.get("stm32sim/eltwise_ops"),
-            "lookup_ops": metrics.get("stm32sim/lookup_ops"),
-            "cycles_per_hop": metrics.get("stm32sim/cycles_per_hop"),
-            "ms_per_hop_80mhz": metrics.get("stm32sim/ms_per_hop_80mhz"),
-            "hop_ms": metrics.get("stm32sim/hop_ms"),
-            "lookahead_ms": metrics.get("stm32sim/lookahead_ms"),
-            "min_required_mhz": metrics.get("stm32sim/min_required_mhz"),
-            "recommended_rt_mhz": metrics.get("stm32sim/recommended_rt_mhz"),
-            "max_profile_mhz": metrics.get("stm32sim/max_profile_mhz"),
-            "cpu_load_pct": metrics.get("stm32sim/cpu_load_pct"),
-            "fit_ok": metrics.get("stm32sim/fit_ok"),
-            "frequency_ok": metrics.get("stm32sim/frequency_ok"),
-            "realtime_ok": metrics.get("stm32sim/realtime_ok"),
-            "latency_ok": metrics.get("stm32sim/latency_ok"),
-            "avg_power_mw": metrics.get("stm32sim/avg_power_mw"),
-            "avg_power_mw_at_recommended_mhz": metrics.get("stm32sim/avg_power_mw_at_recommended_mhz"),
-            "energy_uj_per_hop": metrics.get("stm32sim/energy_uj_per_hop"),
-            "energy_uj_per_hop_at_recommended_mhz": metrics.get("stm32sim/energy_uj_per_hop_at_recommended_mhz"),
-            "power_ok": metrics.get("stm32sim/power_ok"),
-            "deployment_ok": metrics.get("stm32sim/deployment_ok"),
-        },
         "best_val_select_pesq": metrics.get("best/val_select_pesq_mean"),
         "best_val_select_stoi": metrics.get("best/val_select_stoi_mean"),
         "best_val_select_dnsmos_ovr": metrics.get("best/val_select_dnsmos_ovr_mean"),
@@ -2295,7 +2217,7 @@ def summary_from_existing(existing: dict[str, Any]) -> dict[str, Any]:
 
 
 def default_experiment_config(**overrides: Any) -> ExperimentConfig:
-    family = overrides.get("model_family", "atennuate")
+    family = overrides.get("model_family", "metricgan_plus_teacher_wb")
     variant = overrides.get("variant", "base")
     segment_len = int(overrides.get("segment_len", 32000))
     profile = suggest_runtime_profile(family, variant, segment_len)

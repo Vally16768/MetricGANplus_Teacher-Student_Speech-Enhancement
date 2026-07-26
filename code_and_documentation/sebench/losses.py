@@ -7,7 +7,8 @@ from typing import Any
 import torch
 from torch import nn
 
-from sebench.stm32_models import waveform_to_erb_mask
+from sebench.bandwidth import validate_frontend
+from sebench.erb import waveform_to_erb_mask
 
 
 class SISDRLoss(nn.Module):
@@ -82,12 +83,20 @@ class PESQProxyRegressor(nn.Module):
         win_length: int = 320,
         hidden_channels: int = 32,
         projection_dim: int = 64,
+        bandwidth: str | None = None,
     ) -> None:
         super().__init__()
         self.sample_rate = int(sample_rate)
         self.n_fft = int(n_fft)
         self.hop_length = int(hop_length)
         self.win_length = int(win_length)
+        self.bandwidth = validate_frontend(
+            bandwidth,
+            sample_rate=self.sample_rate,
+            n_fft=self.n_fft,
+            hop_length=self.hop_length,
+            win_length=self.win_length,
+        ).name
         self.hidden_channels = int(hidden_channels)
         self.projection_dim = int(projection_dim)
         self.register_buffer("_window", torch.hann_window(self.win_length), persistent=False)
@@ -149,6 +158,7 @@ class PESQProxyRegressor(nn.Module):
             "win_length": self.win_length,
             "hidden_channels": self.hidden_channels,
             "projection_dim": self.projection_dim,
+            "bandwidth": self.bandwidth,
         }
 
 
@@ -159,7 +169,7 @@ def save_pesq_proxy_checkpoint(path: str | Path, model: PESQProxyRegressor) -> N
 
 
 def load_pesq_proxy_checkpoint(path: str | Path, device: str | torch.device = "cpu") -> PESQProxyRegressor:
-    payload = torch.load(Path(path), map_location="cpu")
+    payload = torch.load(Path(path), map_location="cpu", weights_only=True)
     config = dict(payload.get("config") or {})
     model = PESQProxyRegressor(**config)
     model.load_state_dict(payload["state_dict"])
@@ -184,6 +194,33 @@ class LossBreakdown:
     predicted_pesq: torch.Tensor
 
 
+class MetricGANGeneratorObjective(nn.Module):
+    """Differentiable generator objective backed by a frozen metric proxy.
+
+    For enhancement, ``source`` is the noisy waveform. For a future TTS
+    experiment it may be omitted, but the proxy must first be recalibrated on
+    outputs from that synthesis domain.
+    """
+
+    def __init__(self, metric_proxy: nn.Module) -> None:
+        super().__init__()
+        self.metric_proxy = metric_proxy
+        self.metric_proxy.eval()
+        for parameter in self.metric_proxy.parameters():
+            parameter.requires_grad_(False)
+
+    def forward(
+        self,
+        candidate: torch.Tensor,
+        reference: torch.Tensor,
+        *,
+        source: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        proxy_source = torch.zeros_like(candidate) if source is None else source
+        predicted_quality = self.metric_proxy(proxy_source, candidate, reference)
+        return -predicted_quality.mean(), predicted_quality
+
+
 class CompositeEnhancementLoss(nn.Module):
     def __init__(
         self,
@@ -194,13 +231,21 @@ class CompositeEnhancementLoss(nn.Module):
         hop_length: int = 160,
         win_length: int = 320,
         pesq_proxy: nn.Module | None = None,
+        metric_proxy_weight: float = 0.25,
     ):
         super().__init__()
         self.recipe = recipe.upper()
-        if self.recipe not in {"D1", "D2", "T0", "T0_PESQ"}:
+        if self.recipe not in {
+            "D1",
+            "D1_PESQ",
+            "D2",
+            "D2_PESQ",
+            "T0",
+            "T0_PESQ",
+        }:
             raise ValueError(
                 f"Unsupported loss recipe for the standalone project: {recipe}. "
-                "Supported recipes: T0, T0_PESQ, D1, D2."
+                "Supported recipes: T0, T0_PESQ, D1, D1_PESQ, D2, D2_PESQ."
             )
         self.erb_bands = erb_bands
         self.sample_rate = sample_rate
@@ -212,6 +257,14 @@ class CompositeEnhancementLoss(nn.Module):
         self.complex_loss = ComplexSTFTLoss()
         self.sisdr_loss = SISDRLoss()
         self.pesq_proxy = pesq_proxy
+        self.metric_proxy_weight = float(metric_proxy_weight)
+        if self.metric_proxy_weight < 0.0:
+            raise ValueError("metric_proxy_weight must be non-negative.")
+        self.metric_objective = (
+            MetricGANGeneratorObjective(pesq_proxy)
+            if pesq_proxy is not None
+            else None
+        )
 
     def forward(
         self,
@@ -237,9 +290,17 @@ class CompositeEnhancementLoss(nn.Module):
             if self.recipe == "T0_PESQ":
                 if self.pesq_proxy is None:
                     raise ValueError("Loss recipe T0_PESQ requires a frozen PESQ proxy model.")
-                predicted_pesq = self.pesq_proxy(noisy, enhanced, clean).mean()
-                pesq_proxy_loss = -predicted_pesq
-                total = 0.60 * t0_total + 0.25 * pesq_proxy_loss + 0.15 * sisdr
+                pesq_proxy_loss, predictions = self.metric_objective(
+                    enhanced,
+                    clean,
+                    source=noisy,
+                )
+                predicted_pesq = predictions.mean()
+                total = (
+                    0.60 * t0_total
+                    + self.metric_proxy_weight * pesq_proxy_loss
+                    + 0.15 * sisdr
+                )
             return LossBreakdown(
                 total=total,
                 wave=wave,
@@ -271,9 +332,25 @@ class CompositeEnhancementLoss(nn.Module):
         sisdr = enhanced.new_tensor(0.0)
 
         total = 0.60 * teacher_mask + 0.25 * teacher_wave + 0.15 * spectral
-        if self.recipe == "D2":
+        base_recipe = self.recipe.removesuffix("_PESQ")
+        if base_recipe == "D2":
             sisdr = self.sisdr_loss(enhanced, clean)
             total = total + 0.05 * sisdr
+
+        pesq_proxy_loss = zero
+        predicted_pesq = zero
+        if self.recipe.endswith("_PESQ"):
+            if self.metric_objective is None:
+                raise ValueError(
+                    f"Loss recipe {self.recipe} requires a frozen PESQ proxy model."
+                )
+            pesq_proxy_loss, predictions = self.metric_objective(
+                enhanced,
+                clean,
+                source=noisy,
+            )
+            predicted_pesq = predictions.mean()
+            total = total + self.metric_proxy_weight * pesq_proxy_loss
 
         return LossBreakdown(
             total=total,
@@ -284,6 +361,6 @@ class CompositeEnhancementLoss(nn.Module):
             speech_preserve=zero,
             teacher_mask=teacher_mask,
             teacher_wave=teacher_wave,
-            pesq_proxy=zero,
-            predicted_pesq=zero,
+            pesq_proxy=pesq_proxy_loss,
+            predicted_pesq=predicted_pesq,
         )

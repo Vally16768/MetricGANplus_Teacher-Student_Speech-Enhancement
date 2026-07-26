@@ -1,0 +1,4 @@
+interface:
+  display_name: "Manage MetricGAN+ Research"
+  short_description: "Govern reproducible MetricGAN+ research"
+  default_prompt: "Use $manage-metricgan-research to audit and update this MetricGAN+ project safely."

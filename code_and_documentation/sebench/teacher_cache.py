@@ -19,13 +19,15 @@ from sebench.audio import (
     stable_hash_text,
 )
 from sebench.data import ManifestRow, read_pair_manifest
-from sebench.stm32_models import (
-    STM32_HOP_LENGTH,
+from sebench.erb import (
+    WB_HOP_LENGTH,
     compute_spectral_gating_guidance,
     frontend_defaults_for_sample_rate,
     padded_frame_count,
     waveform_to_erb_mask,
 )
+
+STM32_HOP_LENGTH = WB_HOP_LENGTH
 
 
 @dataclass(frozen=True)
@@ -150,7 +152,7 @@ def _load_existing_cache_payload(
     if validate_existing:
         try:
             for path in required_paths:
-                loaded = torch.load(path, map_location="cpu")
+                loaded = torch.load(path, map_location="cpu", weights_only=True)
                 if not isinstance(loaded, torch.Tensor):
                     raise TypeError(f"Expected tensor payload in {path}")
                 del loaded
@@ -661,7 +663,7 @@ class TeacherCacheDataset(Dataset):
     @staticmethod
     def _load_cached_waveform(path: Path | None, fallback: Path, sample_rate: int) -> torch.Tensor:
         if path is not None:
-            return torch.load(path, map_location="cpu").float()
+            return torch.load(path, map_location="cpu", weights_only=True).float()
         wav, _ = load_mono_audio(fallback, sample_rate)
         return wav
 
@@ -670,9 +672,13 @@ class TeacherCacheDataset(Dataset):
 
     def __getitem__(self, idx: int) -> dict[str, torch.Tensor]:
         row = self.rows[idx]
-        teacher_wav = torch.load(row.teacher_wav, map_location="cpu").float()
-        teacher_mask = torch.load(row.teacher_mask_erb, map_location="cpu").float()
-        guidance = torch.load(row.guidance_sg, map_location="cpu").float() if row.guidance_sg is not None else None
+        teacher_wav = torch.load(row.teacher_wav, map_location="cpu", weights_only=True).float()
+        teacher_mask = torch.load(row.teacher_mask_erb, map_location="cpu", weights_only=True).float()
+        guidance = (
+            torch.load(row.guidance_sg, map_location="cpu", weights_only=True).float()
+            if row.guidance_sg is not None
+            else None
+        )
         noisy_full = self._load_cached_waveform(row.noisy_cache, row.noisy, self.sample_rate)
         clean_full = self._load_cached_waveform(row.clean_cache, row.clean, self.sample_rate)
         total = min(int(noisy_full.shape[-1]), int(clean_full.shape[-1]), int(teacher_wav.shape[-1]))

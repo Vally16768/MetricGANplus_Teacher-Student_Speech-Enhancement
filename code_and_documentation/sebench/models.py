@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import inspect
 from pathlib import Path
 
@@ -10,56 +9,35 @@ import torch.nn.functional as F
 import torchaudio
 from torch import nn
 
-try:
-    from attenuate.model import aTENNuate
-except Exception:
-    aTENNuate = None  # type: ignore[assignment]
 from sebench.postfilters import PostFilterEnhancer, resolve_postfilter_config
-from sebench.stm32_models import TinySTM32FC, TinySTM32HybridSG, TinySTM32TCNHybrid
+from sebench.bandwidth import resolve_bandwidth
 
 
 MODEL_FAMILIES = (
-    "atennuate",
-    "fullsubnet_plus",
-    "mp_senet",
-    "cmgan_small",
     "metricgan_plus",
+    "metricgan_plus_teacher_wb",
+    "metricgan_plus_student_wb",
+    "metricgan_plus_student_nb",
     "metricgan_plus_native8k",
     "metricgan_plus_native8k_causal_s",
     "metricgan_plus_native8k_causal_xs",
     "metricgan_plus_native8k_causal_n6",
     "metricgan_plus_native8k_causal_max",
-    "metricgan_plus_refiner",
-    "tiny_stm32_fc",
-    "tiny_stm32_hybrid_sg",
-    "tiny_stm32_tcn_hybrid",
 )
 MODEL_VARIANTS = ("small", "base")
 DEFAULT_MICROBATCH = {
-    "atennuate": 2,
-    "fullsubnet_plus": 2,
-    "mp_senet": 2,
-    "cmgan_small": 1,
     "metricgan_plus": 8,
+    "metricgan_plus_teacher_wb": 8,
+    "metricgan_plus_student_wb": 12,
+    "metricgan_plus_student_nb": 12,
     "metricgan_plus_native8k": 8,
     "metricgan_plus_native8k_causal_s": 12,
     "metricgan_plus_native8k_causal_xs": 14,
     "metricgan_plus_native8k_causal_n6": 10,
     "metricgan_plus_native8k_causal_max": 8,
-    "metricgan_plus_refiner": 4,
-    "tiny_stm32_fc": 16,
-    "tiny_stm32_hybrid_sg": 16,
-    "tiny_stm32_tcn_hybrid": 12,
 }
 METRICGAN_PLUS_SOURCE = "speechbrain/metricgan-plus-voicebank"
 METRICGAN_PLUS_CACHE_DIR = Path.home() / ".cache" / "sebench" / "metricgan_plus_voicebank"
-
-
-def _group_count(channels: int) -> int:
-    for candidate in (8, 4, 2):
-        if channels % candidate == 0:
-            return candidate
-    return 1
 
 
 class WaveformEnhancer(nn.Module):
@@ -551,6 +529,7 @@ def build_metricgan_standalone(
     variant: str = "small",
     native8k: bool = False,
     init_from_pretrained: bool = True,
+    arch_name: str | None = None,
 ) -> MetricGANLikeEnhancer:
     if variant == "small":
         hidden_size = 200
@@ -558,7 +537,10 @@ def build_metricgan_standalone(
     else:
         hidden_size = 256
         linear_dim = 384
-    arch_name = "metricgan_plus_native8k" if native8k else "metricgan_plus"
+    resolved_arch_name = (
+        arch_name
+        or ("metricgan_plus_native8k" if native8k else "metricgan_plus")
+    )
     return MetricGANLikeEnhancer(
         sample_rate=sample_rate,
         n_fft=n_fft,
@@ -567,7 +549,7 @@ def build_metricgan_standalone(
         hidden_size=hidden_size,
         num_layers=2,
         linear_dim=linear_dim,
-        arch_name=arch_name,
+        arch_name=resolved_arch_name,
         init_from_pretrained=init_from_pretrained,
     )
 
@@ -582,6 +564,8 @@ def build_metricgan_causal_lite(
     qat: bool = False,
 ) -> MetricGANCausalLiteEnhancer:
     configs = {
+        "metricgan_plus_student_wb": {"hidden_size": 96, "num_layers": 1, "linear_dim": 128, "rnn_type": "gru"},
+        "metricgan_plus_student_nb": {"hidden_size": 96, "num_layers": 1, "linear_dim": 128, "rnn_type": "gru"},
         "metricgan_plus_native8k_causal_s": {"hidden_size": 96, "num_layers": 1, "linear_dim": 128, "rnn_type": "gru"},
         "metricgan_plus_native8k_causal_xs": {"hidden_size": 64, "num_layers": 1, "linear_dim": 96, "rnn_type": "gru"},
         "metricgan_plus_native8k_causal_n6": {"hidden_size": 128, "num_layers": 2, "linear_dim": 160, "rnn_type": "gru"},
@@ -614,317 +598,6 @@ def dynamic_quantize_metricgan(model: nn.Module) -> nn.Module:
     return quantized
 
 
-class ResidualRefinerBlock(nn.Module):
-    def __init__(self, channels: int, dilation: int):
-        super().__init__()
-        padding = dilation * 3
-        groups = _group_count(channels)
-        self.net = nn.Sequential(
-            nn.Conv1d(channels, channels, kernel_size=7, padding=padding, dilation=dilation),
-            nn.GroupNorm(groups, channels),
-            nn.SiLU(),
-            nn.Conv1d(channels, channels, kernel_size=1),
-            nn.GroupNorm(groups, channels),
-        )
-        self.activation = nn.SiLU()
-
-    def forward(self, features: torch.Tensor) -> torch.Tensor:
-        return self.activation(features + self.net(features))
-
-
-class ResidualWaveRefiner(nn.Module):
-    def __init__(self, variant: str):
-        super().__init__()
-        cfg = {
-            "small": {"channels": 48, "layers": 6},
-            "base": {"channels": 64, "layers": 8},
-        }[variant]
-        channels = cfg["channels"]
-        groups = _group_count(channels)
-        self.input_proj = nn.Sequential(
-            nn.Conv1d(3, channels, kernel_size=7, padding=3),
-            nn.GroupNorm(groups, channels),
-            nn.SiLU(),
-        )
-        dilations = [1, 2, 4, 8]
-        self.blocks = nn.Sequential(
-            *[ResidualRefinerBlock(channels, dilation=dilations[idx % len(dilations)]) for idx in range(cfg["layers"])]
-        )
-        self.output_proj = nn.Sequential(
-            nn.Conv1d(channels, channels, kernel_size=7, padding=3),
-            nn.GroupNorm(groups, channels),
-            nn.SiLU(),
-            nn.Conv1d(channels, 1, kernel_size=1),
-        )
-        final_conv = self.output_proj[-1]
-        nn.init.zeros_(final_conv.weight)
-        nn.init.zeros_(final_conv.bias)
-
-    def forward(self, noisy: torch.Tensor, stage1: torch.Tensor) -> torch.Tensor:
-        residual = noisy - stage1
-        features = torch.cat([noisy, stage1, residual], dim=1)
-        refined = self.blocks(self.input_proj(features))
-        return 0.5 * torch.tanh(self.output_proj(refined))
-
-
-class MetricGANPlusRefiner(WaveformEnhancer):
-    def __init__(self, variant: str):
-        super().__init__()
-        self.variant = variant
-        self.stage1 = MetricGANPlusAdapter("small")
-        self.stage1.eval()
-        self.refiner = ResidualWaveRefiner(variant)
-        self.model_config = {
-            "arch": "metricgan_plus_refiner",
-            "variant": variant,
-            "sample_rate": 16000,
-            "non_causal": True,
-            "base_teacher": "metricgan_plus",
-        }
-
-    def forward(self, input: torch.Tensor) -> torch.Tensor:
-        if input.ndim != 3:
-            raise ValueError("Expected input tensor shaped (batch, 1, length).")
-        with torch.no_grad():
-            stage1 = self.stage1(input)
-        stage1 = stage1.detach().clone()
-        delta = self.refiner(input, stage1)
-        return torch.clamp(stage1 + delta, min=-1.0, max=1.0)
-
-
-class AtennuateAdapter(WaveformEnhancer):
-    def __init__(self, variant: str):
-        super().__init__()
-        if variant == "small":
-            self.model = aTENNuate(
-                channels=[16, 32, 64, 96, 128],
-                num_coeffs=12,
-                repeat=8,
-                resample_factors=[4, 4, 2, 2, 2],
-            )
-            self.pad_factor = 128
-        else:
-            self.model = aTENNuate()
-            self.pad_factor = 256
-
-    def forward(self, input: torch.Tensor) -> torch.Tensor:
-        if input.ndim != 3:
-            raise ValueError("Expected input tensor shaped (batch, 1, length).")
-        original_len = input.shape[-1]
-        padding = (self.pad_factor - original_len % self.pad_factor) % self.pad_factor
-        if padding:
-            input = F.pad(input, (0, padding))
-        enhanced = self.model(input)
-        return enhanced[..., :original_len]
-
-    def denoise_single(self, noisy: torch.Tensor) -> torch.Tensor:
-        return self.forward(noisy.unsqueeze(1)).squeeze(1)
-
-
-class SpectralEnhancer(WaveformEnhancer):
-    def __init__(self, n_fft: int = 512, hop_length: int = 128, win_length: int = 512):
-        super().__init__()
-        self.n_fft = n_fft
-        self.hop_length = hop_length
-        self.win_length = win_length
-        self.freq_bins = n_fft // 2 + 1
-        self.register_buffer("window", torch.hann_window(win_length), persistent=False)
-
-    def _stft(self, wav: torch.Tensor) -> torch.Tensor:
-        return torch.stft(
-            wav.squeeze(1),
-            n_fft=self.n_fft,
-            hop_length=self.hop_length,
-            win_length=self.win_length,
-            window=self.window.to(wav.device),
-            center=True,
-            pad_mode="reflect",
-            return_complex=True,
-        )
-
-    def _istft(self, spec: torch.Tensor, length: int) -> torch.Tensor:
-        wav = torch.istft(
-            spec,
-            n_fft=self.n_fft,
-            hop_length=self.hop_length,
-            win_length=self.win_length,
-            window=self.window.to(spec.device),
-            length=length,
-        )
-        return wav.unsqueeze(1)
-
-    @staticmethod
-    def _apply_complex_mask(spec: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        real = spec.real
-        imag = spec.imag
-        mask_r = torch.tanh(mask[:, 0])
-        mask_i = torch.tanh(mask[:, 1])
-        enh_real = real * mask_r - imag * mask_i
-        enh_imag = real * mask_i + imag * mask_r
-        return torch.complex(enh_real, enh_imag)
-
-
-class FullSubNetPlus(SpectralEnhancer):
-    def __init__(self, variant: str, spectral_native_gate: bool = False):
-        super().__init__()
-        cfg = {
-            "small": {"channels": 24, "gru_hidden": 96},
-            "base": {"channels": 32, "gru_hidden": 128},
-        }[variant]
-        channels = cfg["channels"]
-        self.sub_branch = nn.Sequential(
-            nn.Conv2d(3, channels, kernel_size=3, padding=1),
-            nn.GroupNorm(_group_count(channels), channels),
-            nn.SiLU(),
-            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
-            nn.GroupNorm(_group_count(channels), channels),
-            nn.SiLU(),
-        )
-        self.full_in = nn.Linear(self.freq_bins * 3, cfg["gru_hidden"])
-        self.full_gru = nn.GRU(
-            input_size=cfg["gru_hidden"],
-            hidden_size=cfg["gru_hidden"],
-            batch_first=True,
-            bidirectional=True,
-        )
-        self.full_out = nn.Linear(cfg["gru_hidden"] * 2, channels * self.freq_bins)
-        self.mask_head = nn.Sequential(
-            nn.Conv2d(channels * 2, channels, kernel_size=1),
-            nn.SiLU(),
-            nn.Conv2d(channels, 2, kernel_size=1),
-        )
-        self.spectral_native_gate = spectral_native_gate
-        self.gate_head = nn.Conv2d(channels * 2, 1, kernel_size=1) if spectral_native_gate else None
-
-    def forward(self, input: torch.Tensor) -> torch.Tensor:
-        length = input.shape[-1]
-        spec = self._stft(input)
-        real = spec.real
-        imag = spec.imag
-        mag = spec.abs()
-        feat = torch.stack([real, imag, mag], dim=1)
-
-        sub_features = self.sub_branch(feat)
-        seq = feat.permute(0, 3, 1, 2).reshape(input.size(0), feat.shape[-1], -1)
-        seq = torch.tanh(self.full_in(seq))
-        seq, _ = self.full_gru(seq)
-        full_features = self.full_out(seq)
-        full_features = full_features.reshape(input.size(0), feat.shape[-1], sub_features.shape[1], self.freq_bins)
-        full_features = full_features.permute(0, 2, 3, 1)
-
-        fused = torch.cat([sub_features, full_features], dim=1)
-        mask = self.mask_head(fused)
-        enhanced_spec = self._apply_complex_mask(spec, mask)
-        if self.gate_head is not None:
-            gate = torch.sigmoid(self.gate_head(fused)).squeeze(1)
-            enhanced_spec = torch.polar(enhanced_spec.abs() * gate, torch.angle(enhanced_spec))
-        return self._istft(enhanced_spec, length)
-
-
-class MPSENet(SpectralEnhancer):
-    def __init__(self, variant: str, spectral_native_gate: bool = False):
-        super().__init__()
-        cfg = {
-            "small": {"channels": 24},
-            "base": {"channels": 32},
-        }[variant]
-        channels = cfg["channels"]
-        self.mag_branch = nn.Sequential(
-            nn.Conv2d(1, channels, kernel_size=3, padding=1),
-            nn.GroupNorm(_group_count(channels), channels),
-            nn.SiLU(),
-            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
-            nn.GroupNorm(_group_count(channels), channels),
-            nn.SiLU(),
-        )
-        self.phase_branch = nn.Sequential(
-            nn.Conv2d(2, channels, kernel_size=3, padding=1),
-            nn.GroupNorm(_group_count(channels), channels),
-            nn.SiLU(),
-            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
-            nn.GroupNorm(_group_count(channels), channels),
-            nn.SiLU(),
-        )
-        self.mag_head = nn.Conv2d(channels, 1, kernel_size=1)
-        self.phase_head = nn.Conv2d(channels, 1, kernel_size=1)
-        self.gate_head = nn.Conv2d(channels, 1, kernel_size=1) if spectral_native_gate else None
-
-    def forward(self, input: torch.Tensor) -> torch.Tensor:
-        length = input.shape[-1]
-        spec = self._stft(input)
-        real = spec.real
-        imag = spec.imag
-        mag = spec.abs().clamp_min(1e-6)
-        angle = torch.atan2(imag, real)
-
-        mag_features = self.mag_branch(torch.log1p(mag).unsqueeze(1))
-        phase_features = self.phase_branch(torch.stack([torch.cos(angle), torch.sin(angle)], dim=1))
-
-        mag_mask = torch.sigmoid(self.mag_head(mag_features)).squeeze(1) * 2.0
-        delta_phase = torch.tanh(self.phase_head(phase_features)).squeeze(1) * (math.pi / 2.0)
-        gate = torch.sigmoid(self.gate_head(mag_features)).squeeze(1) if self.gate_head is not None else 1.0
-
-        clean_mag = mag * mag_mask * gate
-        clean_phase = angle + delta_phase
-        enhanced_spec = torch.polar(clean_mag, clean_phase)
-        return self._istft(enhanced_spec, length)
-
-
-class CMGANSmall(SpectralEnhancer):
-    def __init__(self, variant: str, spectral_native_gate: bool = False):
-        super().__init__()
-        cfg = {
-            "small": {"channels": 32, "heads": 4, "layers": 2},
-            "base": {"channels": 48, "heads": 6, "layers": 3},
-        }[variant]
-        channels = cfg["channels"]
-        self.encoder = nn.Sequential(
-            nn.Conv2d(3, channels, kernel_size=3, padding=1),
-            nn.GroupNorm(_group_count(channels), channels),
-            nn.SiLU(),
-            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
-            nn.GroupNorm(_group_count(channels), channels),
-            nn.SiLU(),
-        )
-        layer = nn.TransformerEncoderLayer(
-            d_model=channels,
-            nhead=cfg["heads"],
-            dim_feedforward=channels * 4,
-            dropout=0.1,
-            batch_first=True,
-        )
-        self.transformer = nn.TransformerEncoder(layer, num_layers=cfg["layers"])
-        self.mask_head = nn.Sequential(
-            nn.Conv2d(channels, channels, kernel_size=3, padding=1),
-            nn.GroupNorm(_group_count(channels), channels),
-            nn.SiLU(),
-            nn.Conv2d(channels, 2, kernel_size=1),
-        )
-        self.gate_head = nn.Conv2d(channels, 1, kernel_size=1) if spectral_native_gate else None
-
-    def forward(self, input: torch.Tensor) -> torch.Tensor:
-        length = input.shape[-1]
-        spec = self._stft(input)
-        feat = torch.stack([spec.real, spec.imag, spec.abs()], dim=1)
-        encoded = self.encoder(feat)
-        batch, channels, freq, frames = encoded.shape
-
-        seq = encoded.permute(0, 2, 3, 1).reshape(batch * freq, frames, channels)
-        seq = self.transformer(seq)
-        encoded = seq.reshape(batch, freq, frames, channels).permute(0, 3, 1, 2)
-
-        mask = self.mask_head(encoded)
-        enhanced_spec = self._apply_complex_mask(spec, mask)
-        if self.gate_head is not None:
-            gate = torch.sigmoid(self.gate_head(encoded)).squeeze(1)
-            enhanced_spec = torch.polar(enhanced_spec.abs() * gate, torch.angle(enhanced_spec))
-        return self._istft(enhanced_spec, length)
-
-
-def supports_spectral_native_gate(model_family: str) -> bool:
-    return model_family in {"fullsubnet_plus", "mp_senet", "cmgan_small"}
-
-
 def build_model(
     model_family: str,
     variant: str = "base",
@@ -943,22 +616,24 @@ def build_model(
         raise ValueError(f"Unsupported model variant: {variant}")
 
     model_family = model_family.lower()
-    if model_family == "atennuate":
-        if spectral_native_gate:
-            raise ValueError("aTENNuate does not support spectral-native gating.")
-        if aTENNuate is None:
-            raise ImportError("aTENNuate dependencies are not bundled in this standalone project.")
-        return AtennuateAdapter(variant)
-    if model_family == "fullsubnet_plus":
-        return FullSubNetPlus(variant, spectral_native_gate=spectral_native_gate)
-    if model_family == "mp_senet":
-        return MPSENet(variant, spectral_native_gate=spectral_native_gate)
-    if model_family == "cmgan_small":
-        return CMGANSmall(variant, spectral_native_gate=spectral_native_gate)
     if model_family == "metricgan_plus":
         if spectral_native_gate:
             raise ValueError("MetricGAN+ does not support spectral-native gating.")
         return MetricGANPlusAdapter(variant)
+    if model_family == "metricgan_plus_teacher_wb":
+        if spectral_native_gate:
+            raise ValueError("MetricGAN+ WB teacher does not support spectral-native gating.")
+        resolve_bandwidth("wb", sample_rate=sample_rate)
+        return build_metricgan_standalone(
+            sample_rate=sample_rate,
+            n_fft=n_fft,
+            hop_length=hop_length,
+            win_length=win_length,
+            variant=variant,
+            native8k=True,
+            init_from_pretrained=False,
+            arch_name=model_family,
+        )
     if model_family == "metricgan_plus_native8k":
         if spectral_native_gate:
             raise ValueError("MetricGAN+ native8k does not support spectral-native gating.")
@@ -972,6 +647,8 @@ def build_model(
             init_from_pretrained=False,
         )
     if model_family in {
+        "metricgan_plus_student_wb",
+        "metricgan_plus_student_nb",
         "metricgan_plus_native8k_causal_s",
         "metricgan_plus_native8k_causal_xs",
         "metricgan_plus_native8k_causal_n6",
@@ -979,6 +656,10 @@ def build_model(
     }:
         if spectral_native_gate:
             raise ValueError(f"{model_family} does not support spectral-native gating.")
+        if model_family == "metricgan_plus_student_wb":
+            resolve_bandwidth("wb", sample_rate=sample_rate)
+        elif model_family == "metricgan_plus_student_nb":
+            resolve_bandwidth("nb", sample_rate=sample_rate)
         return build_metricgan_causal_lite(
             sample_rate=sample_rate,
             n_fft=n_fft,
@@ -986,52 +667,6 @@ def build_model(
             win_length=win_length,
             family=model_family,
             qat=qat,
-        )
-    if model_family == "metricgan_plus_refiner":
-        if spectral_native_gate:
-            raise ValueError("MetricGAN+ refiner does not support spectral-native gating.")
-        return MetricGANPlusRefiner(variant)
-    if model_family == "tiny_stm32_fc":
-        if spectral_native_gate:
-            raise ValueError("tiny_stm32_fc does not support spectral-native gating.")
-        return TinySTM32FC(
-            variant,
-            erb_bands=erb_bands,
-            context_frames=context_frames,
-            guidance_classic="none",
-            qat=qat,
-            sample_rate=sample_rate,
-            n_fft=n_fft,
-            hop_length=hop_length,
-            win_length=win_length,
-        )
-    if model_family == "tiny_stm32_hybrid_sg":
-        if spectral_native_gate:
-            raise ValueError("tiny_stm32_hybrid_sg does not support spectral-native gating.")
-        return TinySTM32HybridSG(
-            variant,
-            erb_bands=erb_bands,
-            context_frames=context_frames,
-            guidance_classic=guidance_classic,
-            qat=qat,
-            sample_rate=sample_rate,
-            n_fft=n_fft,
-            hop_length=hop_length,
-            win_length=win_length,
-        )
-    if model_family == "tiny_stm32_tcn_hybrid":
-        if spectral_native_gate:
-            raise ValueError("tiny_stm32_tcn_hybrid does not support spectral-native gating.")
-        return TinySTM32TCNHybrid(
-            variant,
-            erb_bands=erb_bands,
-            context_frames=context_frames,
-            guidance_classic=guidance_classic,
-            qat=qat,
-            sample_rate=sample_rate,
-            n_fft=n_fft,
-            hop_length=hop_length,
-            win_length=win_length,
         )
     raise ValueError(f"Unsupported model family: {model_family}")
 
