@@ -1,0 +1,4 @@
+python=3.11.13
+torch=2.5.1+cu124
+device=cuda
+dataset=VoiceBank+DEMAND (external, read-only)

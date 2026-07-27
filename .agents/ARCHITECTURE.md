@@ -255,7 +255,7 @@ smoke-resume
   -> resume to the same final epoch
   -> compare LR, scheduler, patience, best/final model and history state
 smoke-teacher-calibration / calibrate-teacher
-  -> frozen promoted E0 teacher
+  -> frozen promoted E0 teacher from canonical true-length S0 v2
   -> disjoint current D-update and held-out calibration supports
   -> one current/history/current refresh; no generator update
   -> explicit calibration gate + predicted-versus-true plot
@@ -266,6 +266,7 @@ smoke-teacher / pilot-teacher
   -> true WB val_select teacher gate; never build C1 or train S1 here
 promote-baseline
   -> accept only an audited/promotable converged S0 closure
+  -> preserve corrective true-length evaluation provenance when present
   -> copy selected T0/S0-WB/S0-NB weights with SHA-256 verification
   -> retain aggregate metrics, student histories, plots and report
   -> replace machine paths with portable environment bindings

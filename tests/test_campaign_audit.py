@@ -428,6 +428,10 @@ class CampaignAuditTests(unittest.TestCase):
         self.assertEqual(contract["pesq_mode"], "wb")
         self.assertEqual(contract["sample_rate"], 16_000)
         self.assertEqual(contract["checkpoint_sha256"], sha256(checkpoint))
+        self.assertEqual(
+            contract["source_run_id"],
+            "20260727-converged-s0-baseline-v2",
+        )
 
     def test_teacher_gate_requires_metric_effect_and_calibrated_update(self) -> None:
         def cell(pesq: float, stoi: float, sisdr: float) -> dict[str, object]:

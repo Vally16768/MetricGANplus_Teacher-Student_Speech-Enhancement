@@ -1,0 +1,11 @@
+{
+  "campaign_scope": "official_teacher_students_converged_baseline",
+  "cell_count": 3,
+  "issues": [],
+  "model_count": 3,
+  "reported_sample_count": 0,
+  "run_id": "20260727-converged-s0-baseline-v2",
+  "schema_version": 1,
+  "valid": true,
+  "verification_only": false
+}

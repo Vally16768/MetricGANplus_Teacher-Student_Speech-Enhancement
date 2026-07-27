@@ -1,0 +1,1 @@
+METRICGAN_MANIFEST_ROOT=<voicebank-manifests> METRICGAN_RUN_ROOT=<desktop-local-runs> METRICGAN_SHARED_VENV=<desktop-shared-venv> python campaign.py run-baseline --run-id 20260727-official-baseline-full-s0-a1 && python campaign.py continue-students --source-run-dir <local-runs>/20260727-official-baseline-full-s0-a1 --run-id 20260727-official-students-cont50-s0-a1

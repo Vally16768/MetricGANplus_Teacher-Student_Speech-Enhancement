@@ -60,9 +60,10 @@ metric/reference profile matches the run profile
   models, 54 local report samples, zero independent-audit issues;
 - CUDA resume-equivalence A4: injected post-evaluation interruption; LR,
   patience, best state, selected-model hash and history equal to the control;
-- portable S0 package `20260727-converged-s0-baseline-v1`: canonical run
-  contract passed, complete artifact-manifest audit passed, no dataset/audio/
-  cache/replay/training-state artifact and zero privacy issues;
+- portable S0 package `20260727-converged-s0-baseline-v2`: exact v1 model
+  hashes re-evaluated per utterance at true length; canonical run contract,
+  complete artifact-manifest audit and privacy scan passed; no dataset/audio/
+  cache/replay/training-state artifact;
 - unit/integration suite: 56/56 passed after portable promotion and manifest
   tamper-detection coverage;
 - canonical research plan and project guard: passed with zero issues.

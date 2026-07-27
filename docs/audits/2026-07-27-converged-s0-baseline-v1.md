@@ -1,6 +1,11 @@
 # Converged S0 baseline promotion audit
 
-Evidence status: **reproduced and independently audited**.
+Evidence status: **historical, independently audited, superseded by v2 metrics**.
+
+The three selected model files and their hashes remain valid. The aggregate
+metrics below used padded batched inference and are retained only to document
+the correction. Cite
+`docs/audits/2026-07-27-converged-s0-baseline-v2.md` instead.
 
 The canonical package is
 `experiments/runs/20260727-converged-s0-baseline-v1`. It combines the pinned

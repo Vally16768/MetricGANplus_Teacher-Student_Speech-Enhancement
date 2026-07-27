@@ -1510,7 +1510,7 @@ def _frozen_e0_checkpoint() -> tuple[Path, dict[str, Any]]:
         REPO_ROOT
         / "experiments"
         / "runs"
-        / "20260727-converged-s0-baseline-v1"
+        / "20260727-converged-s0-baseline-v2"
     )
     summary = json.loads(
         (package_root / "metrics" / "campaign_summary.json").read_text(
@@ -3030,6 +3030,10 @@ def promote_converged_baseline(
             ],
         },
     }
+    if "corrective_evaluation" in source_summary:
+        portable_summary["corrective_evaluation"] = copy.deepcopy(
+            source_summary["corrective_evaluation"]
+        )
     _atomic_json(
         destination / "metrics" / "campaign_summary.json",
         portable_summary,
@@ -3126,6 +3130,10 @@ def promote_converged_baseline(
             "environment variables; no machine-local path is published."
         ),
     }
+    if "corrective_evaluation" in source_summary:
+        provenance["corrective_evaluation"] = copy.deepcopy(
+            source_summary["corrective_evaluation"]
+        )
     _atomic_json(
         destination / "provenance" / "provenance.json",
         provenance,

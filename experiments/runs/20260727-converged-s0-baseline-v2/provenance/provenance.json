@@ -1,0 +1,38 @@
+{
+  "campaign_scope": "official_teacher_students_converged_baseline",
+  "config_sha256": "d6989c259c51a43b75f66602e94964657405c21520f34c3a8b5dcc3d28ec9690",
+  "corrective_evaluation": {
+    "cause": "Variable-length bidirectional teacher inference previously treated right-padding as future context.",
+    "protocol": "per-utterance true-length inference",
+    "source_run_id": "20260727-converged-s0-baseline-v1",
+    "source_summary_sha256": "21467e04f0bcbcad846e770207534ce3dd50e3b410ab418ade48251c09a127d2"
+  },
+  "evidence_status": "reproduced",
+  "git_commit": "1770aa636f80042274e3181ae35f3e95f6aeb838",
+  "git_dirty": false,
+  "manifest_sha256": {
+    "test": "b74a2d9002d1a97a0c7f92d483d9c8840e2898d894222323d47f0aa630684e1d",
+    "train_fit": "5715037a664ecb6a7302393a8b973e8744261d95e9487af17c397cdd65642bf6",
+    "val_rank": "5d3df5fa11ca64186117620d07f0beeeac0563ba93cffc85bcba48f38ad62a9e",
+    "val_select": "328e86032d166dc68d01482658b4073f25624ba0d88071c1862c3e0e1ea68d23"
+  },
+  "path_binding": "Dataset, run-root and shared-venv paths are supplied through environment variables; no machine-local path is published.",
+  "promotion_git_commit": "1770aa636f80042274e3181ae35f3e95f6aeb838",
+  "promotion_git_dirty": false,
+  "run_id": "20260727-converged-s0-baseline-v2",
+  "schema_version": 1,
+  "seed": 0,
+  "selected_model_sha256": {
+    "S0-NB": "1b89e6b5931eb3a4bb63db7844ffe5e74486e9bf75b835342926776336d11491",
+    "S0-WB": "dc1d2d2171876fb5665bd447506e3371492a4619cc8f2749cbfca7292f1ca335",
+    "T0-WB-OFFICIAL": "5ece6fbd1ac16cca6df11ea724fb5e3710d6611049f54bbc8d126c79dbbc65d8"
+  },
+  "source_package": {
+    "audit_sha256": "83b6b4803891a80a6a5b433ff2f53f4ccaf95ae8b1df371f750e4e43aea9501e",
+    "run_id": "20260727-converged-s0-true-length-a1",
+    "summary_sha256": "30798985aaa44ec7efd7ce3b3f3845213b7fd802d950efe8ee360fea964b392f"
+  },
+  "sources": {},
+  "status": "audited",
+  "verification_only": false
+}

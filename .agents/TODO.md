@@ -18,7 +18,7 @@ Update this register whenever a gate changes state.
 | C11 | Run unit/integration suite | 39/39 tests passed, including official-teacher, failed-gate fallback and cache identity/FP16 contracts | passed |
 | C12 | Run GPU end-to-end smoke | stable post-cleanup `...-a5`: six cells, six models, 36/36 samples, zero audit issues | passed |
 | C13 | Run canonical full/pilot experiments | pilot passed; first full `...-a1` stopped during inadequate legacy WB student and is invalid; replacement rerun pending | failed |
-| C14 | Audit and promote only valid outputs | v1 published at `e6388d4` but corrective true-length evaluation is active after batch sensitivity was detected | in-progress |
+| C14 | Audit and promote only valid outputs | corrected v2 package built from exact v1 model hashes; final tests/commit/push pending | in-progress |
 | C15 | Remove legacy public surface after verified archive | authorized removal applied; recovery anchors `5129bae` + local archive | passed |
 | C16 | Final docs/privacy/scope audit | project guard passed with zero issues after authorized cleanup | passed |
 | C17 | Recover stronger MP-SENet-campaign student architecture | exact causal-max architecture traced; external sources read-only; mixed-dataset weights explicitly excluded | passed |
@@ -49,7 +49,7 @@ Update this register whenever a gate changes state.
 | C42 | Freeze the deferred teacher-improvement protocol | indexed canonical plan with E0/E1/E2 ablations, discriminator calibration gate, teacher promotion gate and separate TTS boundary | passed |
 | C43 | Track the ordered post-NB program iteratively | `.agents/EXECUTION_TODO.md` owns P1–P6 dependencies, evidence, one active item and next action; project skill enforces updates | passed |
 | C44 | Repair post-evaluation resume robustness | commit `5c48415`; 52/52 tests; real CUDA fault-injection A4 reconciled LR, patience, best state, selected hash and history | passed |
-| C45 | Make evaluation invariant to variable-length batch padding | per-utterance inference for recurrent teachers; re-evaluate/publish S0 v2 before teacher pilot | in-progress |
+| C45 | Make evaluation invariant to variable-length batch padding | true-length reevaluation audited with zero issues; v2 final tests/commit/push pending | in-progress |
 
 ## Execution rule
 

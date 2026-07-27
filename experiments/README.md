@@ -26,7 +26,8 @@ aici.
 
 | Run | Scope | Status |
 |---|---|---|
-| [`20260727-converged-s0-baseline-v1`](runs/20260727-converged-s0-baseline-v1/) | T0 oficial + S0-WB/S0-NB convergenți | valid, auditat |
+| [`20260727-converged-s0-baseline-v2`](runs/20260727-converged-s0-baseline-v2/) | T0 oficial + S0-WB/S0-NB convergenți; evaluare la lungimea reală | canonic, auditat |
+| [`20260727-converged-s0-baseline-v1`](runs/20260727-converged-s0-baseline-v1/) | aceleași modele, evaluare istorică sensibilă la padding | supersedat; nu se citează |
 
 `import_manifest.json` este inventarul complet al fișierelor publicate și le
 leagă de dimensiune și SHA-256. Orice modificare ulterioară este detectată de
