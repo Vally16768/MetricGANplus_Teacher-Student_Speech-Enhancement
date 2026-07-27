@@ -40,12 +40,12 @@ Update this register whenever a gate changes state.
 | C33 | Define the ordered three-phase program | phase 1 official T0→C0→S0; phase 2 metric-aware WB teacher gate; phase 3 C1→fresh S1 only after gate | passed |
 | C34 | Implement an official-baseline-only campaign | `smoke/pilot/run-baseline`; exactly T0, S0-WB, S0-NB; subset-aware report/audit | passed |
 | C35 | Validate baseline-only implementation | 46/46 tests; plan/guard pass; clean protocol metadata; A1 CUDA smoke audited 3/3 cells/models, 18/18 samples, zero issues and zero cached inputs | passed |
-| C36 | Run the full official baseline | launch `20260727-official-baseline-full-s0-a1` from clean commit; full frozen manifests, official FP16 cache, original 20-epoch S0 students; audit before continuation | in-progress |
+| C36 | Run the full official baseline | `...-a1` audited: 3/3 cells/models, 54/54 samples, zero issues; WB best epoch 20 and NB best epoch 18/stop 20 establish the continuation need | passed |
 | C37 | Improve the WB enhancement teacher with a metric discriminator | teacher-only trials; true PESQ-WB/STOI/SI-SDR gate; no S1 or full run before gate | blocked |
 | C38 | Retrain students from an accepted T1 teacher | new content-addressed C1; fresh S1-WB/S1-NB with S0-matched architecture/seed/schedule | blocked |
 | C39 | Evaluate the TTS metric-discriminator hypothesis separately | select TTS generator/data, recalibrate metric on synthesis outputs and keep claims/provenance outside enhancement campaign | blocked |
-| C40 | Replace the 20-epoch student ceiling | full max 50; plateau factor 0.5/patience 2/min LR 1e-6; early stop patience 8; config/architecture/tests | in-progress |
-| C41 | Continue ceiling-limited official students | immutable two-cell continuation from audited C36 states; preserve optimizer/scheduler/scaler/history; report/audit | blocked |
+| C40 | Replace the 20-epoch student ceiling | commit `330e501`; max 50, plateau factor 0.5/patience 2/min LR 1e-6, early stop patience 8; 48/48 tests and clean three-cell CUDA smoke with zero audit issues | passed |
+| C41 | Continue ceiling-limited official students | immutable two-cell continuation from audited C36 states; preserve optimizer/scheduler/scaler/history and source hashes; report/audit | in-progress |
 
 ## Execution rule
 

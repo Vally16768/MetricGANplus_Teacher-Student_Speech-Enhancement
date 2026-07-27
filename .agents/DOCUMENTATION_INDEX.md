@@ -30,6 +30,7 @@ status. Historical experiment directories are evidence, not canonical docs.
 | `docs/audits/2026-07-27-alternating-teacher-smoke-a2.md` | corrected clean-target alternating D/G GPU smoke, local replay and failed verification gate | active observed |
 | `docs/audits/2026-07-27-alternating-teacher-pilot-a1.md` | monitored alternating D/G pilot, current-output calibration failure and rejected T1 teacher | active observed |
 | `docs/audits/2026-07-27-official-baseline-smoke-a1.md` | three-cell official T0→C0→S0 CUDA smoke, cache isolation and subset audit | active observed |
+| `docs/audits/2026-07-27-official-baseline-full-a1.md` | audited full official baseline, bandwidth-matched metrics and 20-epoch convergence diagnosis | active observed |
 | `experiments/README.md` | experiment directory explanation | active, consolidate later |
 | `code_and_documentation/configs/research_plan_voicebank_wb_nb.yaml` | machine-independent canonical WB/NB campaign contract | canonical configuration, non-Markdown |
 

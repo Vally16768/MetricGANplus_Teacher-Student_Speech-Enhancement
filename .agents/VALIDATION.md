@@ -162,5 +162,12 @@ metric/reference profile matches the run profile
   contract, dynamic continuation audit, source state/model hashes and the
   historical baseline audit contracts.
 - canonical configuration validation, research-plan validation and the project
-  guard pass after the student schedule/resume change. A clean real-entry-point
-  CUDA smoke and the full continuation remain required before C40/C41 pass.
+  guard pass after the student schedule/resume change.
+- clean-snapshot real-entry-point CUDA smoke
+  `20260727-student50-policy-smoke-s0-a1` passed on commit `330e501`: exact
+  T0/S0-WB/S0-NB scope, 3/3 cells/models, 18/18 samples, matched WB/NB
+  protocols and zero independent-audit issues.
+- full baseline `20260727-official-baseline-full-s0-a1` passed its independent
+  package audit with 3/3 cells/models, 54/54 reported samples and zero issues.
+  WB selected its maximum epoch 20; NB selected epoch 18 but stopped at the
+  old maximum 20, so the immutable max-50 continuation is the open C41 gate.

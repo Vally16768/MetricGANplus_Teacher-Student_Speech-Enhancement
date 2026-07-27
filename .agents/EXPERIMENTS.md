@@ -75,6 +75,8 @@ experiments/runs/<run_id>/
 | `20260727-alternating-teacher-smoke-s0-a2` | smoke-passed/audited | clean commit `f5003ef`; corrected clean=1 target, current/history/current D refresh, local generated-only replay; 7 cells/models, 42/42 samples, zero issues; T0 fallback | no |
 | `20260727-alternating-teacher-pilot-s0-a1` | execution-passed/audited; T1 gate failed | clean commit `9ad2b85`; 7 cells/models, 84/84 samples, zero issues; T1 val PESQ +0.00221 was below gate and test PESQ was -0.02029; T0 fallback | no |
 | `20260727-official-baseline-smoke-s0-a1` | smoke-passed/audited | dirty-smoke implementation snapshot; exact three-cell T0→C0→S0 scope, no proxy/T1/S1, 3 models, 18/18 samples, zero cached inputs and zero audit issues | no |
+| `20260727-official-baseline-full-s0-a1` | execution-passed/audited; students ceiling-limited | clean commit `357c1df`; 3/3 cells/models, 54/54 samples, zero issues; WB best epoch 20/20, NB best epoch 18/20; immutable max-50 continuation required | no |
+| `20260727-student50-policy-smoke-s0-a1` | smoke-passed/audited | clean commit `330e501`; 3/3 cells/models, 18/18 samples, matched protocols and zero issues; verifies the max-50/scheduler/early-stop implementation path | no |
 
 There is currently no promoted end-to-end run from the current repository
 snapshot.
@@ -185,6 +187,13 @@ treated as converged or promoted as the final student baseline.
 audited official baseline. It preserves source state/model hashes and restores
 the complete optimizer, scheduler, AMP scaler, history and best-score state.
 WB and NB remain separate metric protocols throughout the continuation.
+
+The audited full baseline confirms why this policy is required. `S0-WB`
+selected epoch 20/20 with `val_select` PESQ-WB 2.596915. `S0-NB` selected
+epoch 18 and stopped at 20 with `val_select` PESQ-NB 3.192184. The former is
+unambiguously ceiling-limited, while the latter did not receive enough
+post-best validation checks to satisfy the new early-stopping contract. See
+`docs/audits/2026-07-27-official-baseline-full-a1.md`.
 
 The TTS extension is a separate future campaign. It may reuse the objective
 adapter but requires a selected TTS generator, its own outputs, a recalibrated
