@@ -65,6 +65,9 @@ experiments/runs/<run_id>/
 | `20260727-pilot-wbnb-s0-a1` | pilot-passed/audited | clean commit `76729f3`; six cells, six models, 72/72 samples, frozen manifests unchanged, zero audit issues; verification-only | no |
 | `20260727-full-wbnb-s0-a1` | stopped-by-user/invalid | clean commit `4fee1e3`; teacher/proxies/cache completed; stopped during epoch 14 validation of inadequate 96x1 `S-WB-BASE`; all 9.4 GiB preserved locally | no |
 | official MetricGAN+ checkpoint diagnostic | observed/non-promotable | pinned revision and checkpoint hash; exact full test PESQ-WB 3.1225 on 824 pairs with the SpeechBrain adapter; exact local generator reconstruction passed four-row CUDA diagnostic | no |
+| `20260727-official-two-stage-smoke-s0-a1` | superseded smoke | seven-cell graph passed, but failed gate used an ambiguous T1 downstream label | no |
+| `20260727-official-two-stage-smoke-s0-a2` | superseded smoke | corrected T0 fallback and audited 7/7 cells, but identical stage-labeled caches were duplicated | no |
+| `20260727-official-two-stage-smoke-s0-a3` | smoke-passed/audited | clean commit `8d36d62`; 7 cells/models, 42/42 samples, T0 fallback, one deduplicated FP16 cache, zero issues | no |
 
 There is currently no promoted end-to-end run from the current repository
 snapshot.

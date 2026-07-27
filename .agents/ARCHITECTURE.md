@@ -1,6 +1,6 @@
 # Architecture register
 
-Status: `official-teacher-two-stage-flow-in-validation`; no full run is promoted.
+Status: `official-teacher-two-stage-smoke-passed`; no full run is promoted.
 
 ## A0 — End-to-end research pipeline
 
@@ -211,6 +211,9 @@ Evidence:
   student; preserved and non-promotable).
 - official-checkpoint diagnostic: 21/21 tensors loaded, 1,895,514 parameters,
   PESQ-WB 3.3407 on the four-row frozen smoke test support.
+- final two-stage smoke:
+  `20260727-official-two-stage-smoke-s0-a3` (seven cells/models, 42 samples,
+  failed-gate T0 fallback, one deduplicated cache, audit zero issues).
 
 ## A6 — Selection boundaries
 

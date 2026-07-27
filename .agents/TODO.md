@@ -23,14 +23,14 @@ Update this register whenever a gate changes state.
 | C16 | Final docs/privacy/scope audit | project guard passed with zero issues after authorized cleanup | passed |
 | C17 | Recover stronger MP-SENet-campaign student architecture | exact causal-max architecture traced; external sources read-only; mixed-dataset weights explicitly excluded | passed |
 | C18 | Implement causal-max aliases for WB/NB | new names preserve 96x1 checkpoint semantics; configs and research plan updated | passed |
-| C19 | Validate causal-max architecture | 39/39 tests and direct WB/NB CUDA backward passed; end-to-end two-stage smoke/audit pending | in-progress |
+| C19 | Validate causal-max architecture | 39/39 tests, direct WB/NB CUDA backward and seven-cell A3 smoke/audit passed | passed |
 | C20 | Rerun pilot/full with causal-max students | only after clean committed two-stage smoke passes; compare S1 versus S0 within profile | blocked |
 | C21 | Explain low teacher PESQ against the original implementation | simplified 10-epoch teacher/frontend/loss mismatch isolated; official primary sources and checkpoint inspected | passed |
 | C22 | Import the official MetricGAN+ WB teacher reproducibly | pinned revision/SHA-256; exact 512/256/512 Hamming log-magnitude frontend; 21/21 tensors; offline checkpoint round-trip | passed |
 | C23 | Implement the two-stage teacher-effect campaign | T0 official → C0 → S0 WB/NB → T1 control/metric gate → C1 → fresh S1 WB/NB; seven-cell report/audit | passed |
 | C24 | Validate local persistent teacher caches | Desktop-local, content-addressed, FP16 teacher outputs, no noisy/clean duplication, resume and quantization tests | passed |
-| C25 | Run two-stage GPU smoke and independent audit | unique ignored run; seven cells; profile metadata, teacher gate, caches, models and report reconcile | in-progress |
-| C26 | Run monitored pilot then full campaign | clean committed source only; full requires positive teacher PESQ gate and guardrails | blocked |
+| C25 | Run two-stage GPU smoke and independent audit | A3: clean commit; 7 cells/models, 42/42 samples, cache dedup, zero audit issues; verification-only | passed |
+| C26 | Run monitored pilot then full campaign | pilot is next on a clean committed source; full requires positive teacher PESQ gate and guardrails | in-progress |
 
 ## Execution rule
 

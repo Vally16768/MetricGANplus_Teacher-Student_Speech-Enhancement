@@ -17,7 +17,7 @@ Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
 
 Current release state: **official teacher and two-stage causal-max campaign
-implemented; seven-cell GPU smoke pending**.
+passed its clean-snapshot seven-cell smoke; monitored pilot pending**.
 
 Open blockers:
 
@@ -25,7 +25,8 @@ Open blockers:
   reconstructed.
 - The old six-cell pilot remains non-promotable and does not validate the new
   official-teacher/two-stage graph.
-- The pinned official teacher and local reconstruction pass structure,
-  checkpoint and bounded CUDA metric diagnostics; the full seven-cell graph
-  still requires a clean-snapshot smoke and audit.
+- The pinned official teacher, local reconstruction and full seven-cell graph
+  pass structure, checkpoint, CUDA smoke and independent package audit gates.
+- The clean smoke intentionally rejected one-epoch T1 changes; larger pilot
+  proxy calibration and teacher validation remain required.
 - There is no promoted end-to-end run produced from the current clean snapshot.

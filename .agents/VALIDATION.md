@@ -99,5 +99,11 @@ metric/reference profile matches the run profile
   candidate but feed `T0-WB-OFFICIAL` downstream.
 - direct two-second WB and NB forward/backward passes completed on the shared
   venv's NVIDIA GTX 1660 Ti with finite gradients.
-- a new end-to-end seven-cell two-stage smoke and independent audit remain
-  required before the next pilot/full gate.
+- clean-snapshot two-stage smoke A3 passed on commit `8d36d62`: seven cells,
+  seven hashed models, 42/42 sample files, zero audit issues and unchanged
+  manifest hashes.
+- the smoke correctly rejected both one-epoch T1 branches, retained
+  `T0-WB-OFFICIAL` downstream and remained non-promotable.
+- S0/S1 reused one physical 2.9 MiB cache when the teacher checkpoint was
+  unchanged; the cache recorded both stage labels and no dataset audio copies.
+- the next required gate is the monitored clean-snapshot pilot.
