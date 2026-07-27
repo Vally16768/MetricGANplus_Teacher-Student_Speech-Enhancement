@@ -1,0 +1,188 @@
+# Iterative execution TODO
+
+Status: **active**  
+Last evidence update: **2026-07-27**  
+Current phase: **P1 — close the converged S0 baseline**  
+Next action: **P1.5 — build the merged epoch-20 versus converged report**
+
+This is the detailed execution board for the active research sequence. The
+campaign-wide summary remains `.agents/TODO.md`; this file owns the subtask
+state, dependencies, evidence and next action for P1–P6.
+
+## Agent operating rule
+
+At the start of every project iteration:
+
+1. read this file and inspect the evidence for the single `in-progress` item;
+2. reconcile that state with the filesystem, active process and immutable run
+   records;
+3. execute only the first unblocked item;
+4. attach concrete evidence before changing an item to `passed` or `failed`;
+5. update `Current phase`, `Next action`, the progress log and
+   `.agents/TODO.md`;
+6. leave at most one item `in-progress`;
+7. never skip a failed or blocked gate by relabeling partial evidence.
+
+Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
+`not-applicable`.
+
+## Dependency chain
+
+```text
+P1 close/audit S0
+-> P2 repair and validate resume
+-> P3 sanitize/promote S0
+-> P4 teacher-only T1
+-> teacher gate
+   | fail -> stop and report
+   | pass -> P5 C1 + fresh S1-WB/S1-NB
+-> P6 final comparison/report/audit
+
+TTS remains parked in a separate future campaign.
+```
+
+## P1 — Close and audit the converged S0 baseline
+
+Gate: the merged T0→C0→S0 package must reconcile the original epoch-20 run
+with its immutable continuation and establish the selected WB/NB checkpoints.
+
+| ID | Item | Required evidence | Status |
+|---|---|---|---|
+| P1.1 | Confirm continuation completion | no active process; run status `audited`; two cells; `valid_for_promotion=true` | passed |
+| P1.2 | Evaluate NB on all frozen splits | `val_select`, `val_rank`, test; NB/8 kHz reference; PESQ-NB metadata and support | passed |
+| P1.3 | Verify both selected models and training states | model/training-state hashes, ancestry, selected/best/stop epochs, scheduler/early-stop record | passed |
+| P1.4 | Compare epoch 20 with converged checkpoints | same split/protocol comparison; no cross-band score comparison | passed |
+| P1.5 | Build merged baseline report, tables and plots | T0/S0-WB/S0-NB metrics, 20→converged deltas, curves, support, limitations | in-progress |
+| P1.6 | Run independent merged-package audit | zero unresolved issues; paths and public/private boundaries reconciled | pending |
+| P1.7 | Decide baseline closure gate | valid or failed with cause; update C14/C41 and this board | pending |
+
+Observed immutable continuation evidence:
+
+| Cell | Epoch-20 best | Converged best | Delta | Stop | Interpretation |
+|---|---:|---:|---:|---:|---|
+| S0-WB / PESQ-WB | 2.596915 @ 20 | 2.602952 @ 34 | +0.006037 | 42 | early stopping; not ceiling-limited |
+| S0-NB / PESQ-NB | 3.192184 @ 18 | 3.216751 @ 41 | +0.024567 | 49 | early stopping; not ceiling-limited |
+
+Final continuation metrics already present:
+
+| Cell | `val_select` | `val_rank` | test | Protocol |
+|---|---:|---:|---:|---|
+| S0-WB | 2.602952 | 2.598257 | 3.051937 | WB reference, PESQ-WB |
+| S0-NB | 3.216751 | 3.198166 | 3.615061 | NB reference, PESQ-NB |
+
+Selected artifact hashes:
+
+| Artifact | SHA-256 |
+|---|---|
+| S0-WB model | `dc1d2d2171876fb5665bd447506e3371492a4619cc8f2749cbfca7292f1ca335` |
+| S0-NB model | `1b89e6b5931eb3a4bb63db7844ffe5e74486e9bf75b835342926776336d11491` |
+| S0-WB training state | `64dd420df96b0a05d51a6ab923da2e5d3228d28686cb91c3db4155fb27601a36` |
+| S0-NB training state | `dd74c67625b374d2f8fe0d56f3e32cf74b6b4f5bcae959c64ebceffb3d85d592` |
+
+Continuation evidence root:
+`local/runs/20260727-official-students-cont50-s0-a1` (private/ignored).
+Its existing two-cell audit reports zero issues, two models and 36 report
+samples. P1.6 still requires the merged baseline/continuation closure audit,
+not merely reuse of that two-cell audit.
+
+Ceiling rule: if a future NB best occurs at the configured maximum epoch, mark
+it `ceiling-limited`, do not claim convergence and do not extend the ceiling
+without a separate analysis and decision. The current NB best is epoch 41 and
+stopped at 49 through early stopping, so this rule is not triggered.
+
+## P2 — Repair resume robustness
+
+Gate: interrupted and uninterrupted training must produce identical
+post-evaluation control state and selected checkpoint under a deterministic
+fixture.
+
+This repair does not invalidate the completed S0 continuation because that run
+finished normally.
+
+| ID | Item | Required evidence | Status |
+|---|---|---|---|
+| P2.1 | Reproduce and localize the resume-state defect | focused failing test or state-order trace | blocked |
+| P2.2 | Save scheduler and early-stopping state after every evaluation | minimal training-loop change; architecture/training docs updated | blocked |
+| P2.3 | Add interrupt/resume equivalence test | LR, bad-epoch/patience count, best epoch/score/hash and next action match uninterrupted control | blocked |
+| P2.4 | Run focused and full unit suites | all tests pass in shared venv | blocked |
+| P2.5 | Run project guard and canonical config validation | zero guard issues; plan/config validation passes | blocked |
+| P2.6 | Run clean real-entry-point CUDA resume smoke | interrupted/resumed package reconciles; no dataset mutation | blocked |
+| P2.7 | Commit and push verified repair | clean snapshot and recorded commit | blocked |
+
+Unblock condition: P1.7 passes or records a closure decision.
+
+## P3 — Sanitize and promote the valid S0 baseline
+
+Gate: only selected, audited and portable artifacts enter Git.
+
+| ID | Item | Required evidence | Status |
+|---|---|---|---|
+| P3.1 | Build the promotion inventory | selected WB/NB weights, metrics, plots, config, report and hashes only | blocked |
+| P3.2 | Sanitize public provenance | no personal path, username, host, mount, dataset location or server logic | blocked |
+| P3.3 | Verify exclusions | no dataset, teacher cache, generated audio, replay or regenerable bulk | blocked |
+| P3.4 | Validate promoted run contract | canonical run validation and independent metric/artifact reconciliation | blocked |
+| P3.5 | Update `.agents`, README and documentation index | no stale baseline claims or duplicated source of truth | blocked |
+| P3.6 | Run tests and project guard | required gates pass from the promotion snapshot | blocked |
+| P3.7 | Commit and push baseline release | public commit/hash recorded; Git worktree clean | blocked |
+
+Unblock condition: P1 and P2 pass.
+
+## P4 — Teacher-only T1 improvement
+
+Detailed method: `.agents/TEACHER_IMPROVEMENT_PLAN.md`.
+
+Gate: T1 must improve true `val_select` PESQ-WB by at least `+0.01`, with
+STOI loss at most `0.002` and SI-SDR loss at most `0.25 dB`. Test is
+reporting-only.
+
+| ID | Item | Required evidence | Status |
+|---|---|---|---|
+| P4.1 | Freeze E0 official-teacher reference | official checkpoint ancestry and WB protocol | blocked |
+| P4.2 | Implement calibration-only teacher command | no G update; at least 100 current outputs/refresh | blocked |
+| P4.3 | Implement calibration guard | held-out current-output MAE/correlation/range; failed guard skips G | blocked |
+| P4.4 | Complete resume-state tests for G/D loop | G, D, optimizers, scheduler, patience, replay and history restore | blocked |
+| P4.5 | Run unit/integration tests and project guard | all required gates pass | blocked |
+| P4.6 | Run clean CUDA smoke | current/history/current, clean=1, true noisy/enhanced PESQ, local replay observed | blocked |
+| P4.7 | Run monitored teacher-only pilot | E0/E1/E2, immutable run, no cache/S1 | blocked |
+| P4.8 | Audit teacher gate | true metrics and calibration reconcile independently | blocked |
+| P4.9 | Record gate decision | pass selects T1; fail stops downstream work | blocked |
+
+Unblock condition: P3.7 passes.
+
+## P5 — Build C1 and train fresh S1 students
+
+Run only if P4.9 passes.
+
+| ID | Item | Required evidence | Status |
+|---|---|---|---|
+| P5.1 | Build content-addressed C1 | accepted T1 hash; frozen manifest; Desktop-local FP16; no input audio copies | blocked |
+| P5.2 | Train S1-WB from zero | S0-matched architecture, seed and max-50/plateau/early-stop policy | blocked |
+| P5.3 | Train S1-NB from zero | same controlled policy; NB reference and PESQ-NB | blocked |
+| P5.4 | Apply convergence rule | ceiling-limited handling without automatic extension | blocked |
+| P5.5 | Audit C1/S1 package | ancestry, hashes, histories, support and bandwidth protocols reconcile | blocked |
+
+Unblock condition: accepted T1 teacher.
+
+## P6 — Final comparison and research report
+
+| ID | Item | Required evidence | Status |
+|---|---|---|---|
+| P6.1 | Compare T1−T0 | WB true metrics with uncertainty and fixed support | blocked |
+| P6.2 | Compare S1-WB−S0-WB | PESQ-WB and WB guard metrics | blocked |
+| P6.3 | Compare S1-NB−S0-NB | PESQ-NB and NB guard metrics | blocked |
+| P6.4 | Generate final tables/figures/report | claim-to-artifact traceability | blocked |
+| P6.5 | Run independent promotion audit | zero unresolved issues or explicit failed result | blocked |
+| P6.6 | Commit and push final accepted evidence | sanitized canonical package only | blocked |
+
+## Parked — TTS metric-critic study
+
+The TTS direction is not part of P1–P6. It starts only after the enhancement
+line is stable and audited, with a separate generator, dataset, discriminator
+calibration, evaluation protocol, provenance and claim set.
+
+## Progress log
+
+| Date | Change | Evidence | Next action |
+|---|---|---|---|
+| 2026-07-27 | Created the iterative board after NB completion | continuation status `audited`; audit zero issues; WB best 34/stop 42; NB best 41/stop 49 | P1.5 merged baseline report |
+| 2026-07-27 | Bound the board to the project skill and validated the control plane | skill validator passed; 48/48 tests passed; project guard reported 0 issues | P1.5 merged baseline report |

@@ -12,28 +12,23 @@ This directory is the canonical control plane for the research project.
 | [ACADEMIC.md](ACADEMIC.md) | Evidence language, reporting and article-ready outputs | claims, reports, publication |
 | [DECISIONS.md](DECISIONS.md) | Decisions and their causes | before changing project policy |
 | [TODO.md](TODO.md) | Ordered cleanup/implementation/experiment gates | every active campaign task |
+| [EXECUTION_TODO.md](EXECUTION_TODO.md) | Detailed P1–P6 execution board, dependencies, evidence and next action | at the start and end of every project iteration |
 | [TEACHER_IMPROVEMENT_PLAN.md](TEACHER_IMPROVEMENT_PLAN.md) | Deferred calibration-first T1 plan and separate TTS-transfer protocol | after S0 completion, before C32/C37 implementation |
 
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
 
-Current release state: **the official T0 teacher is pinned and validated; an
-independent three-cell T0→C0→S0 baseline phase is being prepared before any
-new teacher modification. Earlier T1 formulations failed the PESQ gate**.
+Current release state: **the official T0 teacher is pinned; the max-50 S0-WB
+and S0-NB continuation completed through early stopping and its two-cell
+package audit has zero issues. The merged epoch-20→converged baseline report,
+resume repair and promotion remain ahead of any new teacher modification**.
 
 Open blockers:
 
-- Historical experiment validity and checkpoint ancestry are not yet fully
-  reconstructed.
-- The old six-cell pilot remains non-promotable and does not validate the new
-  official-teacher/two-stage graph.
-- The pinned official teacher, local reconstruction and full seven-cell graph
-  pass structure, checkpoint, CUDA smoke and independent package audit gates.
-- The clean pilot calibrated the frozen WB proxy well, but both T1 branches
-  reduced true `val_select` PESQ and were restored to the official checkpoint.
-- The bounded target-score/T0-anchor pilot was stable but still negative; the
-  next branch must refresh its discriminator on current/noisy/historical
-  outputs as in MetricGAN+.
-- There is no promoted end-to-end run produced from the current clean snapshot.
-- The official full baseline must complete before the next teacher-only metric
-  trial and before any S1 retraining.
+- The original epoch-20 baseline and immutable continuation still need one
+  merged report and independent closure audit.
+- The post-evaluation scheduler/early-stopping resume state needs a deterministic
+  interrupt/resume repair and CUDA smoke before the next experiment.
+- There is no promoted, sanitized S0 baseline package yet.
+- Teacher-only T1 remains blocked until S0 promotion; S1 remains blocked until
+  the true-metric teacher gate passes.

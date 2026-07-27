@@ -8,9 +8,10 @@ or publication material.
 Before acting:
 
 1. Read `.agents/INDEX.md`.
-2. Read the task-specific canonical registers linked there.
-3. Inspect the worktree without cleaning, resetting, deleting, or normalizing it.
-4. Keep MetricGAN+ teacher–student in scope; MP-SENet is a separate project.
+2. Read `.agents/EXECUTION_TODO.md` and reconcile its active item with evidence.
+3. Read the task-specific canonical registers linked from the index.
+4. Inspect the worktree without cleaning, resetting, deleting, or normalizing it.
+5. Keep MetricGAN+ teacher–student in scope; MP-SENet is a separate project.
 
 Non-negotiable rules:
 
@@ -33,4 +34,6 @@ Non-negotiable rules:
 - Only promoted, valid end-to-end runs belong in the canonical experiment set.
   Failed or superseded runs may leave a concise audit lesson, not ambiguous
   models and duplicated outputs.
+- Keep at most one detailed execution item `in-progress`; update its evidence,
+  next action and progress log after every material iteration.
 - Do not commit or push without explicit user authorization.

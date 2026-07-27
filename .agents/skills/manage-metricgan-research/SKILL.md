@@ -1,6 +1,6 @@
 ---
 name: manage-metricgan-research
-description: Govern the MetricGAN+ teacher–student speech-enhancement repository as a clean, reproducible academic project. Use for any project discovery, architecture or pipeline change, data/split configuration, code edit, test, audit, experiment planning or training, metric/plot/model management, historical-result cleanup, README/documentation maintenance, provenance validation, result promotion, or article preparation in this repository.
+description: Govern and iteratively execute the MetricGAN+ teacher–student speech-enhancement repository as a clean, reproducible academic project. Use for project discovery, progress checks, TODO tracking, architecture or pipeline changes, data/split configuration, code edits, tests, audits, experiment planning or training, metric/plot/model management, cleanup, documentation, provenance validation, result promotion, or article preparation in this repository.
 ---
 
 # Manage MetricGAN+ Research
@@ -12,11 +12,14 @@ read-only input.
 
 1. Locate the repository root.
 2. Read `AGENTS.md` and `.agents/INDEX.md`.
-3. Read only the task-specific registers linked by the index.
+3. Read `.agents/EXECUTION_TODO.md`, then only the other task-specific
+   registers linked by the index.
 4. Inspect Git state, affected files and existing evidence without cleaning or
    normalizing the worktree.
 5. State the intended block, experiment or document and its cause.
-6. Read and update `.agents/TODO.md` for campaign-wide work. Never mark a gate
+6. Reconcile the single active item in `.agents/EXECUTION_TODO.md` with
+   processes and immutable evidence. Update it after every material iteration.
+7. Synchronize campaign-wide status in `.agents/TODO.md`. Never mark a gate
    passed from plans or code presence alone; attach the required evidence.
 
 Read [references/contracts.md](references/contracts.md) for artifact, run and
@@ -49,8 +52,25 @@ the workflow matching the task.
 - Preserve historical evidence until cleanup is verified; never silently edit
   it to appear portable.
 
-Run `scripts/project_guard.py --repo <repo>` before proposing publication,
-commit or push. Treat every error as a blocker, not as a cosmetic warning.
+Run
+`.agents/skills/manage-metricgan-research/scripts/project_guard.py --repo <repo>`
+before proposing publication, commit or push. Treat every error as a blocker,
+not as a cosmetic warning.
+
+## Execute the iterative board
+
+- Treat `.agents/EXECUTION_TODO.md` as the detailed source of truth for the
+  active P1–P6 sequence; `.agents/TODO.md` remains the campaign summary.
+- Keep at most one subtask `in-progress` and name one concrete `Next action`.
+- Execute the first unblocked dependency only. Do not start T1 before the S0
+  baseline is audited, resume robustness passes and the baseline is promoted.
+- At each progress check, inspect the process and run artifacts before editing
+  status. Absence of a process is not proof of successful completion.
+- Record run ID, evidence path or artifact hash for every passed gate.
+- When a task fails, preserve its cause and set downstream tasks to `blocked`;
+  never silently advance the next phase.
+- End each material iteration by updating the board header and progress log,
+  even when the result is a controlled failure or no state change.
 
 ## Change code or configuration
 
@@ -132,7 +152,8 @@ Use `campaign.py monitor-run --run-dir <run-dir>` throughout pilot/full
 execution. Reconcile the active campaign stage with the current cell epoch,
 metrics and generated files before allowing the next gate.
 
-For multi-stage campaign requests, maintain these gates in `.agents/TODO.md`:
+For multi-stage campaign requests, maintain these gates in
+`.agents/EXECUTION_TODO.md` and synchronize the summary in `.agents/TODO.md`:
 
 ```text
 audit -> local manifest binding -> canonical flow implementation

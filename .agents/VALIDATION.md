@@ -169,5 +169,10 @@ metric/reference profile matches the run profile
   protocols and zero independent-audit issues.
 - full baseline `20260727-official-baseline-full-s0-a1` passed its independent
   package audit with 3/3 cells/models, 54/54 reported samples and zero issues.
-  WB selected its maximum epoch 20; NB selected epoch 18 but stopped at the
-  old maximum 20, so the immutable max-50 continuation is the open C41 gate.
+- immutable continuation `20260727-official-students-cont50-s0-a1` completed
+  and audited with 2/2 cells/models, 36 report samples and zero issues. WB
+  selected epoch 34 and early-stopped at 42; NB selected epoch 41 and
+  early-stopped at 49. Neither is ceiling-limited.
+- the updated project skill and iterative execution board pass the skill
+  validator, 48/48 unit/integration tests and the project guard with zero
+  issues. The merged baseline/continuation report is the next active gate.

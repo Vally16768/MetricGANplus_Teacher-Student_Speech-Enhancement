@@ -4,9 +4,10 @@ Status: **planned; not active**.
 
 Owner: the MetricGAN+ research campaign.
 
-Activation gate: start only after `C41` (the WB/NB S0 continuation) has
-finished and its package has been independently audited. This plan does not
-authorize changes to, or replacement of, the active S0 run.
+Activation gate: start only after P1–P3 in `.agents/EXECUTION_TODO.md` pass:
+the WB/NB S0 continuation is merged and audited, resume robustness is repaired,
+and the sanitized baseline is promoted. This plan does not retroactively alter
+or replace S0 evidence.
 
 ## Research questions
 
@@ -246,4 +247,3 @@ C41 completion and audit
 - MetricGAN+/-: <https://arxiv.org/abs/2203.12369>
 - HiFi-GAN: <https://arxiv.org/abs/2010.05646>
 - VITS: <https://arxiv.org/abs/2106.06103>
-
