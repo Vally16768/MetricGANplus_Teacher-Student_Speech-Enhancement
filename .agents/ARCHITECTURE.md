@@ -190,9 +190,10 @@ monitor-run / audit-run
 snapshot. Smoke and pilot are marked `verification_only` and cannot be
 promoted. All training nodes enforce the shared venv and CUDA contract.
 Generated files live below the configured run root, never below the dataset
-root. Teacher caches are content-addressed by teacher checkpoint and training
-manifest, remain in the Desktop-local ignored runtime area, store teacher
-waveforms/masks as FP16 and do not duplicate noisy/clean dataset audio.
+root. Teacher caches are content-addressed by teacher checkpoint, training
+manifest and cache-contract hashes, remain in the Desktop-local ignored runtime
+area, store teacher waveforms/masks as FP16 and do not duplicate noisy/clean
+dataset audio. Stage labels do not duplicate identical cache content.
 
 Evidence:
 

@@ -67,7 +67,8 @@ refuză CPU și un mediu diferit de venv-ul shared; validarea read-only, testele
 
 Output-urile teacher-ului sunt memorate într-un cache persistent, ignorat de
 Git și aflat local pe Desktop. Cache-ul este identificat prin hash-urile
-checkpoint-ului și manifestului, păstrează în FP16 numai waveform-ul teacher și
+checkpoint-ului, manifestului și contractului de stocare; etichetele etapelor
+nu dublează același conținut. Păstrează în FP16 numai waveform-ul teacher și
 masca ERB și nu copiază fișierele noisy/clean din dataset.
 
 Controlerul canonic este `campaign.py`:

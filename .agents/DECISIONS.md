@@ -129,9 +129,10 @@ only to the teacher upgrade.
 ## D-015 — Persist only regenerable teacher targets in local FP16 caches
 
 Decision: teacher caches live only in the ignored Desktop-local runtime area,
-are keyed by teacher-checkpoint and training-manifest hashes, store teacher
-waveforms and ERB masks in FP16, and leave noisy/clean cache fields empty so
-the loader reads the external VoiceBank+DEMAND inputs.
+are keyed by teacher-checkpoint, training-manifest and cache-contract hashes,
+store teacher waveforms and ERB masks in FP16, and leave noisy/clean cache
+fields empty so the loader reads the external VoiceBank+DEMAND inputs. Stage
+labels are metadata and cannot create duplicate content for the same identity.
 
 Cause: caching avoids repeated teacher inference while preventing duplicated
 dataset audio, Kingston writes and avoidable disk use. Cache precision is

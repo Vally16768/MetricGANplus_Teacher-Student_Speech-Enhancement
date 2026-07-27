@@ -482,6 +482,32 @@ def _run_cell(**kwargs: Any) -> dict[str, Any]:
         raise
 
 
+def _teacher_cache_identity(
+    *,
+    checkpoint_hash: str,
+    manifest_hash: str,
+    cache_config: dict[str, Any],
+) -> tuple[str, dict[str, Any]]:
+    contract = {
+        "schema_version": 1,
+        "teacher_sample_rate": 16_000,
+        "targets": {
+            "wb": {"sample_rate": 16_000, "erb_bands": 32},
+            "nb": {"sample_rate": 8_000, "erb_bands": 32},
+        },
+        "cache_inputs": bool(cache_config["cache_inputs"]),
+        "storage_dtype": str(cache_config["storage_dtype"]),
+    }
+    contract_hash = hashlib.sha256(
+        json.dumps(contract, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    key = (
+        f"teacher-{checkpoint_hash[:16]}-{manifest_hash[:16]}-"
+        f"{contract_hash[:8]}"
+    )
+    return key, contract
+
+
 def _build_cache(
     config: dict[str, Any],
     *,
@@ -500,11 +526,15 @@ def _build_cache(
         effective = _effective_training(config, mode)
         checkpoint_hash = sha256(teacher_checkpoint)
         manifest_hash = sha256(str(config["dataset"]["train_fit"]))
-        cache_key = f"{checkpoint_hash[:16]}-{manifest_hash[:16]}"
         cache_config = dict(config["teacher_cache"])
+        cache_key, cache_contract = _teacher_cache_identity(
+            checkpoint_hash=checkpoint_hash,
+            manifest_hash=manifest_hash,
+            cache_config=cache_config,
+        )
         cache_root = (
             Path(str(cache_config["root"])).expanduser().resolve()
-            / f"{cache_label}-{cache_key}"
+            / cache_key
         )
         result = build_multi_target_teacher_cache(
             str(config["dataset"]["train_fit"]),
@@ -527,23 +557,25 @@ def _build_cache(
             cache_inputs=bool(cache_config["cache_inputs"]),
             storage_dtype=str(cache_config["storage_dtype"]),
         )
+        existing_metadata_path = cache_root / "cache_metadata.json"
+        existing_metadata = (
+            json.loads(existing_metadata_path.read_text(encoding="utf-8"))
+            if existing_metadata_path.is_file()
+            else {}
+        )
+        cache_labels = sorted(
+            set(existing_metadata.get("cache_labels") or []) | {cache_label}
+        )
         metadata = {
-            "schema_version": 1,
-            "cache_label": cache_label,
+            **cache_contract,
+            "cache_labels": cache_labels,
             "cache_key": cache_key,
             "teacher_checkpoint_sha256": checkpoint_hash,
             "train_manifest_sha256": manifest_hash,
-            "teacher_sample_rate": 16_000,
-            "targets": {
-                "wb": {"sample_rate": 16_000, "erb_bands": 32},
-                "nb": {"sample_rate": 8_000, "erb_bands": 32},
-            },
-            "cache_inputs": bool(cache_config["cache_inputs"]),
-            "storage_dtype": str(cache_config["storage_dtype"]),
             "manifests": result,
             "status": "complete",
         }
-        _atomic_json(cache_root / "cache_metadata.json", metadata)
+        _atomic_json(existing_metadata_path, metadata)
         _mark_stage(
             run_root,
             stage=stage,

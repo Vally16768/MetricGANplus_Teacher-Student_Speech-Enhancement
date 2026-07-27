@@ -10,6 +10,7 @@ from campaign import (
     CELL_ORDER,
     _best_teacher,
     _effective_training,
+    _teacher_cache_identity,
     audit_campaign_run,
     monitor_campaign_run,
     sha256,
@@ -165,6 +166,26 @@ class CampaignAuditTests(unittest.TestCase):
         self.assertFalse(gate["passed"])
         self.assertEqual(gate["selected_candidate"], "T1-WB-BASE")
         self.assertEqual(gate["downstream_teacher"], "T0-WB-OFFICIAL")
+
+    def test_teacher_cache_identity_ignores_stage_label_and_tracks_contract(self) -> None:
+        key, contract = _teacher_cache_identity(
+            checkpoint_hash="a" * 64,
+            manifest_hash="b" * 64,
+            cache_config={"cache_inputs": False, "storage_dtype": "float16"},
+        )
+        same_key, _ = _teacher_cache_identity(
+            checkpoint_hash="a" * 64,
+            manifest_hash="b" * 64,
+            cache_config={"cache_inputs": False, "storage_dtype": "float16"},
+        )
+        changed_key, _ = _teacher_cache_identity(
+            checkpoint_hash="a" * 64,
+            manifest_hash="b" * 64,
+            cache_config={"cache_inputs": False, "storage_dtype": "float32"},
+        )
+        self.assertEqual(key, same_key)
+        self.assertNotEqual(key, changed_key)
+        self.assertEqual(contract["targets"]["nb"]["sample_rate"], 8000)
 
     def test_monitor_reads_campaign_and_cell_progress(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

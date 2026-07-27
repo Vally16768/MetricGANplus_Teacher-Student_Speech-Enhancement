@@ -64,7 +64,7 @@ metric/reference profile matches the run profile
 - metric-objective teacher/student backward smoke: passed.
 - local shared environment prefix and CUDA resolution: passed on 2026-07-26.
 - safe checkpoint/proxy restricted-load round trips: passed.
-- unit/integration suite: 38/38 passed on 2026-07-27 after the official-teacher,
+- unit/integration suite: 39/39 passed on 2026-07-27 after the official-teacher,
   two-stage campaign and local FP16 cache changes.
 - stable post-cleanup VoiceBank-only six-cell GPU smoke: passed as
   `20260727-postcleanup-smoke-wbnb-s0-a5` on one NVIDIA GTX 1660 Ti.
@@ -93,7 +93,7 @@ metric/reference profile matches the run profile
 - local teacher-cache tests passed: FP16 teacher waveform/mask payloads,
   no noisy/clean copies, float32 loader output, maximum waveform quantization
   error below 0.0005 and successful resume validation.
-- 38/38 unit/integration tests and the research-plan validator passed after the
+- 39/39 unit/integration tests and the research-plan validator passed after the
   architecture and campaign change.
 - failed-gate fallback test passed: verification runs record the rejected T1
   candidate but feed `T0-WB-OFFICIAL` downstream.

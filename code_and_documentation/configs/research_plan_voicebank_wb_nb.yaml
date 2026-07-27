@@ -75,7 +75,7 @@ teacher_promotion_gate:
 
 teacher_cache:
   location: "desktop_local_only"
-  key: "teacher_checkpoint_sha256 + train_manifest_sha256"
+  key: "teacher_checkpoint_sha256 + train_manifest_sha256 + cache_contract_sha256"
   cache_inputs: false
   storage_dtype: "float16"
 

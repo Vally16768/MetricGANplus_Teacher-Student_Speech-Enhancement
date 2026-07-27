@@ -101,9 +101,10 @@ Smoke/pilot may continue after a failed gate only as explicitly
 `verification_only`; such runs can never be promoted.
 
 Teacher caches must stay in the ignored Desktop-local runtime area, outside
-the dataset and Git. Key them by teacher checkpoint and frozen training
-manifest, store regenerable teacher targets in validated FP16, and do not copy
-noisy/clean dataset audio into the cache.
+the dataset and Git. Key them by teacher checkpoint, frozen training manifest
+and cache contract; stage labels must not duplicate identical content. Store
+regenerable teacher targets in validated FP16, and do not copy noisy/clean
+dataset audio into the cache.
 
 Use `campaign.py monitor-run --run-dir <run-dir>` throughout pilot/full
 execution. Reconcile the active campaign stage with the current cell epoch,
