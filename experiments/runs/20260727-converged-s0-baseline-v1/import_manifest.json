@@ -1,0 +1,132 @@
+{
+  "copy_mode": "selected-and-hash-verified",
+  "excluded_classes": [
+    "VoiceBank+DEMAND audio",
+    "generated evaluation audio",
+    "teacher cache",
+    "training-state checkpoints",
+    "replay buffers"
+  ],
+  "file_count": 23,
+  "files": [
+    {
+      "bytes": 133,
+      "path": "logs/promotion.log",
+      "sha256": "7f2719fff1503e11e7c28bd6c5ad792e685aba81b8ea94795ea83d8a7f1942d1"
+    },
+    {
+      "bytes": 17946,
+      "path": "metrics/campaign_summary.json",
+      "sha256": "21467e04f0bcbcad846e770207534ce3dd50e3b410ab418ade48251c09a127d2"
+    },
+    {
+      "bytes": 5606,
+      "path": "metrics/canonical_metrics.csv",
+      "sha256": "f873fcc465c52d717c710c36917c5ca19dad86ded98bfe37d08a290887ad17b4"
+    },
+    {
+      "bytes": 359,
+      "path": "metrics/epoch20_vs_converged.csv",
+      "sha256": "2148b1bb40d43dd6225f09f6c18c0b237891e29d7ffec201633380622431fea1"
+    },
+    {
+      "bytes": 17946,
+      "path": "metrics/summary.json",
+      "sha256": "21467e04f0bcbcad846e770207534ce3dd50e3b410ab418ade48251c09a127d2"
+    },
+    {
+      "bytes": 25196,
+      "path": "metrics/training/S0-NB.csv",
+      "sha256": "bacf18a2bba0f30f5596a75f5a6afa3931786a7663ec705c1f49f7ffe2611dc3"
+    },
+    {
+      "bytes": 93766,
+      "path": "metrics/training/S0-NB.json",
+      "sha256": "756e4ee97b859b2712d115e96c47e2c5aa7ab2d0b2fb7e62933f83ddec730f29"
+    },
+    {
+      "bytes": 21847,
+      "path": "metrics/training/S0-WB.csv",
+      "sha256": "78cae6d7b7f58f83ca0de867b695f5d61df3bb0197760ea83e178b38568dd1f4"
+    },
+    {
+      "bytes": 80498,
+      "path": "metrics/training/S0-WB.json",
+      "sha256": "50766f1dd4469a17f0872741ed417a9b00b47f95aae49658672e3c81caeead93"
+    },
+    {
+      "bytes": 2060596,
+      "path": "models/S0-NB.pt",
+      "sha256": "1b89e6b5931eb3a4bb63db7844ffe5e74486e9bf75b835342926776336d11491"
+    },
+    {
+      "bytes": 2422068,
+      "path": "models/S0-WB.pt",
+      "sha256": "dc1d2d2171876fb5665bd447506e3371492a4619cc8f2749cbfca7292f1ca335"
+    },
+    {
+      "bytes": 7587572,
+      "path": "models/T0-WB-OFFICIAL.pt",
+      "sha256": "5ece6fbd1ac16cca6df11ea724fb5e3710d6611049f54bbc8d126c79dbbc65d8"
+    },
+    {
+      "bytes": 366,
+      "path": "provenance/command.txt",
+      "sha256": "1952cfc6dc02de053b24fdaa66d3f92d4694593b8b5bef446454ff31dbbbe49c"
+    },
+    {
+      "bytes": 2245,
+      "path": "provenance/config_resolved.yaml",
+      "sha256": "a2e46e070572ce66c90962915d6860abbdcba7e77efd226d79cb0f44e4b07ff2"
+    },
+    {
+      "bytes": 92,
+      "path": "provenance/environment.txt",
+      "sha256": "20c774169ca53854119c2194b1982f541bc9b0c99d6534012ae3b2fa3ed8f905"
+    },
+    {
+      "bytes": 2057,
+      "path": "provenance/provenance.json",
+      "sha256": "a9485822f417d71c029d4ce2080832dfe946682f208a90c2f622f3c833a3a52e"
+    },
+    {
+      "bytes": 275,
+      "path": "reports/audit.json",
+      "sha256": "10821ca57be579b75b23a38ec5aa1488154f21fbb43d99f06c0b494f3fec7ae0"
+    },
+    {
+      "bytes": 61212,
+      "path": "reports/convergence_comparison.png",
+      "sha256": "1267b9b6aef76296a6b839e1ac842652e3b458d7d41ed1501c9d0f5f7617bcf0"
+    },
+    {
+      "bytes": 1801,
+      "path": "reports/report.md",
+      "sha256": "dce38d502660340917dcfec4f3e389a05af852cbb0f10ac8a9a66bada899a303"
+    },
+    {
+      "bytes": 42851,
+      "path": "reports/test_pesq_by_cell.png",
+      "sha256": "1b11e54306bf583fd99ff02336c747ac06a24fac640f518b579b0786553359f7"
+    },
+    {
+      "bytes": 217243,
+      "path": "reports/training/S0-NB.png",
+      "sha256": "af9ad595ffde003591b45baeeef86c1a3336565da425c23f249f37142c1af39e"
+    },
+    {
+      "bytes": 214362,
+      "path": "reports/training/S0-WB.png",
+      "sha256": "f50f4fa983343c31cadf5abd1b8136e90ba4105ec04093462f817c634fb7e4f9"
+    },
+    {
+      "bytes": 150,
+      "path": "status.json",
+      "sha256": "2440124f4a983345845ef3832321d8dbb53f73e2a7c2edce6b89051ab16d42a4"
+    }
+  ],
+  "run_id": "20260727-converged-s0-baseline-v1",
+  "schema_version": 1,
+  "source_run_id": "20260727-converged-s0-baseline-a1",
+  "total_bytes": 12876187
+}

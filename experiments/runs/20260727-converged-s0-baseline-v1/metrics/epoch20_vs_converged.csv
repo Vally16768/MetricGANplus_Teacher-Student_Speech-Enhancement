@@ -1,0 +1,3 @@
+cell,pesq_mode,epoch20_best_epoch,epoch20_val_select_pesq,converged_best_epoch,converged_stop_epoch,converged_val_select_pesq,delta,stop_reason,ceiling_limited
+S0-WB,wb,20,2.5969151238012596,34,42,2.6029517441811647,0.006036620379905155,early_stopping,False
+S0-NB,nb,18,3.1921840111179463,41,49,3.2167510953175245,0.024567084199578204,early_stopping,False
