@@ -13,6 +13,7 @@ from campaign import (
     CONVERGED_BASELINE_SCOPE,
     STUDENT_CONTINUATION_CELL_ORDER,
     STUDENT_CONTINUATION_SCOPE,
+    _artifact_manifest,
     _best_teacher,
     _effective_training,
     _portable_baseline_cell,
@@ -371,6 +372,27 @@ class CampaignAuditTests(unittest.TestCase):
         self.assertFalse(result["valid"])
         self.assertIn("model size mismatch: T1-WB-BASE", result["issues"])
         self.assertIn("model hash mismatch: T1-WB-BASE", result["issues"])
+
+    def test_promoted_artifact_manifest_tampering_is_detected(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self.make_run(root, baseline=True)
+            audit_campaign_run(root)
+            manifest = _artifact_manifest(root)
+            (root / "import_manifest.json").write_text(
+                json.dumps(manifest),
+                encoding="utf-8",
+            )
+            (root / "reports" / "report.md").write_text(
+                "# modified\n",
+                encoding="utf-8",
+            )
+            result = audit_campaign_run(root)
+        self.assertFalse(result["valid"])
+        self.assertIn(
+            "manifested artifact hash mismatch: reports/report.md",
+            result["issues"],
+        )
 
     def test_pilot_overrides_full_training_without_changing_full(self) -> None:
         config = {

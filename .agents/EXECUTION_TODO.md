@@ -3,7 +3,7 @@
 Status: **active**
 Last evidence update: **2026-07-27**
 Current phase: **P3 — sanitize and promote the valid S0 baseline**
-Next action: **P3.1 — build and validate the selected-artifact inventory**
+Next action: **P3.7 — commit and push the audited baseline release**
 
 This is the detailed execution board for the active research sequence. The
 campaign-wide summary remains `.agents/TODO.md`; this file owns the subtask
@@ -122,13 +122,13 @@ Gate: only selected, audited and portable artifacts enter Git.
 
 | ID | Item | Required evidence | Status |
 |---|---|---|---|
-| P3.1 | Build the promotion inventory | selected WB/NB weights, metrics, plots, config, report and hashes only | in-progress |
-| P3.2 | Sanitize public provenance | no personal path, username, host, mount, dataset location or server logic | pending |
-| P3.3 | Verify exclusions | no dataset, teacher cache, generated audio, replay or regenerable bulk | pending |
-| P3.4 | Validate promoted run contract | canonical run validation and independent metric/artifact reconciliation | pending |
-| P3.5 | Update `.agents`, README and documentation index | no stale baseline claims or duplicated source of truth | pending |
-| P3.6 | Run tests and project guard | required gates pass from the promotion snapshot | pending |
-| P3.7 | Commit and push baseline release | public commit/hash recorded; Git worktree clean | pending |
+| P3.1 | Build the promotion inventory | selected WB/NB weights, metrics, plots, config, report and hashes only | passed |
+| P3.2 | Sanitize public provenance | no personal path, username, host, mount, dataset location or server logic | passed |
+| P3.3 | Verify exclusions | no dataset, teacher cache, generated audio, replay or regenerable bulk | passed |
+| P3.4 | Validate promoted run contract | canonical run validation and independent metric/artifact reconciliation | passed |
+| P3.5 | Update `.agents`, README and documentation index | no stale baseline claims or duplicated source of truth | passed |
+| P3.6 | Run tests and project guard | required gates pass from the promotion snapshot | passed |
+| P3.7 | Commit and push baseline release | public commit/hash recorded; Git worktree clean | in-progress |
 
 Unblock condition: P1 and P2 pass.
 
@@ -199,3 +199,4 @@ calibration, evaluation protocol, provenance and claim set.
 | 2026-07-27 | Resume smoke A3 stopped on an unsupported deterministic CUDA kernel | `reflection_pad1d_backward` has no deterministic CUDA implementation; changing the frontend would invalidate S0 | CUDA forward/backward with optimizer effect frozen for exact state-equivalence A4 |
 | 2026-07-27 | Resume smoke A4 passed exact state equivalence | real CUDA forward/backward; injected stop after epoch 2; resumed/control LR, patience, best state, selected hash and history identical; optimizer effect isolated because the CUDA reflection-pad backward is nondeterministic | P2.7 commit/push |
 | 2026-07-27 | Closed P2 on pushed commit `5c48415` | 52/52 tests, plan/config validation and project guard passed; resume smoke A4 audit has zero issues | P3.1 promotion inventory |
+| 2026-07-27 | Built and audited the portable S0 package | `20260727-converged-s0-baseline-v1`; 3 models, 23 inventoried artifacts, zero package/privacy issues; 56/56 tests, contract/plan/guard pass | P3.7 commit/push |

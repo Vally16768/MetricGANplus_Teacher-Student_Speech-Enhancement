@@ -21,3 +21,13 @@ runs/<run_id>/
 Rulările în desfășurare stau în `local/runs/` (ignorat de Git). După finalizare
 se exportă într-un `run_id` nou. Datasetul, audio și `teacher_cache` nu se copiază
 aici.
+
+## Rulări promovate
+
+| Run | Scope | Status |
+|---|---|---|
+| [`20260727-converged-s0-baseline-v1`](runs/20260727-converged-s0-baseline-v1/) | T0 oficial + S0-WB/S0-NB convergenți | valid, auditat |
+
+`import_manifest.json` este inventarul complet al fișierelor publicate și le
+leagă de dimensiune și SHA-256. Orice modificare ulterioară este detectată de
+`campaign.py audit-run`.

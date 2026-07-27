@@ -101,6 +101,21 @@ este folosit numai pentru un baseline full auditat care s-a oprit la un plafon
 mai mic; creează un director nou și restaurează starea completă fără să
 suprascrie rularea sursă.
 
+## Baseline S0 publicat
+
+Baseline-ul convergent și auditat este
+[`20260727-converged-s0-baseline-v1`](experiments/runs/20260727-converged-s0-baseline-v1/).
+Studentul WB a selectat epoca 34 și s-a oprit la 42, iar studentul NB a
+selectat epoca 41 și s-a oprit la 49. Pe test, rezultatele sunt PESQ-WB
+`3.051937` pentru S0-WB și PESQ-NB `3.615061` pentru S0-NB; cele două valori
+aparțin unor protocoale diferite și nu se compară direct.
+
+Pachetul public conține cele trei modele selectate, metrici, istoricele de
+training, grafice, config portabil, proveniență și hash-uri. Nu conține
+VoiceBank+DEMAND, audio generat, cache teacher, replay sau training state.
+Raportul complet este
+[`reports/report.md`](experiments/runs/20260727-converged-s0-baseline-v1/reports/report.md).
+
 ## Discriminatorul metric și extensia TTS
 
 PESQ nu este folosit direct ca o funcție diferențiabilă. Un predictor PESQ

@@ -987,6 +987,41 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
     summary = load_json(summary_path)
     status = load_json(status_path)
     provenance = load_json(provenance_path)
+    manifest_path = run_root / "import_manifest.json"
+    if manifest_path.is_file():
+        artifact_manifest = load_json(manifest_path)
+        declared_artifacts: set[str] = set()
+        for item in artifact_manifest.get("files") or []:
+            entry = dict(item or {})
+            relative = Path(str(entry.get("path") or ""))
+            if (
+                not relative.as_posix()
+                or relative.is_absolute()
+                or ".." in relative.parts
+            ):
+                issues.append(f"invalid artifact-manifest path: {relative}")
+                continue
+            declared_artifacts.add(relative.as_posix())
+            artifact = run_root / relative
+            if not artifact.is_file():
+                issues.append(f"missing manifested artifact: {relative}")
+                continue
+            if int(entry.get("bytes") or -1) != artifact.stat().st_size:
+                issues.append(f"manifested artifact size mismatch: {relative}")
+            if str(entry.get("sha256") or "") != sha256(artifact):
+                issues.append(f"manifested artifact hash mismatch: {relative}")
+        actual_artifacts = {
+            path.relative_to(run_root).as_posix()
+            for path in run_root.rglob("*")
+            if path.is_file() and path != manifest_path
+        }
+        if declared_artifacts != actual_artifacts:
+            missing = sorted(actual_artifacts - declared_artifacts)
+            extra = sorted(declared_artifacts - actual_artifacts)
+            issues.append(
+                "artifact-manifest inventory mismatch: "
+                f"unlisted={missing} nonexistent={extra}"
+            )
     campaign_scope = str(
         summary.get("campaign_scope") or TWO_STAGE_SCOPE
     )
@@ -2348,6 +2383,11 @@ def promote_converged_baseline(
     destination = REPO_ROOT / "experiments" / "runs" / run_id
     if destination.exists():
         raise FileExistsError(f"Promotion destination already exists: {destination}")
+    promotion_git = _git_state()
+    if promotion_git["dirty"]:
+        raise ValueError(
+            "Refusing to promote a baseline from a dirty worktree."
+        )
     source_status = json.loads(
         (source_root / "status.json").read_text(encoding="utf-8")
     )
@@ -2551,6 +2591,8 @@ def promote_converged_baseline(
         "verification_only": False,
         "git_commit": source_provenance.get("git_commit"),
         "git_dirty": False,
+        "promotion_git_commit": promotion_git["commit"],
+        "promotion_git_dirty": promotion_git["dirty"],
         "seed": 0,
         "config_sha256": sha256(config_path),
         "manifest_sha256": manifest_hashes,

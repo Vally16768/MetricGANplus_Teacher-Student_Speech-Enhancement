@@ -56,6 +56,16 @@ metric/reference profile matches the run profile
 
 ## Current baseline
 
+- converged S0 closure `20260727-converged-s0-baseline-a1`: 3/3 cells and
+  models, 54 local report samples, zero independent-audit issues;
+- CUDA resume-equivalence A4: injected post-evaluation interruption; LR,
+  patience, best state, selected-model hash and history equal to the control;
+- portable S0 package `20260727-converged-s0-baseline-v1`: canonical run
+  contract passed, complete artifact-manifest audit passed, no dataset/audio/
+  cache/replay/training-state artifact and zero privacy issues;
+- unit/integration suite: 56/56 passed after portable promotion and manifest
+  tamper-detection coverage;
+- canonical research plan and project guard: passed with zero issues.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.
