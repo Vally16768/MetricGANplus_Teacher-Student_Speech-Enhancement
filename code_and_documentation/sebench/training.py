@@ -2447,8 +2447,16 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
         rank_metrics_by_split: dict[str, dict[str, Any]] = {}
         select_metrics_by_split: dict[str, dict[str, Any]] = {}
         test_metrics_by_split: dict[str, dict[str, Any]] = {}
+        reuse_init_evaluation = bool(
+            config.epochs == 0
+            and config.evaluate_init_checkpoint
+            and best_select_metrics_by_split
+        )
+        if reuse_init_evaluation:
+            rank_metrics_by_split = dict(best_rank_metrics_by_split)
+            select_metrics_by_split = dict(best_select_metrics_by_split)
 
-        if rank_eval_manifests:
+        if rank_eval_manifests and not reuse_init_evaluation:
             rank_metrics_by_split, rank_flat = _evaluate_group(
                 final_model,
                 "final_val_rank",
@@ -2462,7 +2470,7 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
             mlflow.log_metrics({f"final/{key}": value for key, value in rank_flat.items()})
             log_dict_artifact(rank_metrics_by_split, "reports/final_val_rank_metrics_by_split.json")
 
-        if select_eval_manifests:
+        if select_eval_manifests and not reuse_init_evaluation:
             sample_dir = checkpoint_path.parent / f"{checkpoint_path.stem}_samples"
             if sample_dir.exists():
                 shutil.rmtree(sample_dir, ignore_errors=True)
