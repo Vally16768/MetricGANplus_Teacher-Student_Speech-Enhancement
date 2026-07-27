@@ -113,12 +113,17 @@ antrenează studenți.
 
 ## Baseline S0 publicat
 
-Baseline-ul convergent și auditat este
+Pachetul istoric v1 este
 [`20260727-converged-s0-baseline-v1`](experiments/runs/20260727-converged-s0-baseline-v1/).
 Studentul WB a selectat epoca 34 și s-a oprit la 42, iar studentul NB a
 selectat epoca 41 și s-a oprit la 49. Pe test, rezultatele sunt PESQ-WB
 `3.051937` pentru S0-WB și PESQ-NB `3.615061` pentru S0-NB; cele două valori
 aparțin unor protocoale diferite și nu se compară direct.
+
+În timpul pregătirii T1 s-a constatat că evaluarea teacher-ului BLSTM din v1
+era sensibilă la padding și `eval_batch_size`. Modelele și selecția sunt
+păstrate, dar scorurile v1 sunt marcate provizoriu și nu trebuie citate până
+la publicarea pachetului corectat cu inferență per utterance la lungimea reală.
 
 Pachetul public conține cele trei modele selectate, metrici, istoricele de
 training, grafice, config portabil, proveniență și hash-uri. Nu conține

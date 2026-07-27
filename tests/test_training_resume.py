@@ -14,6 +14,7 @@ sys.path.insert(0, CODE_ROOT.as_posix())
 
 from sebench.training import (  # noqa: E402
     _capture_rng_state,
+    _enhance_variable_length_eval_rows,
     _metric_discriminator_state_fields,
     _resume_epoch_position,
     _restore_rng_state,
@@ -24,6 +25,29 @@ from sebench.losses import SpeechBrainMetricDiscriminator  # noqa: E402
 
 
 class ResumeControlStateTests(unittest.TestCase):
+    def test_evaluation_preserves_each_utterance_true_length(self) -> None:
+        class LengthRecorder(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.lengths: list[int] = []
+
+            def denoise_single(self, noisy: torch.Tensor) -> torch.Tensor:
+                self.lengths.append(int(noisy.shape[-1]))
+                return noisy
+
+        model = LengthRecorder()
+        rows = [
+            (None, torch.zeros(11), torch.zeros(11), 16_000),
+            (None, torch.zeros(17), torch.zeros(17), 16_000),
+        ]
+        enhanced = _enhance_variable_length_eval_rows(
+            model,
+            rows,  # type: ignore[arg-type]
+            device="cpu",
+        )
+        self.assertEqual(model.lengths, [11, 17])
+        self.assertEqual([item.numel() for item in enhanced], [11, 17])
+
     @staticmethod
     def _run_scores(
         scores: list[float],

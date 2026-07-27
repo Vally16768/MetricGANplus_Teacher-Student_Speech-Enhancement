@@ -19,7 +19,6 @@ import mlflow
 import numpy as np
 import torch
 from torch import nn
-from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader
 from tqdm.auto import tqdm
 
@@ -1174,6 +1173,34 @@ def _load_eval_audio_rows(
     return loaded
 
 
+def _enhance_variable_length_eval_rows(
+    model: nn.Module,
+    rows: list[EvalAudioRow],
+    *,
+    device: str,
+) -> list[torch.Tensor]:
+    """Enhance each utterance at its true length.
+
+    Bidirectional recurrent teachers must not see right-padding as real future
+    context. Per-utterance inference makes metrics invariant to eval batching.
+    """
+    autocast_enabled = device.startswith("cuda")
+    enhanced: list[torch.Tensor] = []
+    for _, noisy, _, _ in rows:
+        with torch.autocast(
+            device_type="cuda" if device.startswith("cuda") else "cpu",
+            enabled=autocast_enabled,
+        ):
+            output = model.denoise_single(
+                noisy.unsqueeze(0).to(
+                    device,
+                    non_blocking=device.startswith("cuda"),
+                )
+            )
+        enhanced.append(output.squeeze(0).detach().cpu())
+    return enhanced
+
+
 @torch.inference_mode()
 def evaluate_manifest(
     model: nn.Module,
@@ -1221,24 +1248,21 @@ def evaluate_manifest(
     model_was_training = model.training
     model.eval()
     eval_batch_size = max(1, int(batch_size))
-    autocast_enabled = device.startswith("cuda")
 
     try:
         row_index = 0
         total_rows = len(rows)
         while row_index < len(rows):
             batch_rows = rows[row_index:row_index + eval_batch_size]
-            noisy_batch = pad_sequence([item[1] for item in batch_rows], batch_first=True)
             try:
-                with torch.autocast(device_type="cuda" if device.startswith("cuda") else "cpu", enabled=autocast_enabled):
-                    enhanced_batch = model.denoise_single(
-                        noisy_batch.to(device, non_blocking=device.startswith("cuda"))
-                    ).cpu()
+                enhanced_batch = _enhance_variable_length_eval_rows(
+                    model,
+                    batch_rows,
+                    device=device,
+                )
             except RuntimeError as exc:
-                if "out of memory" in str(exc).lower() and device.startswith("cuda") and eval_batch_size > 1:
+                if "out of memory" in str(exc).lower() and device.startswith("cuda"):
                     torch.cuda.empty_cache()
-                    eval_batch_size = max(1, eval_batch_size // 2)
-                    continue
                 raise
             if progress_callback is not None:
                 completed = min(row_index + len(batch_rows), total_rows)

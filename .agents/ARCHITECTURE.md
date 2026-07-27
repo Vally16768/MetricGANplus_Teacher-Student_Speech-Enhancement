@@ -149,6 +149,13 @@ the next epoch rather than repeating the completed epoch.
 `pesq_mode`. A mismatch stops evaluation. WB and NB PESQ values are reported in
 separate columns/figures and are not pooled.
 
+Evaluation always invokes the enhancer separately at each utterance's true
+length. This is required for the bidirectional teacher: right-padding is
+future context to a BLSTM and previously made E0 metrics depend on
+`eval_batch_size`. The requested evaluation batch now controls iteration/
+loading only, not the waveform passed to the model. A regression test verifies
+that two unequal utterance lengths reach the model unpadded.
+
 ## A4 — Metric discriminator and generator objective
 
 ```text

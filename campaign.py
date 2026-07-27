@@ -3173,6 +3173,197 @@ def promote_converged_baseline(
     }
 
 
+def reevaluate_converged_baseline(
+    config: dict[str, Any],
+    *,
+    source_run_dir: str | Path,
+    run_id: str,
+) -> dict[str, Any]:
+    """Re-evaluate selected S0 models with padding-invariant inference."""
+    source_root = Path(source_run_dir).expanduser().resolve()
+    source_audit = audit_campaign_run(source_root)
+    if not source_audit["valid"]:
+        raise ValueError(f"Source package audit failed: {source_audit['issues']}")
+    source_summary = json.loads(
+        (source_root / "metrics" / "campaign_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    if source_summary.get("campaign_scope") != CONVERGED_BASELINE_SCOPE:
+        raise ValueError("Corrective evaluation requires a converged S0 package.")
+    dataset_audit = validate_campaign_config(config)
+    git = _git_state()
+    if git["dirty"]:
+        raise RuntimeError("Refusing baseline re-evaluation from a dirty worktree.")
+    require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+    config["runtime"]["device"] = require_training_cuda(
+        str(config["runtime"]["device"])
+    )
+    run_root = (
+        Path(str(config["runtime"]["run_root"])).expanduser().resolve() / run_id
+    )
+    run_root.mkdir(parents=True, exist_ok=False)
+    provenance = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "status": "running",
+        "mode": "full",
+        "campaign_scope": CONVERGED_BASELINE_SCOPE,
+        "verification_only": False,
+        "git_commit": git["commit"],
+        "git_dirty": git["dirty"],
+        "dataset_audit": dataset_audit,
+        "corrective_evaluation": {
+            "cause": (
+                "Variable-length bidirectional teacher inference previously "
+                "treated right-padding as future context."
+            ),
+            "protocol": "per-utterance true-length inference",
+            "source_run_id": source_root.name,
+            "source_summary_sha256": sha256(
+                source_root / "metrics" / "campaign_summary.json"
+            ),
+        },
+    }
+    _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+    (run_root / "provenance" / "config_resolved.yaml").write_text(
+        yaml.safe_dump(config, sort_keys=False),
+        encoding="utf-8",
+    )
+    _atomic_json(
+        run_root / "status.json",
+        {
+            "status": "running",
+            "campaign_mode": "full",
+            "campaign_scope": CONVERGED_BASELINE_SCOPE,
+            "valid_for_promotion": False,
+        },
+    )
+    _mark_stage(
+        run_root,
+        stage="preflight",
+        status="completed",
+        details={"dataset": dataset_audit, "git": git},
+    )
+
+    source_cells = dict(source_summary["cells"])
+    source_inventory = dict(source_summary["model_inventory"])
+    cells: dict[str, dict[str, Any]] = {}
+    for cell in BASELINE_CELL_ORDER:
+        source_payload = dict(source_cells[cell])
+        source_model = _run_artifact_path(
+            source_root,
+            dict(source_inventory[cell])["path"],
+        )
+        if source_model is None or not source_model.is_file():
+            raise FileNotFoundError(f"Missing corrective-evaluation model: {cell}")
+        bandwidth = "nb" if cell.endswith("-NB") else "wb"
+        frontend = (
+            dict(config["model"]["teacher_frontend"])
+            if cell == "T0-WB-OFFICIAL"
+            else None
+        )
+        evaluated = _run_cell(
+            config=config,
+            run_root=run_root,
+            cell=cell,
+            family=str(source_payload["model_family"]),
+            bandwidth=bandwidth,
+            loss_recipe=str(source_payload["loss_recipe"]),
+            epochs=0,
+            lr=0.0,
+            seed=int(source_payload["seed"]),
+            init_checkpoint=source_model.as_posix(),
+            include_test=True,
+            evaluate_init_checkpoint=True,
+            frontend=frontend,
+            mode="full",
+        )
+        for key in (
+            "best_epoch",
+            "stop_epoch",
+            "stop_reason",
+            "early_stopped",
+            "global_step",
+            "continued_from",
+        ):
+            if key in source_payload:
+                evaluated[key] = copy.deepcopy(source_payload[key])
+        shutil.copy2(source_model, Path(str(evaluated["checkpoint_out"])))
+        _atomic_json(
+            Path(str(evaluated["checkpoint_out"])).parent / "summary.json",
+            evaluated,
+        )
+        cells[cell] = evaluated
+
+    baseline_contract = copy.deepcopy(source_summary["baseline_contract"])
+    closure_contract = copy.deepcopy(
+        source_summary["baseline_closure_contract"]
+    )
+    for cell in STUDENT_CONTINUATION_CELL_ORDER:
+        corrected = float(cells[cell]["val_select_metrics"]["pesq_mean"])
+        closure_contract["converged_val_select_pesq"][cell] = corrected
+        closure_contract["val_select_pesq_delta"][cell] = corrected - float(
+            closure_contract["epoch20_val_select_pesq"][cell]
+        )
+    report = _write_report(
+        run_root=run_root,
+        cells=cells,
+        proxies={},
+        selected_teacher="T0-WB-OFFICIAL",
+        teacher_gate=None,
+        mode="full",
+        verification_only=False,
+        campaign_scope=CONVERGED_BASELINE_SCOPE,
+        cell_order=BASELINE_CELL_ORDER,
+        comparison_pairs={},
+        baseline_contract=baseline_contract,
+    )
+    report["baseline_closure_contract"] = closure_contract
+    comparison_target = run_root / "metrics" / "epoch20_vs_converged.csv"
+    convergence_target = run_root / "reports" / "convergence_comparison.png"
+    comparison_source = _run_artifact_path(
+        source_root,
+        source_summary["epoch_comparison_csv"],
+    )
+    if comparison_source is None or not comparison_source.is_file():
+        raise FileNotFoundError("Missing source artifact: epoch_comparison_csv")
+    with comparison_source.open(newline="", encoding="utf-8") as handle:
+        reader = csv.DictReader(handle)
+        comparison_rows = list(reader)
+        comparison_fields = list(reader.fieldnames or [])
+    for row in comparison_rows:
+        cell = str(row["cell"])
+        corrected = closure_contract["converged_val_select_pesq"][cell]
+        row["converged_val_select_pesq"] = str(corrected)
+        row["delta"] = str(
+            closure_contract["val_select_pesq_delta"][cell]
+        )
+    with comparison_target.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=comparison_fields)
+        writer.writeheader()
+        writer.writerows(comparison_rows)
+    convergence_source = _run_artifact_path(
+        source_root,
+        source_summary["convergence_plot"],
+    )
+    if convergence_source is None or not convergence_source.is_file():
+        raise FileNotFoundError("Missing source artifact: convergence_plot")
+    shutil.copy2(convergence_source, convergence_target)
+    report["epoch_comparison_csv"] = comparison_target.as_posix()
+    report["convergence_plot"] = convergence_target.as_posix()
+    report["corrective_evaluation"] = provenance["corrective_evaluation"]
+    _atomic_json(run_root / "metrics" / "campaign_summary.json", report)
+    return _finish_run(
+        run_root=run_root,
+        provenance=provenance,
+        report=report,
+        mode="full",
+        git=git,
+        promotion_gate_passed=True,
+    )
+
+
 def _resume_equivalence_issues(
     control_state: dict[str, Any],
     resumed_state: dict[str, Any],
@@ -3495,6 +3686,9 @@ def parse_args() -> argparse.Namespace:
     promotion = subparsers.add_parser("promote-baseline")
     promotion.add_argument("--source-run-dir", required=True)
     promotion.add_argument("--run-id", required=True)
+    reevaluate_baseline = subparsers.add_parser("reevaluate-baseline")
+    reevaluate_baseline.add_argument("--source-run-dir", required=True)
+    reevaluate_baseline.add_argument("--run-id", required=True)
     resume_smoke = subparsers.add_parser("smoke-resume")
     resume_smoke.add_argument("--source-run-dir", required=True)
     resume_smoke.add_argument("--run-id", required=True)
@@ -3541,6 +3735,13 @@ def main() -> None:
         )
     elif args.command == "promote-baseline":
         result = promote_converged_baseline(
+            source_run_dir=args.source_run_dir,
+            run_id=args.run_id,
+        )
+    elif args.command == "reevaluate-baseline":
+        config = load_campaign_config(args.config)
+        result = reevaluate_converged_baseline(
+            config,
             source_run_dir=args.source_run_dir,
             run_id=args.run_id,
         )
@@ -3668,6 +3869,7 @@ def main() -> None:
         "audit-run",
         "close-baseline",
         "promote-baseline",
+        "reevaluate-baseline",
         "smoke-teacher-calibration",
         "calibrate-teacher",
         "smoke-teacher",
