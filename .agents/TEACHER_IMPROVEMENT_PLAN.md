@@ -1,13 +1,13 @@
 # Teacher improvement and TTS-transfer plan
 
-Status: **planned; not active**.
+Status: **active — P4 implementation and validation**.
 
 Owner: the MetricGAN+ research campaign.
 
-Activation gate: start only after P1–P3 in `.agents/EXECUTION_TODO.md` pass:
-the WB/NB S0 continuation is merged and audited, resume robustness is repaired,
-and the sanitized baseline is promoted. This plan does not retroactively alter
-or replace S0 evidence.
+Activation gate satisfied by baseline release commit `e6388d4`: P1–P3 in
+`.agents/EXECUTION_TODO.md` passed, including the merged S0 audit, resume
+repair and sanitized baseline promotion. This plan does not retroactively
+alter or replace S0 evidence.
 
 ## Research questions
 
@@ -107,6 +107,10 @@ Do not update G in this stage.
 5. Execute the canonical current/history/current D refresh.
 6. Record raw and normalized MAE/RMSE, Pearson, Spearman, score coverage and a
    predicted-versus-true calibration plot.
+
+The implementation draws 100 discriminator-update records plus a disjoint 100
+record held-out current-output partition. Held-out examples never enter the
+current/history/current discriminator updates.
 
 The initial predeclared calibration gate is:
 

@@ -82,6 +82,10 @@ export METRICGAN_SHARED_VENV=/path/to/shared-venv
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py run-baseline --run-id <baseline-id>
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py continue-students \
   --source-run-dir <audited-baseline-run> --run-id <continuation-id>
+"$METRICGAN_SHARED_VENV/bin/python" campaign.py calibrate-teacher \
+  --run-id <calibration-id>
+"$METRICGAN_SHARED_VENV/bin/python" campaign.py pilot-teacher \
+  --calibration-run-dir <passed-calibration-run> --run-id <teacher-pilot-id>
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py pilot-all --run-id <pilot-id>
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py run-all --run-id <immutable-id>
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py monitor-run --run-dir <run-dir>
@@ -100,6 +104,12 @@ Rulările full ale studenților au un plafon de 50 de epoci, reduc LR la platou
 este folosit numai pentru un baseline full auditat care s-a oprit la un plafon
 mai mic; creează un director nou și restaurează starea completă fără să
 suprascrie rularea sursă.
+
+`calibrate-teacher` ține E0 înghețat, actualizează numai discriminatorul și
+aplică gate-ul pe 100 de output-uri curente held-out. `pilot-teacher` pornește
+numai după un gate de calibrare trecut și execută exclusiv E0/E1/E2; un gate D
+eșuat sare peste update-ul generatorului. Aceste comenzi nu creează C1 și nu
+antrenează studenți.
 
 ## Baseline S0 publicat
 

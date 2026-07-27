@@ -156,8 +156,16 @@ class ExperimentConfig:
     metric_discriminator_mode: str = "frozen"
     metric_discriminator_lr: float = 5e-4
     metric_discriminator_rows: int = 100
+    metric_discriminator_calibration_rows: int = 100
     metric_discriminator_history_portion: float = 0.2
     metric_discriminator_replay_root: str | None = None
+    metric_discriminator_calibration_only: bool = False
+    metric_discriminator_min_calibration_records: int = 100
+    metric_discriminator_max_normalized_mae: float = 0.06
+    metric_discriminator_min_pearson: float = 0.80
+    metric_discriminator_min_spearman: float = 0.80
+    metric_discriminator_min_prediction_std: float = 0.02
+    metric_discriminator_range_tolerance_raw: float = 0.30
 
 
 def _normalize_runtime_devices(device: str, gpu_ids: list[int] | None) -> tuple[str, list[int]]:
@@ -843,6 +851,39 @@ def _training_control_state_fields(
         "epochs_without_improve": int(epochs_without_improve),
         "history_rows": list(history_rows),
     }
+
+
+def _metric_discriminator_state_fields(
+    *,
+    discriminator: SpeechBrainMetricDiscriminator,
+    optimizer: torch.optim.Optimizer,
+    refresh_history: list[dict[str, Any]],
+    replay_root: str,
+) -> dict[str, Any]:
+    return {
+        "metric_discriminator_state": discriminator.state_dict(),
+        "metric_discriminator_optimizer_state": optimizer.state_dict(),
+        "metric_discriminator_refresh_history": list(refresh_history),
+        "metric_discriminator_replay_root": str(Path(replay_root).resolve()),
+    }
+
+
+def _restore_metric_discriminator_state(
+    payload: dict[str, Any],
+    *,
+    discriminator: SpeechBrainMetricDiscriminator,
+    optimizer: torch.optim.Optimizer,
+    replay_root: str,
+) -> list[dict[str, Any]]:
+    expected_replay = str(Path(replay_root).resolve())
+    observed_replay = str(payload.get("metric_discriminator_replay_root") or "")
+    if observed_replay and observed_replay != expected_replay:
+        raise ValueError(
+            "Metric-discriminator replay identity changed across resume."
+        )
+    discriminator.load_state_dict(payload["metric_discriminator_state"])
+    optimizer.load_state_dict(payload["metric_discriminator_optimizer_state"])
+    return list(payload.get("metric_discriminator_refresh_history") or [])
 
 
 def _resolve_eval_frequency(config: ExperimentConfig) -> tuple[int, int]:
@@ -1599,15 +1640,11 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
             and state_payload.get("metric_discriminator_state")
             and isinstance(pesq_proxy_model, SpeechBrainMetricDiscriminator)
         ):
-            pesq_proxy_model.load_state_dict(
-                state_payload["metric_discriminator_state"]
-            )
-            if state_payload.get("metric_discriminator_optimizer_state"):
-                discriminator_optimizer.load_state_dict(
-                    state_payload["metric_discriminator_optimizer_state"]
-                )
-            discriminator_refresh_history = list(
-                state_payload.get("metric_discriminator_refresh_history") or []
+            discriminator_refresh_history = _restore_metric_discriminator_state(
+                state_payload,
+                discriminator=pesq_proxy_model,
+                optimizer=discriminator_optimizer,
+                replay_root=str(config.metric_discriminator_replay_root),
             )
 
         best_score = float(state_payload.get("best_score", best_score))
@@ -1713,17 +1750,17 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                 history_rows=history_rows,
             ),
         }
-        if isinstance(pesq_proxy_model, SpeechBrainMetricDiscriminator):
-            payload["metric_discriminator_state"] = (
-                pesq_proxy_model.state_dict()
-            )
-            payload["metric_discriminator_optimizer_state"] = (
-                discriminator_optimizer.state_dict()
-                if discriminator_optimizer is not None
-                else None
-            )
-            payload["metric_discriminator_refresh_history"] = list(
-                discriminator_refresh_history
+        if (
+            isinstance(pesq_proxy_model, SpeechBrainMetricDiscriminator)
+            and discriminator_optimizer is not None
+        ):
+            payload.update(
+                _metric_discriminator_state_fields(
+                    discriminator=pesq_proxy_model,
+                    optimizer=discriminator_optimizer,
+                    refresh_history=discriminator_refresh_history,
+                    replay_root=str(config.metric_discriminator_replay_root),
+                )
             )
         return payload
 
@@ -1961,6 +1998,7 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                 teacher_cache_manifest=current_teacher_cache_manifest or "",
             )
             discriminator_metrics: dict[str, float] = {}
+            generator_update_accepted = True
             if alternating_discriminator:
                 if (
                     not isinstance(
@@ -1988,6 +2026,29 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                     epoch=epoch,
                     device=config.device,
                     max_rows=int(config.metric_discriminator_rows),
+                    calibration_rows=int(
+                        config.metric_discriminator_calibration_rows
+                    ),
+                    calibration_gate={
+                        "min_records": int(
+                            config.metric_discriminator_min_calibration_records
+                        ),
+                        "max_normalized_mae": float(
+                            config.metric_discriminator_max_normalized_mae
+                        ),
+                        "min_pearson": float(
+                            config.metric_discriminator_min_pearson
+                        ),
+                        "min_spearman": float(
+                            config.metric_discriminator_min_spearman
+                        ),
+                        "min_prediction_std": float(
+                            config.metric_discriminator_min_prediction_std
+                        ),
+                        "range_tolerance_raw": float(
+                            config.metric_discriminator_range_tolerance_raw
+                        ),
+                    },
                     history_portion=float(
                         config.metric_discriminator_history_portion
                     ),
@@ -1996,6 +2057,9 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                     progress_callback=_eval_progress,
                 )
                 discriminator_refresh_history.append(refresh)
+                generator_update_accepted = bool(
+                    refresh["calibration_gate"]["passed"]
+                ) and not bool(config.metric_discriminator_calibration_only)
                 discriminator_metrics = {
                     "discriminator_current_first_mse": float(
                         refresh["current_first_mse"]
@@ -2011,6 +2075,18 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                     ),
                     "discriminator_current_pearson": float(
                         refresh["calibration"]["pearson"]
+                    ),
+                    "discriminator_current_spearman": float(
+                        refresh["calibration"]["spearman"]
+                    ),
+                    "discriminator_current_normalized_mae": float(
+                        refresh["calibration"]["normalized_mae"]
+                    ),
+                    "discriminator_calibration_gate_passed": float(
+                        bool(refresh["calibration_gate"]["passed"])
+                    ),
+                    "generator_update_accepted": float(
+                        generator_update_accepted
                     ),
                 }
 
@@ -2061,16 +2137,22 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                     last_state_save_step = global_step
                     last_state_save_ts = time.monotonic()
 
-            train_metrics = run_epoch(
-                train_model,
-                train_loader,
-                optimizer,
-                loss_fn,
-                config,
-                epoch,
-                autocast_scaler,
-                step_callback=_step_callback,
-            )
+            if generator_update_accepted:
+                train_metrics = run_epoch(
+                    train_model,
+                    train_loader,
+                    optimizer,
+                    loss_fn,
+                    config,
+                    epoch,
+                    autocast_scaler,
+                    step_callback=_step_callback,
+                )
+            else:
+                train_metrics = {
+                    "loss": 0.0,
+                    "generator_update_skipped": 1.0,
+                }
             train_metrics.update(discriminator_metrics)
             epoch_seconds = time.monotonic() - epoch_start_ts
             _write_progress(
@@ -2169,7 +2251,16 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                     guardrail_ok = guardrail_value is not None and float(guardrail_value) >= float(config.selection_guardrail_min)
                     history_row["selection_guardrail_value"] = float(guardrail_value) if guardrail_value is not None else None
                     history_row["selection_guardrail_passed"] = 1 if guardrail_ok else 0
-                if scheduler is not None and config.scheduler == "plateau":
+                selection_eligible = bool(
+                    not alternating_discriminator
+                    or generator_update_accepted
+                )
+                history_row["selection_eligible"] = int(selection_eligible)
+                if (
+                    selection_eligible
+                    and scheduler is not None
+                    and config.scheduler == "plateau"
+                ):
                     scheduler.step(float(score))
                 _write_progress(
                     "selection_scored",
@@ -2182,7 +2273,11 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                     guardrail_passed=guardrail_ok,
                 )
 
-                if guardrail_ok and float(score) > best_score:
+                if (
+                    selection_eligible
+                    and guardrail_ok
+                    and float(score) > best_score
+                ):
                     best_score = float(score)
                     best_epoch = epoch
                     epochs_without_improve = 0
@@ -2214,13 +2309,22 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                         selection_score=float(score),
                         target_gap=float(config.target_floor - float(score)) if config.target_floor is not None else None,
                     )
-                else:
+                elif selection_eligible:
                     epochs_without_improve += 1
                     history_row["improved"] = 0
+                else:
+                    history_row["improved"] = None
+                    _write_progress(
+                        "generator_update_skipped",
+                        epoch=epoch,
+                        global_step=global_step,
+                        selection_score=float(score),
+                        calibration_gate_passed=False,
+                    )
 
                 history_row["epochs_without_improve"] = int(epochs_without_improve)
 
-                if epoch >= config.min_epochs and config.early_stop_patience > 0 and epochs_without_improve >= config.early_stop_patience:
+                if selection_eligible and epoch >= config.min_epochs and config.early_stop_patience > 0 and epochs_without_improve >= config.early_stop_patience:
                     early_stopped = True
                     stop_reason = "early_stopping"
                     history_row["early_stop_triggered"] = 1
@@ -2415,6 +2519,13 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                 ),
                 "metric_discriminator_refresh_history": list(
                     discriminator_refresh_history
+                ),
+                "metric_discriminator_accepted_update_count": sum(
+                    int(
+                        bool(item.get("calibration_gate", {}).get("passed"))
+                        and not config.metric_discriminator_calibration_only
+                    )
+                    for item in discriminator_refresh_history
                 ),
                 "val_rank_metrics": primary_rank_metrics,
                 "val_select_metrics": primary_select_metrics,

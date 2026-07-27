@@ -63,6 +63,10 @@ TWO_STAGE_SCOPE = "teacher_improvement_two_stage"
 STUDENT_CONTINUATION_CELL_ORDER = ("S0-WB", "S0-NB")
 STUDENT_CONTINUATION_SCOPE = "official_student_training_continuation"
 CONVERGED_BASELINE_SCOPE = "official_teacher_students_converged_baseline"
+TEACHER_CALIBRATION_SCOPE = "teacher_current_output_calibration"
+TEACHER_TRIAL_SCOPE = "teacher_only_metric_improvement"
+TEACHER_CALIBRATION_CELL_ORDER = ("E0-T0", "E0-D-CAL")
+TEACHER_TRIAL_CELL_ORDER = ("E0-T0", "E1-CONTROL", "E2-PESQ")
 
 
 def sha256(path: str | Path) -> str:
@@ -166,6 +170,22 @@ def validate_campaign_config(config: dict[str, Any]) -> dict[str, Any]:
     training = dict(config["training"])
     if int(training.get("student_epochs", 0)) != 50:
         raise ValueError("Canonical student training must use a 50-epoch ceiling.")
+    if int(training.get("metric_discriminator_rows", 0)) < 100:
+        raise ValueError(
+            "Canonical teacher refresh requires at least 100 training outputs."
+        )
+    if int(training.get("metric_discriminator_calibration_rows", 0)) < 100:
+        raise ValueError(
+            "Canonical teacher calibration requires at least 100 held-out outputs."
+        )
+    if int(training.get("metric_discriminator_min_calibration_records", 0)) < 100:
+        raise ValueError(
+            "Canonical teacher calibration gate requires at least 100 records."
+        )
+    if int(training.get("teacher_trial_epochs", 0)) != 10:
+        raise ValueError("Canonical teacher-only pilot ceiling must be 10 epochs.")
+    if float(training.get("teacher_trial_lr", 0.0)) != 1e-6:
+        raise ValueError("Canonical teacher-only pilot LR must be 1e-6.")
     student_lr_patience = int(training.get("student_lr_patience", 0))
     student_early_stop_patience = int(
         training.get("student_early_stop_patience", 0)
@@ -442,6 +462,7 @@ def _experiment_config(
     evaluate_init_checkpoint: bool = False,
     frontend: dict[str, int] | None = None,
     alternating_metric_discriminator: bool = False,
+    metric_discriminator_calibration_only: bool = False,
     resume_training_state: str | None = None,
     early_stop_patience: int | None = None,
     lr_factor: float | None = None,
@@ -521,6 +542,9 @@ def _experiment_config(
         ),
         metric_discriminator_lr=float(effective["metric_discriminator_lr"]),
         metric_discriminator_rows=int(effective["metric_discriminator_rows"]),
+        metric_discriminator_calibration_rows=int(
+            effective["metric_discriminator_calibration_rows"]
+        ),
         metric_discriminator_history_portion=float(
             effective["metric_discriminator_history_portion"]
         ),
@@ -528,6 +552,27 @@ def _experiment_config(
             (cell_root / "metricgan_replay").as_posix()
             if alternating_metric_discriminator
             else None
+        ),
+        metric_discriminator_calibration_only=bool(
+            metric_discriminator_calibration_only
+        ),
+        metric_discriminator_min_calibration_records=int(
+            effective["metric_discriminator_min_calibration_records"]
+        ),
+        metric_discriminator_max_normalized_mae=float(
+            effective["metric_discriminator_max_normalized_mae"]
+        ),
+        metric_discriminator_min_pearson=float(
+            effective["metric_discriminator_min_pearson"]
+        ),
+        metric_discriminator_min_spearman=float(
+            effective["metric_discriminator_min_spearman"]
+        ),
+        metric_discriminator_min_prediction_std=float(
+            effective["metric_discriminator_min_prediction_std"]
+        ),
+        metric_discriminator_range_tolerance_raw=float(
+            effective["metric_discriminator_range_tolerance_raw"]
         ),
         eval_dnsmos=False,
         sample_count=int(evaluation["sample_count"]),
@@ -1029,6 +1074,10 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
         canonical_cells = BASELINE_CELL_ORDER
     elif campaign_scope == STUDENT_CONTINUATION_SCOPE:
         canonical_cells = STUDENT_CONTINUATION_CELL_ORDER
+    elif campaign_scope == TEACHER_CALIBRATION_SCOPE:
+        canonical_cells = TEACHER_CALIBRATION_CELL_ORDER
+    elif campaign_scope == TEACHER_TRIAL_SCOPE:
+        canonical_cells = TEACHER_TRIAL_CELL_ORDER
     else:
         canonical_cells = CELL_ORDER
     declared_cells = tuple(summary.get("expected_cells") or canonical_cells)
@@ -1058,15 +1107,24 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
                 csv_values[(row["cell"], row["split"], row["metric"])] = row["value"]
 
     reported_samples: set[Path] = set()
+    audited_splits = (
+        (
+            ("val_rank_metrics", "val_rank"),
+            ("val_select_metrics", "val_select"),
+        )
+        if campaign_scope
+        in {TEACHER_CALIBRATION_SCOPE, TEACHER_TRIAL_SCOPE}
+        else (
+            ("val_rank_metrics", "val_rank"),
+            ("val_select_metrics", "val_select"),
+            ("test_metrics", "test"),
+        )
+    )
     for cell in expected_cells:
         payload = dict(cells.get(cell) or {})
         bandwidth = "nb" if "-NB" in cell else "wb"
         profile = PROFILES[bandwidth]
-        for split_key, split_label in (
-            ("val_rank_metrics", "val_rank"),
-            ("val_select_metrics", "val_select"),
-            ("test_metrics", "test"),
-        ):
+        for split_key, split_label in audited_splits:
             metrics = dict(payload.get(split_key) or {})
             expected_metadata = {
                 "bandwidth": bandwidth,
@@ -1245,6 +1303,49 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
                 issues.append(f"continuation did not advance beyond source: {cell}")
             if int(cell_summary.get("stop_epoch") or 0) > 50:
                 issues.append(f"continuation exceeded epoch ceiling: {cell}")
+    elif campaign_scope == TEACHER_CALIBRATION_SCOPE:
+        calibration_gate = dict(summary.get("teacher_calibration_gate") or {})
+        if not calibration_gate:
+            issues.append("missing teacher calibration gate")
+        calibration_cell = dict(cells.get("E0-D-CAL") or {})
+        refreshes = list(
+            calibration_cell.get("metric_discriminator_refresh_history") or []
+        )
+        if len(refreshes) != 1:
+            issues.append("calibration package must contain exactly one refresh")
+        elif dict(refreshes[0].get("calibration_gate") or {}) != calibration_gate:
+            issues.append("teacher calibration gate binding mismatch")
+        if int(
+            calibration_cell.get("metric_discriminator_accepted_update_count")
+            or 0
+        ) != 0:
+            issues.append("calibration-only run updated the generator")
+    elif campaign_scope == TEACHER_TRIAL_SCOPE:
+        if not teacher_gate:
+            issues.append("missing teacher promotion gate")
+        for cell in TEACHER_TRIAL_CELL_ORDER:
+            payload = dict(cells.get(cell) or {})
+            for split_key in ("val_rank_metrics", "val_select_metrics"):
+                if not dict(payload.get(split_key) or {}):
+                    issues.append(f"missing teacher trial split: {cell}/{split_key}")
+        metric_cell = dict(cells.get("E2-PESQ") or {})
+        refreshes = list(
+            metric_cell.get("metric_discriminator_refresh_history") or []
+        )
+        accepted = int(
+            metric_cell.get("metric_discriminator_accepted_update_count") or 0
+        )
+        observed_accepted = sum(
+            bool(dict(item.get("calibration_gate") or {}).get("passed"))
+            for item in refreshes
+        )
+        if accepted != observed_accepted:
+            issues.append("teacher accepted-update count mismatch")
+        if bool(teacher_gate.get("passed")) and not all(
+            bool(dict(item.get("calibration_gate") or {}).get("passed"))
+            for item in refreshes
+        ):
+            issues.append("promoted teacher contains an uncalibrated G epoch")
     else:
         if not teacher_gate:
             issues.append("missing teacher promotion gate")
@@ -1339,6 +1440,418 @@ def _finish_run(
     progress["current_stage"] = None
     _atomic_json(progress_path, progress)
     return {"run_root": run_root.as_posix(), **report}
+
+
+def _teacher_run_preflight(
+    config: dict[str, Any],
+    *,
+    run_id: str,
+    mode: str,
+    scope: str,
+    allow_dirty_smoke: bool,
+) -> tuple[Path, dict[str, Any], dict[str, Any], dict[str, Any]]:
+    dataset_audit = validate_campaign_config(config)
+    git = _git_state()
+    if git["dirty"] and not (mode == "smoke" and allow_dirty_smoke):
+        raise RuntimeError(
+            "Refusing teacher training from a dirty worktree. "
+            "Only explicit dirty smoke verification is allowed."
+        )
+    require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+    config["runtime"]["device"] = require_training_cuda(
+        str(config["runtime"]["device"])
+    )
+    run_root = (
+        Path(str(config["runtime"]["run_root"])).expanduser().resolve() / run_id
+    )
+    run_root.mkdir(parents=True, exist_ok=False)
+    provenance = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "status": "running",
+        "mode": mode,
+        "campaign_scope": scope,
+        "verification_only": True,
+        "git_commit": git["commit"],
+        "git_dirty": git["dirty"],
+        "dataset_audit": dataset_audit,
+        "environment": {
+            "python": sys.version,
+            "torch": torch.__version__,
+            "cuda_available": torch.cuda.is_available(),
+            "cuda_device": torch.cuda.get_device_name(0),
+        },
+    }
+    _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+    (run_root / "provenance" / "config_resolved.yaml").write_text(
+        yaml.safe_dump(config, sort_keys=False),
+        encoding="utf-8",
+    )
+    _atomic_json(
+        run_root / "status.json",
+        {
+            "status": "running",
+            "campaign_mode": mode,
+            "campaign_scope": scope,
+            "valid_for_promotion": False,
+        },
+    )
+    _mark_stage(
+        run_root,
+        stage="preflight",
+        status="completed",
+        details={"dataset": dataset_audit, "git": git},
+    )
+    return run_root, provenance, git, _effective_training(config, mode)
+
+
+def _frozen_e0_checkpoint() -> tuple[Path, dict[str, Any]]:
+    package_root = (
+        REPO_ROOT
+        / "experiments"
+        / "runs"
+        / "20260727-converged-s0-baseline-v1"
+    )
+    summary = json.loads(
+        (package_root / "metrics" / "campaign_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    model = package_root / "models" / "T0-WB-OFFICIAL.pt"
+    inventory = dict(summary["model_inventory"]["T0-WB-OFFICIAL"])
+    observed = sha256(model)
+    if observed != inventory["sha256"]:
+        raise ValueError("Published E0 teacher hash mismatch.")
+    if observed != summary["baseline_contract"]["teacher_checkpoint_sha256"]:
+        raise ValueError("Published E0 teacher ancestry mismatch.")
+    return model, {
+        "source_run_id": package_root.name,
+        "checkpoint_sha256": observed,
+        "bandwidth": "wb",
+        "sample_rate": 16_000,
+        "pesq_mode": "wb",
+        "official_revision": "a196ce26b3bdace6fa1d819017584bdbcce462a8",
+    }
+
+
+def _write_teacher_calibration_plot(
+    run_root: Path,
+    refreshes: list[dict[str, Any]],
+) -> Path:
+    figure, axis = plt.subplots(figsize=(5.5, 5.0))
+    plotted = False
+    for refresh in refreshes:
+        calibration = dict(refresh.get("calibration") or {})
+        targets = list(calibration.get("targets") or [])
+        predictions = list(calibration.get("predictions") or [])
+        if targets and len(targets) == len(predictions):
+            axis.scatter(
+                targets,
+                predictions,
+                alpha=0.65,
+                label=f"refresh {refresh.get('epoch')}",
+            )
+            plotted = True
+    axis.plot([-0.5, 4.5], [-0.5, 4.5], linestyle="--", color="black")
+    axis.set_xlim(-0.5, 4.5)
+    axis.set_ylim(-0.5, 4.5)
+    axis.set_xlabel("True PESQ-WB")
+    axis.set_ylabel("Predicted PESQ-WB")
+    axis.set_title("Held-out current-output discriminator calibration")
+    if plotted:
+        axis.legend()
+    axis.grid(alpha=0.2)
+    figure.tight_layout()
+    path = run_root / "reports" / "current_output_calibration.png"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(path, dpi=160)
+    plt.close(figure)
+    return path
+
+
+def run_teacher_calibration(
+    config: dict[str, Any],
+    *,
+    run_id: str,
+    mode: str,
+    allow_dirty_smoke: bool = False,
+) -> dict[str, Any]:
+    """Run one discriminator refresh against frozen E0 with no G update."""
+    run_root, provenance, git, effective = _teacher_run_preflight(
+        config,
+        run_id=run_id,
+        mode=mode,
+        scope=TEACHER_CALIBRATION_SCOPE,
+        allow_dirty_smoke=allow_dirty_smoke,
+    )
+    e0_checkpoint, e0_contract = _frozen_e0_checkpoint()
+    provenance["e0_contract"] = e0_contract
+    _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+    teacher_common = {
+        "config": config,
+        "run_root": run_root,
+        "family": str(config["model"]["teacher_family"]),
+        "bandwidth": "wb",
+        "lr": float(effective["teacher_trial_lr"]),
+        "seed": int(effective["seed"]),
+        "frontend": dict(config["model"]["teacher_frontend"]),
+        "include_test": False,
+        "mode": mode,
+    }
+    cells: dict[str, dict[str, Any]] = {}
+    cells["E0-T0"] = _run_cell(
+        **teacher_common,
+        cell="E0-T0",
+        loss_recipe="T0",
+        epochs=0,
+        init_checkpoint=e0_checkpoint.as_posix(),
+        evaluate_init_checkpoint=True,
+    )
+    proxy = _proxy(
+        config,
+        run_root=run_root,
+        bandwidth="wb",
+        candidate_teacher_checkpoint=str(cells["E0-T0"]["checkpoint_out"]),
+        mode=mode,
+    )
+    cells["E0-D-CAL"] = _run_cell(
+        **teacher_common,
+        cell="E0-D-CAL",
+        loss_recipe="T0_PESQ",
+        epochs=1,
+        init_checkpoint=str(cells["E0-T0"]["checkpoint_out"]),
+        evaluate_init_checkpoint=True,
+        proxy_checkpoint=str(proxy["checkpoint"]),
+        alternating_metric_discriminator=True,
+        metric_discriminator_calibration_only=True,
+        early_stop_patience=0,
+    )
+    refreshes = list(
+        cells["E0-D-CAL"].get("metric_discriminator_refresh_history") or []
+    )
+    if len(refreshes) != 1:
+        raise RuntimeError("Calibration-only diagnostic did not record one refresh.")
+    calibration_gate = dict(refreshes[0]["calibration_gate"])
+    plot = _write_teacher_calibration_plot(run_root, refreshes)
+    report = _write_report(
+        run_root=run_root,
+        cells=cells,
+        proxies={"wb": proxy},
+        selected_teacher="E0-T0",
+        teacher_gate=None,
+        mode=mode,
+        verification_only=True,
+        campaign_scope=TEACHER_CALIBRATION_SCOPE,
+        cell_order=TEACHER_CALIBRATION_CELL_ORDER,
+        comparison_pairs={},
+    )
+    report["teacher_calibration_gate"] = calibration_gate
+    report["e0_contract"] = e0_contract
+    report["calibration_plot"] = plot.as_posix()
+    _atomic_json(run_root / "metrics" / "campaign_summary.json", report)
+    result = _finish_run(
+        run_root=run_root,
+        provenance=provenance,
+        report=report,
+        mode=mode,
+        git=git,
+        promotion_gate_passed=False,
+    )
+    return {
+        **result,
+        "teacher_calibration_gate": calibration_gate,
+    }
+
+
+def _teacher_trial_gate(
+    official: dict[str, Any],
+    control: dict[str, Any],
+    metric: dict[str, Any],
+    *,
+    config: dict[str, Any],
+) -> dict[str, Any]:
+    training = dict(config["training"])
+    e0 = dict(official.get("val_select_metrics") or {})
+    e1 = dict(control.get("val_select_metrics") or {})
+    e2 = dict(metric.get("val_select_metrics") or {})
+    deltas = {
+        name: float(e2[name]) - float(e0[name])
+        for name in ("pesq_mean", "stoi_mean", "sisdr_mean", "delta_snr_mean")
+    }
+    refreshes = list(
+        metric.get("metric_discriminator_refresh_history") or []
+    )
+    accepted = int(metric.get("metric_discriminator_accepted_update_count") or 0)
+    checks = {
+        "pesq_gain": deltas["pesq_mean"]
+        >= float(training["teacher_min_pesq_gain"]),
+        "stoi_guardrail": deltas["stoi_mean"]
+        >= -float(training["teacher_max_stoi_drop"]),
+        "sisdr_guardrail": deltas["sisdr_mean"]
+        >= -float(training["teacher_max_sisdr_drop"]),
+        "metric_beats_control": float(e2["pesq_mean"]) > float(e1["pesq_mean"]),
+        "accepted_metric_update": accepted > 0,
+        "all_accepted_updates_calibrated": accepted
+        == sum(
+            bool(dict(item.get("calibration_gate") or {}).get("passed"))
+            for item in refreshes
+        ),
+    }
+    return {
+        "official_teacher": "E0-T0",
+        "control_teacher": "E1-CONTROL",
+        "metric_teacher": "E2-PESQ",
+        "selected_candidate": "E2-PESQ" if all(checks.values()) else "E0-T0",
+        "downstream_teacher": "E2-PESQ" if all(checks.values()) else "E0-T0",
+        "val_select_deltas": deltas,
+        "e2_minus_e1_pesq": float(e2["pesq_mean"]) - float(e1["pesq_mean"]),
+        "accepted_metric_update_count": accepted,
+        "refresh_count": len(refreshes),
+        "checks": checks,
+        "passed": all(checks.values()),
+    }
+
+
+def run_teacher_trial(
+    config: dict[str, Any],
+    *,
+    calibration_run_dir: str | Path,
+    run_id: str,
+    mode: str,
+    allow_dirty_smoke: bool = False,
+) -> dict[str, Any]:
+    """Run E0/E1/E2 only; never build C1 or train students."""
+    calibration_root = Path(calibration_run_dir).expanduser().resolve()
+    calibration_audit = audit_campaign_run(calibration_root)
+    calibration_summary = json.loads(
+        (calibration_root / "metrics" / "campaign_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    calibration_gate = dict(
+        calibration_summary.get("teacher_calibration_gate") or {}
+    )
+    if not calibration_audit["valid"] or not bool(calibration_gate.get("passed")):
+        raise ValueError(
+            "Teacher pilot requires an audited, passed calibration-only run."
+        )
+    calibration_cell = dict(calibration_summary["cells"]["E0-D-CAL"])
+    discriminator_checkpoint = _run_artifact_path(
+        calibration_root,
+        calibration_cell["metric_discriminator_checkpoint"],
+    )
+    if discriminator_checkpoint is None or not discriminator_checkpoint.is_file():
+        raise FileNotFoundError("Calibration discriminator checkpoint is missing.")
+
+    run_root, provenance, git, effective = _teacher_run_preflight(
+        config,
+        run_id=run_id,
+        mode=mode,
+        scope=TEACHER_TRIAL_SCOPE,
+        allow_dirty_smoke=allow_dirty_smoke,
+    )
+    e0_checkpoint, e0_contract = _frozen_e0_checkpoint()
+    provenance["e0_contract"] = e0_contract
+    provenance["calibration_source"] = {
+        "run_id": calibration_root.name,
+        "summary_sha256": sha256(
+            calibration_root / "metrics" / "campaign_summary.json"
+        ),
+        "discriminator_sha256": sha256(discriminator_checkpoint),
+    }
+    _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+    common = {
+        "config": config,
+        "run_root": run_root,
+        "family": str(config["model"]["teacher_family"]),
+        "bandwidth": "wb",
+        "lr": float(effective["teacher_trial_lr"]),
+        "seed": int(effective["seed"]),
+        "frontend": dict(config["model"]["teacher_frontend"]),
+        "include_test": False,
+        "mode": mode,
+    }
+    cells: dict[str, dict[str, Any]] = {}
+    cells["E0-T0"] = _run_cell(
+        **common,
+        cell="E0-T0",
+        loss_recipe="T0",
+        epochs=0,
+        init_checkpoint=e0_checkpoint.as_posix(),
+        evaluate_init_checkpoint=True,
+    )
+    anchor_cache = _build_cache(
+        config,
+        run_root=run_root,
+        teacher_checkpoint=str(cells["E0-T0"]["checkpoint_out"]),
+        cache_label="teacher-trial-anchor",
+        mode=mode,
+    )
+    trial_epochs = int(effective["teacher_trial_epochs"])
+    cells["E1-CONTROL"] = _run_cell(
+        **common,
+        cell="E1-CONTROL",
+        loss_recipe="T0",
+        epochs=trial_epochs,
+        init_checkpoint=str(cells["E0-T0"]["checkpoint_out"]),
+        evaluate_init_checkpoint=True,
+        teacher_cache_manifest=anchor_cache["wb"],
+        early_stop_patience=int(effective["teacher_trial_early_stop_patience"]),
+    )
+    cells["E2-PESQ"] = _run_cell(
+        **common,
+        cell="E2-PESQ",
+        loss_recipe="T0_PESQ",
+        epochs=trial_epochs,
+        init_checkpoint=str(cells["E0-T0"]["checkpoint_out"]),
+        evaluate_init_checkpoint=True,
+        teacher_cache_manifest=anchor_cache["wb"],
+        proxy_checkpoint=discriminator_checkpoint.as_posix(),
+        alternating_metric_discriminator=True,
+        early_stop_patience=int(effective["teacher_trial_early_stop_patience"]),
+    )
+    gate = _teacher_trial_gate(
+        cells["E0-T0"],
+        cells["E1-CONTROL"],
+        cells["E2-PESQ"],
+        config=config,
+    )
+    selected = "E2-PESQ" if gate["passed"] else "E0-T0"
+    plot = _write_teacher_calibration_plot(
+        run_root,
+        list(
+            cells["E2-PESQ"].get("metric_discriminator_refresh_history")
+            or []
+        ),
+    )
+    report = _write_report(
+        run_root=run_root,
+        cells=cells,
+        proxies={},
+        selected_teacher=selected,
+        teacher_gate=gate,
+        mode=mode,
+        verification_only=True,
+        campaign_scope=TEACHER_TRIAL_SCOPE,
+        cell_order=TEACHER_TRIAL_CELL_ORDER,
+        comparison_pairs={
+            "control_vs_official": ("E0-T0", "E1-CONTROL"),
+            "metric_vs_official": ("E0-T0", "E2-PESQ"),
+            "metric_vs_control": ("E1-CONTROL", "E2-PESQ"),
+        },
+    )
+    report["e0_contract"] = e0_contract
+    report["calibration_source_gate"] = calibration_gate
+    report["calibration_plot"] = plot.as_posix()
+    _atomic_json(run_root / "metrics" / "campaign_summary.json", report)
+    return _finish_run(
+        run_root=run_root,
+        provenance=provenance,
+        report=report,
+        mode=mode,
+        git=git,
+        promotion_gate_passed=bool(gate["passed"]),
+    )
 
 
 def run_all(
@@ -2990,6 +3503,23 @@ def parse_args() -> argparse.Namespace:
         choices=STUDENT_CONTINUATION_CELL_ORDER,
         default="S0-NB",
     )
+    teacher_calibration_smoke = subparsers.add_parser(
+        "smoke-teacher-calibration"
+    )
+    teacher_calibration_smoke.add_argument("--run-id", required=True)
+    teacher_calibration_smoke.add_argument(
+        "--allow-dirty-smoke",
+        action="store_true",
+    )
+    teacher_calibration = subparsers.add_parser("calibrate-teacher")
+    teacher_calibration.add_argument("--run-id", required=True)
+    teacher_smoke = subparsers.add_parser("smoke-teacher")
+    teacher_smoke.add_argument("--calibration-run-dir", required=True)
+    teacher_smoke.add_argument("--run-id", required=True)
+    teacher_smoke.add_argument("--allow-dirty-smoke", action="store_true")
+    teacher_pilot = subparsers.add_parser("pilot-teacher")
+    teacher_pilot.add_argument("--calibration-run-dir", required=True)
+    teacher_pilot.add_argument("--run-id", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -3013,6 +3543,34 @@ def main() -> None:
         result = promote_converged_baseline(
             source_run_dir=args.source_run_dir,
             run_id=args.run_id,
+        )
+    elif args.command in {
+        "smoke-teacher-calibration",
+        "calibrate-teacher",
+    }:
+        config = load_campaign_config(args.config)
+        result = run_teacher_calibration(
+            config,
+            run_id=args.run_id,
+            mode=(
+                "smoke"
+                if args.command == "smoke-teacher-calibration"
+                else "pilot"
+            ),
+            allow_dirty_smoke=bool(
+                getattr(args, "allow_dirty_smoke", False)
+            ),
+        )
+    elif args.command in {"smoke-teacher", "pilot-teacher"}:
+        config = load_campaign_config(args.config)
+        result = run_teacher_trial(
+            config,
+            calibration_run_dir=args.calibration_run_dir,
+            run_id=args.run_id,
+            mode="smoke" if args.command == "smoke-teacher" else "pilot",
+            allow_dirty_smoke=bool(
+                getattr(args, "allow_dirty_smoke", False)
+            ),
         )
     else:
         config = load_campaign_config(args.config)
@@ -3110,6 +3668,10 @@ def main() -> None:
         "audit-run",
         "close-baseline",
         "promote-baseline",
+        "smoke-teacher-calibration",
+        "calibrate-teacher",
+        "smoke-teacher",
+        "pilot-teacher",
         "monitor-run",
         "smoke-resume",
         "continue-students",

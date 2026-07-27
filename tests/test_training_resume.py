@@ -14,10 +14,13 @@ sys.path.insert(0, CODE_ROOT.as_posix())
 
 from sebench.training import (  # noqa: E402
     _capture_rng_state,
+    _metric_discriminator_state_fields,
     _resume_epoch_position,
     _restore_rng_state,
+    _restore_metric_discriminator_state,
     _training_control_state_fields,
 )
+from sebench.losses import SpeechBrainMetricDiscriminator  # noqa: E402
 
 
 class ResumeControlStateTests(unittest.TestCase):
@@ -169,6 +172,70 @@ class ResumeControlStateTests(unittest.TestCase):
                 weights_only=True,
             )
         _restore_rng_state(payload["rng_state"])
+
+    def test_metric_discriminator_optimizer_history_and_replay_resume(
+        self,
+    ) -> None:
+        source = SpeechBrainMetricDiscriminator(base_channels=2)
+        source_optimizer = torch.optim.Adam(source.parameters(), lr=2e-4)
+        waveform = torch.randn(1, 8192)
+        loss = source.normalized_score(waveform, waveform).mean()
+        loss.backward()
+        source_optimizer.step()
+        history = [
+            {
+                "epoch": 1,
+                "calibration_gate": {"passed": True},
+                "replay_index": "epoch_0001/index.json",
+            }
+        ]
+        with tempfile.TemporaryDirectory() as raw:
+            replay = Path(raw) / "replay"
+            replay.mkdir()
+            payload = _metric_discriminator_state_fields(
+                discriminator=source,
+                optimizer=source_optimizer,
+                refresh_history=history,
+                replay_root=replay.as_posix(),
+            )
+            state_path = Path(raw) / "state.pt"
+            torch.save(payload, state_path)
+            loaded = torch.load(
+                state_path,
+                map_location="cpu",
+                weights_only=True,
+            )
+            target = SpeechBrainMetricDiscriminator(base_channels=2)
+            target_optimizer = torch.optim.Adam(target.parameters(), lr=1e-3)
+            restored_history = _restore_metric_discriminator_state(
+                loaded,
+                discriminator=target,
+                optimizer=target_optimizer,
+                replay_root=replay.as_posix(),
+            )
+            for key, value in source.state_dict().items():
+                self.assertTrue(torch.equal(value, target.state_dict()[key]), key)
+            source_optim_state = source_optimizer.state_dict()
+            target_optim_state = target_optimizer.state_dict()
+            self.assertEqual(
+                source_optim_state["param_groups"],
+                target_optim_state["param_groups"],
+            )
+            for parameter_id, state in source_optim_state["state"].items():
+                for key, value in state.items():
+                    observed = target_optim_state["state"][parameter_id][key]
+                    if torch.is_tensor(value):
+                        self.assertTrue(torch.equal(value, observed), key)
+                    else:
+                        self.assertEqual(value, observed)
+            self.assertEqual(restored_history, history)
+            with self.assertRaisesRegex(ValueError, "replay identity"):
+                _restore_metric_discriminator_state(
+                    loaded,
+                    discriminator=target,
+                    optimizer=target_optimizer,
+                    replay_root=(Path(raw) / "other").as_posix(),
+                )
 
 
 if __name__ == "__main__":

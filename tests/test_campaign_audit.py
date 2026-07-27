@@ -16,9 +16,11 @@ from campaign import (
     _artifact_manifest,
     _best_teacher,
     _effective_training,
+    _frozen_e0_checkpoint,
     _portable_baseline_cell,
     _student_schedule,
     _teacher_cache_identity,
+    _teacher_trial_gate,
     _write_portable_history,
     audit_campaign_run,
     close_converged_baseline,
@@ -418,6 +420,60 @@ class CampaignAuditTests(unittest.TestCase):
                 "min_lr": 1e-6,
             },
         )
+
+    def test_frozen_e0_binds_promoted_official_teacher(self) -> None:
+        checkpoint, contract = _frozen_e0_checkpoint()
+        self.assertTrue(checkpoint.is_file())
+        self.assertEqual(contract["bandwidth"], "wb")
+        self.assertEqual(contract["pesq_mode"], "wb")
+        self.assertEqual(contract["sample_rate"], 16_000)
+        self.assertEqual(contract["checkpoint_sha256"], sha256(checkpoint))
+
+    def test_teacher_gate_requires_metric_effect_and_calibrated_update(self) -> None:
+        def cell(pesq: float, stoi: float, sisdr: float) -> dict[str, object]:
+            return {
+                "val_select_metrics": {
+                    "pesq_mean": pesq,
+                    "stoi_mean": stoi,
+                    "sisdr_mean": sisdr,
+                    "delta_snr_mean": 0.0,
+                }
+            }
+
+        official = cell(3.0, 0.93, 9.0)
+        control = cell(3.005, 0.93, 9.0)
+        metric = cell(3.02, 0.929, 8.8)
+        metric["metric_discriminator_refresh_history"] = [
+            {"calibration_gate": {"passed": True}}
+        ]
+        metric["metric_discriminator_accepted_update_count"] = 1
+        gate = _teacher_trial_gate(
+            official,
+            control,
+            metric,
+            config={
+                "training": {
+                    "teacher_min_pesq_gain": 0.01,
+                    "teacher_max_stoi_drop": 0.002,
+                    "teacher_max_sisdr_drop": 0.25,
+                }
+            },
+        )
+        self.assertTrue(gate["passed"], gate)
+        metric["metric_discriminator_accepted_update_count"] = 0
+        failed = _teacher_trial_gate(
+            official,
+            control,
+            metric,
+            config={
+                "training": {
+                    "teacher_min_pesq_gain": 0.01,
+                    "teacher_max_stoi_drop": 0.002,
+                    "teacher_max_sisdr_drop": 0.25,
+                }
+            },
+        )
+        self.assertFalse(failed["passed"])
 
     def test_failed_verification_gate_keeps_official_teacher_downstream(self) -> None:
         metrics = {

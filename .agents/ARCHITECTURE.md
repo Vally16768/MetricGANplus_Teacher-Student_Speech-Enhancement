@@ -181,6 +181,15 @@ PESQ labels (clean is fixed to 1) and references the external clean/noisy paths 
 dataset audio. Noisy scores are reused from a local JSON cache. D optimizer,
 checkpoint and refresh history are part of the resumable T1 state.
 
+The active T1 fidelity protocol draws two disjoint current-output partitions
+per refresh: at least 100 examples for D updates and at least 100 held out for
+calibration. The held-out partition reports raw/normalized MAE and RMSE,
+Pearson, Spearman, target/prediction ranges and prediction variance. A failed
+gate persists the D/replay evidence but skips the generator epoch, scheduler
+decision and selection update. Resume binds the D model, D optimizer, refresh
+history and exact replay root alongside the existing G/optimizer/scheduler/
+patience/RNG/history state.
+
 The canonical S0/S1 student comparison uses `D1` in both stages, with identical
 architecture, seed and schedule, so the changed teacher is the only intended
 experimental variable. A future direct student-metric ablation must restore
@@ -238,6 +247,16 @@ smoke-resume
   -> one fault-injected stop after a durable evaluation checkpoint
   -> resume to the same final epoch
   -> compare LR, scheduler, patience, best/final model and history state
+smoke-teacher-calibration / calibrate-teacher
+  -> frozen promoted E0 teacher
+  -> disjoint current D-update and held-out calibration supports
+  -> one current/history/current refresh; no generator update
+  -> explicit calibration gate + predicted-versus-true plot
+smoke-teacher / pilot-teacher
+  -> require an audited, passed calibration-only source
+  -> E0 frozen + E1 control + E2 metric branch only
+  -> skip every E2 G epoch whose current-output calibration fails
+  -> true WB val_select teacher gate; never build C1 or train S1 here
 promote-baseline
   -> accept only an audited/promotable converged S0 closure
   -> copy selected T0/S0-WB/S0-NB weights with SHA-256 verification

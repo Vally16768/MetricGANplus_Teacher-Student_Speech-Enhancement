@@ -19,6 +19,7 @@ from sebench.losses import (  # noqa: E402
     load_pesq_proxy_checkpoint,
 )
 from sebench.metricgan_alternating import (  # noqa: E402
+    evaluate_calibration_gate,
     normalize_pesq,
     refresh_metricgan_discriminator,
 )
@@ -75,6 +76,37 @@ class AlternatingMetricGANTests(unittest.TestCase):
                 all(record["pesq"] == 4.5 for record in clean_records)
             )
             self.assertEqual(metric.call_count, 8)
+
+    def test_current_output_calibration_gate_is_explicit(self) -> None:
+        calibration = {
+            "record_count": 100,
+            "normalized_mae": 0.05,
+            "pearson": 0.85,
+            "spearman": 0.82,
+            "prediction_std": 0.2,
+            "prediction_min": 1.5,
+            "prediction_max": 3.5,
+            "target_min": 1.4,
+            "target_max": 3.6,
+        }
+        gate = evaluate_calibration_gate(
+            calibration,
+            min_records=100,
+            max_normalized_mae=0.06,
+            min_pearson=0.8,
+            min_spearman=0.8,
+        )
+        self.assertTrue(gate["passed"], gate)
+        calibration["prediction_std"] = 0.0
+        failed = evaluate_calibration_gate(
+            calibration,
+            min_records=100,
+            max_normalized_mae=0.06,
+            min_pearson=0.8,
+            min_spearman=0.8,
+        )
+        self.assertFalse(failed["passed"])
+        self.assertFalse(failed["checks"]["prediction_variance"])
 
     def test_discriminator_matches_official_layer_contract_and_round_trip(
         self,

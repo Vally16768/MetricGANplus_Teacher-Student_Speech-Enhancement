@@ -45,11 +45,21 @@ training:
   proxy_validation_rows: 64
   proxy_batch_size: 8
   teacher_branch_lr: 0.00001
+  teacher_trial_lr: 0.000001
+  teacher_trial_epochs: 10
+  teacher_trial_early_stop_patience: 3
   student_lr: 0.0005
   proxy_lr: 0.001
   metric_discriminator_lr: 0.0005
   metric_discriminator_rows: 100
+  metric_discriminator_calibration_rows: 100
   metric_discriminator_history_portion: 0.2
+  metric_discriminator_min_calibration_records: 100
+  metric_discriminator_max_normalized_mae: 0.06
+  metric_discriminator_min_pearson: 0.80
+  metric_discriminator_min_spearman: 0.80
+  metric_discriminator_min_prediction_std: 0.02
+  metric_discriminator_range_tolerance_raw: 0.30
   metric_proxy_weight: 0.25
   teacher_anchor_weight: 0.75
   teacher_min_pesq_gain: 0.01
@@ -69,12 +79,16 @@ pilot:
   batch_size: 4
   num_workers: 2
   teacher_branch_epochs: 2
+  teacher_trial_epochs: 10
+  teacher_trial_early_stop_patience: 3
   student_epochs: 3
   proxy_epochs: 4
   proxy_train_rows: 64
   proxy_validation_rows: 16
   proxy_batch_size: 4
-  metric_discriminator_rows: 32
+  metric_discriminator_rows: 100
+  metric_discriminator_calibration_rows: 100
+  metric_discriminator_min_calibration_records: 100
   eval_batch_size: 4
   sample_count: 2
   benchmark_seconds: 2
@@ -85,12 +99,21 @@ smoke:
   batch_size: 2
   num_workers: 0
   teacher_branch_epochs: 1
+  teacher_trial_epochs: 1
+  teacher_trial_early_stop_patience: 0
   student_epochs: 1
   proxy_epochs: 1
   proxy_train_rows: 2
   proxy_validation_rows: 1
   proxy_batch_size: 2
   metric_discriminator_rows: 2
+  metric_discriminator_calibration_rows: 2
+  metric_discriminator_min_calibration_records: 2
+  metric_discriminator_max_normalized_mae: 1.0
+  metric_discriminator_min_pearson: -1.0
+  metric_discriminator_min_spearman: -1.0
+  metric_discriminator_min_prediction_std: 0.0
+  metric_discriminator_range_tolerance_raw: 5.0
   eval_batch_size: 2
   sample_count: 1
   benchmark_seconds: 1
