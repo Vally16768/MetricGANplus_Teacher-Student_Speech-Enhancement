@@ -156,3 +156,20 @@ it does not maximize raw predicted PESQ.
 Constraint: the current frozen-proxy branch is a safety-corrected ablation, not
 an exact reproduction of the official alternating discriminator/history loop.
 Full training remains blocked unless true PESQ passes the predeclared gate.
+
+## D-017 — Stop scaling the frozen proxy; implement discriminator refresh
+
+Decision: do not run the bounded frozen-proxy T1 at full scale. The next teacher
+experiment must alternate discriminator and generator updates and refresh the
+discriminator with true normalized PESQ labels for clean, noisy, current
+enhanced and historical enhanced examples.
+
+Cause: bounded pilot A1 eliminated collapse but still reduced true
+`val_select` PESQ from 2.8238 to 2.8197 after one metric epoch and 2.8131 after
+two. Fixed-candidate proxy Pearson remained 0.9539, demonstrating that static
+calibration is not enough for generator-induced distribution shift. The
+original SpeechBrain MetricGAN+ recipe explicitly retrains the discriminator
+before each generator epoch and replays historical outputs.
+
+Constraint: test metrics cannot tune this loop. Selection remains confined to
+the frozen `val_select` split and the existing promotion guardrails.

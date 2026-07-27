@@ -17,8 +17,8 @@ Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
 
 Current release state: **official teacher and two-stage causal-max campaign
-passed its clean-snapshot seven-cell pilot; the teacher-improvement gate failed
-and full training is blocked**.
+passed two clean-snapshot seven-cell pilots; both frozen-proxy teacher
+improvement formulations failed the PESQ gate and full training is blocked**.
 
 Open blockers:
 
@@ -30,6 +30,7 @@ Open blockers:
   pass structure, checkpoint, CUDA smoke and independent package audit gates.
 - The clean pilot calibrated the frozen WB proxy well, but both T1 branches
   reduced true `val_select` PESQ and were restored to the official checkpoint.
-- A bounded official-style target-score objective plus protection against
-  proxy distribution shift must pass smoke and pilot gates before full.
+- The bounded target-score/T0-anchor pilot was stable but still negative; the
+  next branch must refresh its discriminator on current/noisy/historical
+  outputs as in MetricGAN+.
 - There is no promoted end-to-end run produced from the current clean snapshot.

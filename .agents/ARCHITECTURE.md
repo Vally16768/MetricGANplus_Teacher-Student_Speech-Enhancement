@@ -1,7 +1,7 @@
 # Architecture register
 
-Status: `official-teacher-two-stage-pilot-gate-failed`; no full run is
-promoted.
+Status: `bounded-frozen-proxy-pilot-gate-failed`; alternating discriminator
+refresh is required; no full run is promoted.
 
 ## A0 — End-to-end research pipeline
 
@@ -244,6 +244,10 @@ Evidence:
 - bounded-objective smoke:
   `20260727-bounded-teacher-smoke-s0-a1` on commit `27838d9` (seven
   cells/models, 42 samples, no T1 collapse, T0 fallback, audit zero issues).
+- bounded-objective pilot:
+  `20260727-bounded-teacher-pilot-s0-a1` on commit `33ef895` (seven
+  cells/models, 84 samples, stable but negative T1 teacher changes, T0
+  fallback, audit zero issues).
 
 ## A6 — Selection boundaries
 

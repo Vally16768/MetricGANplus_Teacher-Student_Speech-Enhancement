@@ -119,5 +119,9 @@ metric/reference profile matches the run profile
   seven models, 42/42 samples and zero independent-audit issues.
 - bounded T1 control/metric epoch deltas were only -0.0004/-0.0007 PESQ-WB,
   eliminating the earlier ~0.4 PESQ collapse; neither passed the gain gate.
-- the next required gate is a tested bounded/refreshable teacher metric
-  objective followed by a new clean smoke and monitored pilot.
+- bounded-teacher clean pilot A1 passed execution/audit on commit `33ef895`:
+  seven cells/models, 84/84 samples and zero issues.
+- pilot control PESQ moved 2.8238→2.8093→2.7964; bounded metric PESQ moved
+  2.8238→2.8197→2.8131. Both retained epoch-0 T0 and blocked full.
+- the next required gate is an alternating current/noisy/historical
+  discriminator refresh implementation, followed by a new smoke and pilot.

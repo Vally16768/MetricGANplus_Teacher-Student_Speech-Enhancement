@@ -70,6 +70,7 @@ experiments/runs/<run_id>/
 | `20260727-official-two-stage-smoke-s0-a3` | smoke-passed/audited | clean commit `8d36d62`; 7 cells/models, 42/42 samples, T0 fallback, one deduplicated FP16 cache, zero issues | no |
 | `20260727-official-two-stage-pilot-s0-a1` | pilot-passed/audited; T1 gate failed | clean commit `0756a68`; 7 cells/models, 84/84 samples, strong fixed-proxy calibration but true-PESQ degradation; T0 fallback and cache reuse passed; zero audit issues | no |
 | `20260727-bounded-teacher-smoke-s0-a1` | smoke-passed/audited | clean commit `27838d9`; bounded T1 stayed within 0.0007 PESQ of T0, failed the positive-gain gate, restored T0; 7 cells/models, 42/42 samples, zero issues | no |
+| `20260727-bounded-teacher-pilot-s0-a1` | pilot-passed/audited; T1 gate failed | clean commit `33ef895`; stable bounded branches but best true PESQ remained epoch-0 T0; 7 cells/models, 84/84 samples, zero issues | no |
 
 There is currently no promoted end-to-end run from the current repository
 snapshot.
@@ -186,3 +187,15 @@ The failed gate correctly reused the same content-addressed T0 cache for S0 and
 S1. WB/NB student PESQ deltas were -0.00007/-0.00085, so no teacher-improvement
 claim exists. The full campaign is blocked. See
 `docs/audits/2026-07-27-two-stage-pilot-a1.md`.
+
+### Bounded pilot `20260727-bounded-teacher-pilot-s0-a1`
+
+The safety correction eliminated catastrophic proxy exploitation, but did not
+create a positive teacher effect. Control `val_select` PESQ moved
+2.8238 → 2.8093 → 2.7964; bounded metric PESQ moved
+2.8238 → 2.8197 → 2.8131. Both selected the original checkpoint.
+
+The frozen proxy remained strongly calibrated on fixed candidates (Pearson
+0.9539), so repeating this full run would only scale a negative formulation.
+The next experiment must implement current/noisy/historical discriminator
+refresh as in MetricGAN+, then pass a new pilot gate.

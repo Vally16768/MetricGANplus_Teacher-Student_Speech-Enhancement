@@ -32,8 +32,10 @@ Update this register whenever a gate changes state.
 | C25 | Run two-stage GPU smoke and independent audit | A3: clean commit; 7 cells/models, 42/42 samples, cache dedup, zero audit issues; verification-only | passed |
 | C26 | Run monitored two-stage pilot | clean commit `0756a68`; 7 cells/models, 84/84 samples, zero audit issues; T1 PESQ gate failed and T0 fallback passed | failed |
 | C27 | Replace unsafe teacher proxy optimization | bounded target-score loss, T0 trust anchor, official log-spectral features, 41/41 tests and clean 7-cell CUDA smoke | passed |
-| C28 | Rerun clean smoke and monitored pilot | smoke passed without collapse; larger clean pilot must show true `val_select` PESQ gain >= 0.01 with guardrails | in-progress |
+| C28 | Rerun clean smoke and monitored pilot | smoke/pilot executed and audited; bounded proxy stable but true PESQ gate failed | failed |
 | C29 | Run and promote full multi-seed campaign | only after C28 passes; independent audit and article-ready report | blocked |
+| C30 | Implement alternating MetricGAN+ discriminator refresh | true normalized PESQ labels for clean/noisy/current, historical replay, G/D alternation, tests and current-output calibration audit | in-progress |
+| C31 | Validate alternating T1 in clean smoke/pilot | T1 gain >= 0.01 PESQ-WB with STOI/SI-SDR guardrails before students/full | blocked |
 
 ## Execution rule
 
