@@ -76,5 +76,14 @@ metric/reference profile matches the run profile
   retained zero pair/clean overlaps.
 - pilot WB/NB metric/reference contracts passed and held-out proxy Pearson
   correlations were 0.9695/0.9551.
-- pilot is verification-only; full VoiceBank-only training remains the next
-  promotable experiment gate.
+- first full attempt `20260727-full-wbnb-s0-a1` was deliberately stopped and is
+  non-promotable; artifacts and hashes are preserved.
+- causal-max structural audit passed: WB `604386` parameters, NB `514018`,
+  GRU hidden size `160`, three layers, linear size `224`, fixed 16 ms
+  lookahead.
+- 32/32 unit/integration tests and the research-plan validator passed after the
+  architecture change.
+- direct two-second WB and NB forward/backward passes completed on the shared
+  venv's NVIDIA GTX 1660 Ti with finite gradients.
+- a new end-to-end six-cell smoke and independent audit remain required before
+  the next pilot/full gate.

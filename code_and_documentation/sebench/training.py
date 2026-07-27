@@ -324,6 +324,11 @@ def suggest_runtime_profile(model_family: str, variant: str, segment_len: int) -
         "metricgan_plus_student_nb",
     }:
         batch_size = 16 if short_segment else 12
+    elif model_family in {
+        "metricgan_plus_student_wb_causal_max",
+        "metricgan_plus_student_nb_causal_max",
+    }:
+        batch_size = 8 if short_segment else 6
     elif model_family == "metricgan_plus_native8k_causal_xs":
         batch_size = 18 if short_segment else 14
     elif model_family == "metricgan_plus_native8k_causal_n6":

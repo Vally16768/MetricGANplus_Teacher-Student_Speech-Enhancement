@@ -18,6 +18,8 @@ MODEL_FAMILIES = (
     "metricgan_plus_teacher_wb",
     "metricgan_plus_student_wb",
     "metricgan_plus_student_nb",
+    "metricgan_plus_student_wb_causal_max",
+    "metricgan_plus_student_nb_causal_max",
     "metricgan_plus_native8k",
     "metricgan_plus_native8k_causal_s",
     "metricgan_plus_native8k_causal_xs",
@@ -30,6 +32,8 @@ DEFAULT_MICROBATCH = {
     "metricgan_plus_teacher_wb": 8,
     "metricgan_plus_student_wb": 12,
     "metricgan_plus_student_nb": 12,
+    "metricgan_plus_student_wb_causal_max": 8,
+    "metricgan_plus_student_nb_causal_max": 8,
     "metricgan_plus_native8k": 8,
     "metricgan_plus_native8k_causal_s": 12,
     "metricgan_plus_native8k_causal_xs": 14,
@@ -566,6 +570,18 @@ def build_metricgan_causal_lite(
     configs = {
         "metricgan_plus_student_wb": {"hidden_size": 96, "num_layers": 1, "linear_dim": 128, "rnn_type": "gru"},
         "metricgan_plus_student_nb": {"hidden_size": 96, "num_layers": 1, "linear_dim": 128, "rnn_type": "gru"},
+        "metricgan_plus_student_wb_causal_max": {
+            "hidden_size": 160,
+            "num_layers": 3,
+            "linear_dim": 224,
+            "rnn_type": "gru",
+        },
+        "metricgan_plus_student_nb_causal_max": {
+            "hidden_size": 160,
+            "num_layers": 3,
+            "linear_dim": 224,
+            "rnn_type": "gru",
+        },
         "metricgan_plus_native8k_causal_s": {"hidden_size": 96, "num_layers": 1, "linear_dim": 128, "rnn_type": "gru"},
         "metricgan_plus_native8k_causal_xs": {"hidden_size": 64, "num_layers": 1, "linear_dim": 96, "rnn_type": "gru"},
         "metricgan_plus_native8k_causal_n6": {"hidden_size": 128, "num_layers": 2, "linear_dim": 160, "rnn_type": "gru"},
@@ -649,6 +665,8 @@ def build_model(
     if model_family in {
         "metricgan_plus_student_wb",
         "metricgan_plus_student_nb",
+        "metricgan_plus_student_wb_causal_max",
+        "metricgan_plus_student_nb_causal_max",
         "metricgan_plus_native8k_causal_s",
         "metricgan_plus_native8k_causal_xs",
         "metricgan_plus_native8k_causal_n6",
@@ -656,9 +674,15 @@ def build_model(
     }:
         if spectral_native_gate:
             raise ValueError(f"{model_family} does not support spectral-native gating.")
-        if model_family == "metricgan_plus_student_wb":
+        if model_family in {
+            "metricgan_plus_student_wb",
+            "metricgan_plus_student_wb_causal_max",
+        }:
             resolve_bandwidth("wb", sample_rate=sample_rate)
-        elif model_family == "metricgan_plus_student_nb":
+        elif model_family in {
+            "metricgan_plus_student_nb",
+            "metricgan_plus_student_nb_causal_max",
+        }:
             resolve_bandwidth("nb", sample_rate=sample_rate)
         return build_metricgan_causal_lite(
             sample_rate=sample_rate,

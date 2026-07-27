@@ -93,3 +93,19 @@ recovery through public commit `5129bae` and ignored local forensic imports.
 
 Cause: the user explicitly authorized cleanup so the canonical MetricGAN+
 campaign can pass privacy/scope gates and produce a clean training snapshot.
+
+## D-013 — Replace canonical students with recovered causal-max capacity
+
+Decision: use new canonical aliases
+`metricgan_plus_student_wb_causal_max` and
+`metricgan_plus_student_nb_causal_max`, both with a three-layer
+unidirectional GRU (`hidden_size=160`) and a 224-unit linear projection.
+Retain the former 96x1 aliases only for historical checkpoint compatibility.
+
+Cause: the first full WB student showed measurable but inadequate learning,
+remaining 0.218756 PESQ-WB below the selected teacher on the same validation
+support. The stronger architecture is the exact MetricGAN-style student used
+for WB/NB in the earlier MP-SENet teacher–student campaign.
+
+Constraint: transfer architecture only. Do not warm-start from the historical
+weights because their provenance includes non-VoiceBank training data.

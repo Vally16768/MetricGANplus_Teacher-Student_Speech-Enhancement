@@ -18,7 +18,7 @@ teacher:
 students:
   wb:
     role: "student_wb"
-    family: "metricgan_plus_student_wb"
+    family: "metricgan_plus_student_wb_causal_max"
     bandwidth: "wb"
     sample_rate: 16000
     n_fft: 512
@@ -27,7 +27,7 @@ students:
     evaluation_reference_bandwidth: "wb"
   nb:
     role: "student_nb"
-    family: "metricgan_plus_student_nb"
+    family: "metricgan_plus_student_nb_causal_max"
     bandwidth: "nb"
     sample_rate: 8000
     n_fft: 256

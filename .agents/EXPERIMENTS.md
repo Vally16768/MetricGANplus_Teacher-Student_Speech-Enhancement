@@ -63,6 +63,7 @@ experiments/runs/<run_id>/
 | `20260726-postcleanup-smoke-wbnb-s0-a4` | superseded smoke | six cells completed, but ERB extraction changed the working source while the process was active; proxy WB held-out correlation was negative on six smoke records | no |
 | `20260727-postcleanup-smoke-wbnb-s0-a5` | smoke-passed/audited | stable post-cleanup source; six cells, six models, 36/36 reported samples, matched WB/NB protocols, zero audit issues | no |
 | `20260727-pilot-wbnb-s0-a1` | pilot-passed/audited | clean commit `76729f3`; six cells, six models, 72/72 samples, frozen manifests unchanged, zero audit issues; verification-only | no |
+| `20260727-full-wbnb-s0-a1` | stopped-by-user/invalid | clean commit `4fee1e3`; teacher/proxies/cache completed; stopped during epoch 14 validation of inadequate 96x1 `S-WB-BASE`; all 9.4 GiB preserved locally | no |
 
 There is currently no promoted end-to-end run from the current repository
 snapshot.
@@ -71,6 +72,13 @@ The smoke runs prove wiring only. The pilot used 256 training pairs and one
 seed; it validates execution and exposes directional warnings, but its metric
 values are not publication evidence and must not enter the article as final
 results.
+
+The first full attempt is also non-promotable. Its WB student improved from
+1.837460 to a best 1.996045 PESQ-WB on `val_select`, but remained 0.218756
+below the selected teacher on identical support. It was deliberately stopped
+before the remaining student cells and replaced by a separately named
+causal-max architecture. See
+`docs/audits/2026-07-27-full-a1-stopped.md`.
 
 ### Pilot `20260727-pilot-wbnb-s0-a1`
 

@@ -1,6 +1,6 @@
 # Architecture register
 
-Status: `clean-snapshot-pilot-confirmed`; no full run is promoted.
+Status: `causal-max-student-change-in-validation`; no full run is promoted.
 
 ## A0 — End-to-end research pipeline
 
@@ -86,12 +86,25 @@ waveform
 
 | Canonical family | Band | Rate | Hidden | GRU layers | Linear | Role |
 |---|---:|---:|---:|---:|---:|---|
-| `metricgan_plus_student_wb` | WB | 16 kHz | 96 | 1 | 128 | WB student |
-| `metricgan_plus_student_nb` | NB | 8 kHz | 96 | 1 | 128 | NB student |
+| `metricgan_plus_student_wb_causal_max` | WB | 16 kHz | 160 | 3 | 224 | WB student |
+| `metricgan_plus_student_nb_causal_max` | NB | 8 kHz | 160 | 3 | 224 | NB student |
 
 Both aliases use the same causal capacity so bandwidth is the controlled
-variable. Historical `native8k_causal_*` family names remain readable only for
-checkpoint/result compatibility and are not canonical experiment labels.
+variable. The recurrent graph is frame-causal; centered STFT analysis imposes
+a fixed 16 ms lookahead for both profiles. The WB and NB models contain
+604,386 and 514,018 trainable parameters respectively because their spectral
+input/output dimensions differ.
+
+The recovered design is the `causal_max` student used in the historical
+MP-SENet teacher–student campaign. It is a MetricGAN-style magnitude-mask
+student, not the full MP-SENet magnitude/phase teacher architecture. Only its
+architecture is transferred; its mixed-dataset weights are excluded.
+
+The old `metricgan_plus_student_wb` and `metricgan_plus_student_nb` aliases
+remain loadable at 96 hidden units/one GRU layer solely so pilot and stopped-run
+checkpoints do not change meaning. They are no longer canonical campaign
+families. Historical `native8k_causal_*` family names likewise remain readable
+only for checkpoint/result compatibility.
 
 QAT uses fake quantization in the causal mask generator. The final deployment
 claim requires a validated exported model and measured latency/model size, not
@@ -172,6 +185,9 @@ Evidence:
   `20260727-postcleanup-smoke-wbnb-s0-a5` (six cells, audit zero issues).
 - clean-snapshot pilot:
   `20260727-pilot-wbnb-s0-a1` (six cells, 72 samples, audit zero issues).
+- first full attempt:
+  `20260727-full-wbnb-s0-a1` (user-stopped during the inadequate 96x1 WB
+  student; preserved and non-promotable).
 
 ## A6 — Selection boundaries
 

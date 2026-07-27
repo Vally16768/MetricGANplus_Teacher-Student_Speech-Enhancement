@@ -17,10 +17,14 @@ Update this register whenever a gate changes state.
 | C10 | Implement plots and academic report | curves, calibration, deltas, hashes, report and independent auditor | passed |
 | C11 | Run unit/integration suite | 30/30 tests passed, including WB/NB ERB extraction | passed |
 | C12 | Run GPU end-to-end smoke | stable post-cleanup `...-a5`: six cells, six models, 36/36 samples, zero audit issues | passed |
-| C13 | Run canonical full/pilot experiments | pilot `20260727-pilot-wbnb-s0-a1` passed all execution/audit gates from clean commit `76729f3`; full run is next | in-progress |
-| C14 | Audit and promote only valid outputs | pilot reconciles 0 issues but is explicitly non-promotable; teacher test PESQ warning recorded; no full result | blocked |
+| C13 | Run canonical full/pilot experiments | pilot passed; first full `...-a1` stopped during inadequate legacy WB student and is invalid; replacement rerun pending | failed |
+| C14 | Audit and promote only valid outputs | pilot reconciles 0 issues but is non-promotable; stopped full documented and excluded; no full result | blocked |
 | C15 | Remove legacy public surface after verified archive | authorized removal applied; recovery anchors `5129bae` + local archive | passed |
 | C16 | Final docs/privacy/scope audit | project guard passed with zero issues after authorized cleanup | passed |
+| C17 | Recover stronger MP-SENet-campaign student architecture | exact causal-max architecture traced; external sources read-only; mixed-dataset weights explicitly excluded | passed |
+| C18 | Implement causal-max aliases for WB/NB | new names preserve 96x1 checkpoint semantics; configs and research plan updated | passed |
+| C19 | Validate causal-max architecture | 32/32 tests and direct WB/NB CUDA backward passed; end-to-end smoke/audit pending | in-progress |
+| C20 | Rerun pilot/full with causal-max students | only after clean committed smoke passes; compare matched val curves against stopped run | blocked |
 
 ## Execution rule
 

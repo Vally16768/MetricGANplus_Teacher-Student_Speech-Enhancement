@@ -61,7 +61,7 @@ def validate_research_plan(plan: dict[str, Any]) -> dict[str, Any]:
         name: _validate_model_profile(
             f"student.{name}",
             dict(payload),
-            expected_family=f"metricgan_plus_student_{name}",
+            expected_family=f"metricgan_plus_student_{name}_causal_max",
         )
         for name, payload in students_payload.items()
     }

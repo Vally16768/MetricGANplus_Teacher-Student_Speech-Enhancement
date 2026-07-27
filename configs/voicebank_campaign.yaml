@@ -15,8 +15,8 @@ runtime:
 
 model:
   teacher_family: "metricgan_plus_teacher_wb"
-  student_wb_family: "metricgan_plus_student_wb"
-  student_nb_family: "metricgan_plus_student_nb"
+  student_wb_family: "metricgan_plus_student_wb_causal_max"
+  student_nb_family: "metricgan_plus_student_nb_causal_max"
   variant: "small"
   erb_bands: 32
 
