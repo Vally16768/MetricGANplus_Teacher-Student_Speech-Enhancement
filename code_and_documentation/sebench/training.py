@@ -149,6 +149,7 @@ class ExperimentConfig:
     log_system_metrics: bool = False
     quantize_dynamic: bool = False
     deterministic: bool = False
+    optimizer_lr_override_after_resume: float | None = None
     bandwidth: str | None = None
     metric_proxy_weight: float = 0.25
     teacher_anchor_weight: float = 0.75
@@ -1577,6 +1578,18 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
             scheduler.load_state_dict(state_payload["scheduler_state"])
         if autocast_scaler is not None and state_payload.get("scaler_state"):
             autocast_scaler.load_state_dict(state_payload["scaler_state"])
+        if config.optimizer_lr_override_after_resume is not None:
+            override_lr = float(config.optimizer_lr_override_after_resume)
+            if override_lr < 0.0:
+                raise ValueError(
+                    "optimizer_lr_override_after_resume cannot be negative."
+                )
+            for parameter_group in optimizer.param_groups:
+                parameter_group["lr"] = override_lr
+            if scheduler is not None and hasattr(scheduler, "_last_lr"):
+                scheduler._last_lr = [
+                    override_lr for _ in optimizer.param_groups
+                ]
         _restore_rng_state(state_payload.get("rng_state"))
         resume_loader_generator_states = dict(
             state_payload.get("train_loader_generator_states") or {}

@@ -2350,8 +2350,10 @@ def smoke_resume_equivalence(
         **common,
         cell=f"{cell}-INTERRUPTED",
     )
-    control.deterministic = True
-    interrupted.deterministic = True
+    control.optimizer_lr_override_after_resume = 0.0
+    interrupted.optimizer_lr_override_after_resume = 0.0
+    control.min_lr = 0.0
+    interrupted.min_lr = 0.0
     shutil.copy2(source_model_path, control.checkpoint_out)
     shutil.copy2(source_model_path, interrupted.checkpoint_out)
     control_summary = run_experiment(control)
@@ -2391,6 +2393,7 @@ def smoke_resume_equivalence(
         "source_epoch": source_epoch,
         "interrupted_after_epoch": source_epoch + 1,
         "final_epoch": target_epochs,
+        "optimizer_updates_disabled_for_equivalence": True,
         "control": {
             "best_epoch": control_summary["best_epoch"],
             "best_score": control_summary["best_score"],
