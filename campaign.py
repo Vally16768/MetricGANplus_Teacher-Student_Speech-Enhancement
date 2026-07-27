@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import traceback
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -39,7 +40,11 @@ from sebench.teacher_cache import (  # noqa: E402
     TeacherCacheTarget,
     build_multi_target_teacher_cache,
 )
-from sebench.training import ExperimentConfig, run_experiment  # noqa: E402
+from sebench.training import (  # noqa: E402
+    ExperimentConfig,
+    PlannedTrainingInterruption,
+    run_experiment,
+)
 
 
 CELL_ORDER = (
@@ -2130,6 +2135,291 @@ def close_converged_baseline(
     }
 
 
+def _resume_equivalence_issues(
+    control_state: dict[str, Any],
+    resumed_state: dict[str, Any],
+    *,
+    control_checkpoint: Path,
+    resumed_checkpoint: Path,
+) -> list[str]:
+    issues: list[str] = []
+    for key in ("best_epoch", "epochs_without_improve", "global_step"):
+        if int(control_state.get(key, -1)) != int(resumed_state.get(key, -1)):
+            issues.append(f"state mismatch: {key}")
+    if abs(
+        float(control_state.get("best_score", float("nan")))
+        - float(resumed_state.get("best_score", float("nan")))
+    ) > 1e-9:
+        issues.append("state mismatch: best_score")
+
+    control_lrs = [
+        float(group["lr"])
+        for group in dict(control_state["optimizer_state"])["param_groups"]
+    ]
+    resumed_lrs = [
+        float(group["lr"])
+        for group in dict(resumed_state["optimizer_state"])["param_groups"]
+    ]
+    if control_lrs != resumed_lrs:
+        issues.append("optimizer LR mismatch")
+    if control_state.get("scheduler_state") != resumed_state.get(
+        "scheduler_state"
+    ):
+        issues.append("scheduler state mismatch")
+
+    def tensor_mapping_equal(
+        left: dict[str, torch.Tensor],
+        right: dict[str, torch.Tensor],
+    ) -> bool:
+        return set(left) == set(right) and all(
+            torch.equal(left[key].cpu(), right[key].cpu())
+            for key in left
+        )
+
+    if not tensor_mapping_equal(
+        dict(control_state["model_state"]),
+        dict(resumed_state["model_state"]),
+    ):
+        issues.append("final model state mismatch")
+    control_package = torch.load(
+        control_checkpoint,
+        map_location="cpu",
+        weights_only=True,
+    )
+    resumed_package = torch.load(
+        resumed_checkpoint,
+        map_location="cpu",
+        weights_only=True,
+    )
+    if not tensor_mapping_equal(
+        dict(control_package["state_dict"]),
+        dict(resumed_package["state_dict"]),
+    ):
+        issues.append("best checkpoint state mismatch")
+
+    control_history = [
+        {
+            key: row.get(key)
+            for key in (
+                "row_type",
+                "epoch",
+                "global_step",
+                "selection_score",
+                "improved",
+                "epochs_without_improve",
+                "early_stop_triggered",
+                "lr_after_eval",
+            )
+        }
+        for row in list(control_state.get("history_rows") or [])
+        if row.get("row_type") in {"init", "epoch"}
+    ]
+    resumed_history = [
+        {
+            key: row.get(key)
+            for key in (
+                "row_type",
+                "epoch",
+                "global_step",
+                "selection_score",
+                "improved",
+                "epochs_without_improve",
+                "early_stop_triggered",
+                "lr_after_eval",
+            )
+        }
+        for row in list(resumed_state.get("history_rows") or [])
+        if row.get("row_type") in {"init", "epoch"}
+    ]
+    if control_history != resumed_history:
+        issues.append("post-evaluation history mismatch")
+    return issues
+
+
+def smoke_resume_equivalence(
+    config: dict[str, Any],
+    *,
+    source_run_dir: str | Path,
+    run_id: str,
+    cell: str = "S0-NB",
+) -> dict[str, Any]:
+    """Fault-inject one post-evaluation interruption and compare with control."""
+    if cell not in STUDENT_CONTINUATION_CELL_ORDER:
+        raise ValueError(f"Unsupported resume-smoke cell: {cell}")
+    dataset_audit = validate_campaign_config(config)
+    git = _git_state()
+    if git["dirty"]:
+        raise RuntimeError("Resume smoke requires a clean committed snapshot.")
+    require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+    device = require_training_cuda(str(config["runtime"]["device"]))
+    config["runtime"]["device"] = device
+
+    source_root = Path(source_run_dir).expanduser().resolve()
+    source_audit = audit_campaign_run(source_root)
+    if not source_audit["valid"]:
+        raise ValueError(f"Resume-smoke source audit failed: {source_audit['issues']}")
+    source_summary = json.loads(
+        (source_root / "metrics" / "campaign_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    source_cell = dict(source_summary["cells"][cell])
+    source_state_path = source_root / "cells" / cell / "training_state.pt"
+    source_model_path = source_root / "models" / f"{cell}.pt"
+    if not source_state_path.is_file() or not source_model_path.is_file():
+        raise FileNotFoundError(f"Missing source state/model for {cell}")
+    source_state = torch.load(
+        source_state_path,
+        map_location="cpu",
+        weights_only=True,
+    )
+    source_config = dict(source_state.get("config") or {})
+    for state_key, dataset_key in (
+        ("train_csv", "train_fit"),
+        ("val_rank_csv", "val_rank"),
+        ("val_select_csv", "val_select"),
+    ):
+        state_manifest = Path(str(source_config.get(state_key) or ""))
+        current_manifest = Path(str(config["dataset"][dataset_key]))
+        if (
+            not state_manifest.is_file()
+            or sha256(state_manifest) != sha256(current_manifest)
+        ):
+            raise ValueError(f"Resume-smoke source manifest mismatch: {state_key}")
+    teacher_cache_manifest = Path(
+        str(source_cell.get("teacher_cache_manifest") or "")
+    )
+    if not teacher_cache_manifest.is_file():
+        raise FileNotFoundError("Resume-smoke teacher cache is missing.")
+
+    run_root = (
+        Path(str(config["runtime"]["run_root"])).expanduser().resolve()
+        / run_id
+    )
+    run_root.mkdir(parents=True, exist_ok=False)
+    source_epoch = int(source_state.get("epoch") or 0)
+    target_epochs = source_epoch + 2
+    bandwidth = "nb" if cell.endswith("-NB") else "wb"
+    effective = _effective_training(config, "smoke")
+    common = {
+        "config": config,
+        "run_root": run_root,
+        "family": str(source_cell["model_family"]),
+        "bandwidth": bandwidth,
+        "loss_recipe": str(source_cell["loss_recipe"]),
+        "epochs": target_epochs,
+        "lr": float(source_config.get("lr") or effective["student_lr"]),
+        "seed": int(source_cell["seed"]),
+        "teacher_cache_manifest": teacher_cache_manifest.as_posix(),
+        "include_test": False,
+        "resume_training_state": source_state_path.as_posix(),
+        "early_stop_patience": 0,
+        "lr_factor": float(config["training"]["student_lr_factor"]),
+        "lr_patience": int(config["training"]["student_lr_patience"]),
+        "min_lr": float(config["training"]["student_min_lr"]),
+        "mode": "smoke",
+    }
+    provenance = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "status": "running",
+        "campaign_scope": "resume_equivalence_smoke",
+        "verification_only": True,
+        "git_commit": git["commit"],
+        "git_dirty": git["dirty"],
+        "dataset_audit": dataset_audit,
+        "source": {
+            "run_id": source_root.name,
+            "cell": cell,
+            "state_sha256": sha256(source_state_path),
+            "model_sha256": sha256(source_model_path),
+            "epoch": source_epoch,
+        },
+    }
+    _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+    (run_root / "provenance" / "config_resolved.yaml").write_text(
+        yaml.safe_dump(config, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    control = _experiment_config(
+        **common,
+        cell=f"{cell}-CONTROL",
+    )
+    interrupted = _experiment_config(
+        **common,
+        cell=f"{cell}-INTERRUPTED",
+    )
+    shutil.copy2(source_model_path, control.checkpoint_out)
+    shutil.copy2(source_model_path, interrupted.checkpoint_out)
+    control_summary = run_experiment(control)
+    interrupted.interrupt_after_evaluation_epoch = source_epoch + 1
+    try:
+        run_experiment(interrupted)
+    except PlannedTrainingInterruption:
+        pass
+    else:
+        raise RuntimeError("Resume smoke did not trigger the planned interruption.")
+    interrupted.interrupt_after_evaluation_epoch = None
+    interrupted.resume_training_state = interrupted.training_state_out
+    resumed_summary = run_experiment(interrupted)
+
+    control_state = torch.load(
+        control.training_state_out,
+        map_location="cpu",
+        weights_only=True,
+    )
+    resumed_state = torch.load(
+        interrupted.training_state_out,
+        map_location="cpu",
+        weights_only=True,
+    )
+    issues = _resume_equivalence_issues(
+        control_state,
+        resumed_state,
+        control_checkpoint=Path(control.checkpoint_out),
+        resumed_checkpoint=Path(interrupted.checkpoint_out),
+    )
+    result = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "valid": not issues,
+        "verification_only": True,
+        "cell": cell,
+        "source_epoch": source_epoch,
+        "interrupted_after_epoch": source_epoch + 1,
+        "final_epoch": target_epochs,
+        "control": {
+            "best_epoch": control_summary["best_epoch"],
+            "best_score": control_summary["best_score"],
+            "model_sha256": sha256(control.checkpoint_out),
+            "training_state_sha256": sha256(control.training_state_out),
+        },
+        "resumed": {
+            "best_epoch": resumed_summary["best_epoch"],
+            "best_score": resumed_summary["best_score"],
+            "model_sha256": sha256(interrupted.checkpoint_out),
+            "training_state_sha256": sha256(interrupted.training_state_out),
+        },
+        "issues": issues,
+    }
+    _atomic_json(run_root / "reports" / "resume_audit.json", result)
+    provenance["status"] = "smoke-passed" if result["valid"] else "failed"
+    provenance["resume_audit"] = result
+    _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+    _atomic_json(
+        run_root / "status.json",
+        {
+            "status": provenance["status"],
+            "campaign_scope": "resume_equivalence_smoke",
+            "valid_for_promotion": False,
+        },
+    )
+    if issues:
+        raise RuntimeError(f"Resume equivalence smoke failed: {issues}")
+    return {"run_root": run_root.as_posix(), **result}
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -2159,6 +2449,14 @@ def parse_args() -> argparse.Namespace:
     closure.add_argument("--baseline-run-dir", required=True)
     closure.add_argument("--continuation-run-dir", required=True)
     closure.add_argument("--run-id", required=True)
+    resume_smoke = subparsers.add_parser("smoke-resume")
+    resume_smoke.add_argument("--source-run-dir", required=True)
+    resume_smoke.add_argument("--run-id", required=True)
+    resume_smoke.add_argument(
+        "--cell",
+        choices=STUDENT_CONTINUATION_CELL_ORDER,
+        default="S0-NB",
+    )
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -2263,10 +2561,18 @@ def main() -> None:
                     {"status": "failed", "valid_for_promotion": False},
                 )
             raise
+    elif args.command == "smoke-resume":
+        result = smoke_resume_equivalence(
+            config,
+            source_run_dir=args.source_run_dir,
+            run_id=args.run_id,
+            cell=args.cell,
+        )
     elif args.command not in {
         "audit-run",
         "close-baseline",
         "monitor-run",
+        "smoke-resume",
         "continue-students",
     }:
         raise ValueError(args.command)

@@ -85,6 +85,7 @@ class ExperimentConfig:
     checkpoint_keep_last: int = 2
     training_state_out: str | None = None
     resume_training_state: str | None = None
+    interrupt_after_evaluation_epoch: int | None = None
     history_plot_every_epochs: int = 1
     history_plot_final_only: bool = False
     history_persist_every_periods: int = 4
@@ -750,6 +751,94 @@ def _selection_score(metrics: dict[str, float]) -> float:
     if "loss" in metrics:
         return float(-metrics["loss"])
     return float("-inf")
+
+
+_COMPLETED_EPOCH_STATE_REASONS = frozenset(
+    {"epoch", "evaluation", "final", "best"}
+)
+
+
+class PlannedTrainingInterruption(RuntimeError):
+    """Controlled fault injection after a durable evaluation checkpoint."""
+
+
+def _capture_rng_state() -> dict[str, Any]:
+    numpy_state = np.random.get_state()
+    return {
+        "python": random.getstate(),
+        "numpy": {
+            "bit_generator": numpy_state[0],
+            "state": torch.from_numpy(numpy_state[1].copy()),
+            "position": int(numpy_state[2]),
+            "has_gauss": int(numpy_state[3]),
+            "cached_gaussian": float(numpy_state[4]),
+        },
+        "torch_cpu": torch.get_rng_state(),
+        "torch_cuda": (
+            torch.cuda.get_rng_state_all() if torch.cuda.is_available() else []
+        ),
+    }
+
+
+def _restore_rng_state(payload: dict[str, Any] | None) -> None:
+    state = dict(payload or {})
+    if state.get("python") is not None:
+        random.setstate(tuple(state["python"]))
+    numpy_payload = dict(state.get("numpy") or {})
+    if numpy_payload:
+        numpy_tensor = numpy_payload["state"]
+        np.random.set_state(
+            (
+                str(numpy_payload["bit_generator"]),
+                numpy_tensor.cpu().numpy().astype(np.uint32, copy=False),
+                int(numpy_payload["position"]),
+                int(numpy_payload["has_gauss"]),
+                float(numpy_payload["cached_gaussian"]),
+            )
+        )
+    if state.get("torch_cpu") is not None:
+        torch.set_rng_state(state["torch_cpu"])
+    cuda_states = list(state.get("torch_cuda") or [])
+    if cuda_states and torch.cuda.is_available():
+        torch.cuda.set_rng_state_all(cuda_states)
+
+
+def _resume_epoch_position(payload: dict[str, Any]) -> tuple[int, int]:
+    """Return next epoch and last completed epoch for a saved state."""
+    resume_epoch = int(payload.get("epoch", 0) or 0)
+    reason = str(payload.get("reason") or "").strip().lower()
+    if reason in _COMPLETED_EPOCH_STATE_REASONS:
+        return resume_epoch + 1, resume_epoch
+    start_epoch = max(1, resume_epoch)
+    return start_epoch, max(0, start_epoch - 1)
+
+
+def _training_control_state_fields(
+    *,
+    scheduler: Any,
+    best_score: float,
+    best_epoch: int,
+    best_rank_metrics: dict[str, Any],
+    best_select_metrics: dict[str, Any],
+    best_rank_metrics_by_split: dict[str, dict[str, Any]],
+    best_select_metrics_by_split: dict[str, dict[str, Any]],
+    epochs_without_improve: int,
+    history_rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Build the post-evaluation state shared by checkpoints and resume tests."""
+    return {
+        "scheduler_state": (
+            scheduler.state_dict() if scheduler is not None else None
+        ),
+        "best_score": float(best_score),
+        "best_epoch": int(best_epoch),
+        "best_rank_metrics": dict(best_rank_metrics),
+        "best_select_metrics": dict(best_select_metrics),
+        "best_rank_metrics_by_split": dict(best_rank_metrics_by_split),
+        "best_select_metrics_by_split": dict(best_select_metrics_by_split),
+        "epochs_without_improve": int(epochs_without_improve),
+        "history_rows": list(history_rows),
+    }
 
 
 def _resolve_eval_frequency(config: ExperimentConfig) -> tuple[int, int]:
@@ -1456,6 +1545,7 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
     stop_epoch = max(start_epoch - 1, 0)
 
     resume_state_path: Path | None = None
+    resume_loader_generator_states: dict[str, torch.Tensor] = {}
     if config.resume_training_state:
         setting = str(config.resume_training_state).strip()
         if setting.lower() == "auto_if_exists":
@@ -1480,6 +1570,10 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
             scheduler.load_state_dict(state_payload["scheduler_state"])
         if autocast_scaler is not None and state_payload.get("scaler_state"):
             autocast_scaler.load_state_dict(state_payload["scaler_state"])
+        _restore_rng_state(state_payload.get("rng_state"))
+        resume_loader_generator_states = dict(
+            state_payload.get("train_loader_generator_states") or {}
+        )
         if (
             discriminator_optimizer is not None
             and state_payload.get("metric_discriminator_state")
@@ -1504,14 +1598,14 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
         best_select_metrics_by_split = dict(state_payload.get("best_select_metrics_by_split", {}))
         epochs_without_improve = int(state_payload.get("epochs_without_improve", epochs_without_improve))
         global_step = int(state_payload.get("global_step", global_step))
-        resume_epoch = int(state_payload.get("epoch", 0) or 0)
-        resume_reason = str(state_payload.get("reason") or "").strip().lower()
-        if resume_reason in {"epoch", "final", "best"}:
-            start_epoch = resume_epoch + 1
-            last_completed_epoch = max(last_completed_epoch, resume_epoch)
-        else:
-            start_epoch = max(1, resume_epoch)
-            last_completed_epoch = max(last_completed_epoch, max(0, start_epoch - 1))
+        resume_start_epoch, resume_completed_epoch = _resume_epoch_position(
+            state_payload
+        )
+        start_epoch = resume_start_epoch
+        last_completed_epoch = max(
+            last_completed_epoch,
+            resume_completed_epoch,
+        )
         loaded_history = state_payload.get("history_rows")
         if isinstance(loaded_history, list):
             history_rows = [row for row in loaded_history if isinstance(row, dict)]
@@ -1580,16 +1674,24 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
             "config": asdict(config),
             "model_state": base_model.state_dict(),
             "optimizer_state": optimizer.state_dict(),
-            "scheduler_state": scheduler.state_dict() if scheduler is not None else None,
             "scaler_state": autocast_scaler.state_dict() if autocast_scaler is not None else None,
-            "best_score": float(best_score),
-            "best_epoch": int(best_epoch),
-            "best_rank_metrics": dict(best_rank_metrics),
-            "best_select_metrics": dict(best_select_metrics),
-            "best_rank_metrics_by_split": dict(best_rank_metrics_by_split),
-            "best_select_metrics_by_split": dict(best_select_metrics_by_split),
-            "epochs_without_improve": int(epochs_without_improve),
-            "history_rows": list(history_rows),
+            "rng_state": _capture_rng_state(),
+            "train_loader_generator_states": {
+                json.dumps(key): loader.generator.get_state()
+                for key, loader in train_loader_cache.items()
+                if loader.generator is not None
+            },
+            **_training_control_state_fields(
+                scheduler=scheduler,
+                best_score=best_score,
+                best_epoch=best_epoch,
+                best_rank_metrics=best_rank_metrics,
+                best_select_metrics=best_select_metrics,
+                best_rank_metrics_by_split=best_rank_metrics_by_split,
+                best_select_metrics_by_split=best_select_metrics_by_split,
+                epochs_without_improve=epochs_without_improve,
+                history_rows=history_rows,
+            ),
         }
         if isinstance(pesq_proxy_model, SpeechBrainMetricDiscriminator):
             payload["metric_discriminator_state"] = (
@@ -1680,6 +1782,14 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
         if loader is None:
             loader_config = replace(config, teacher_cache_manifest=teacher_cache_manifest)
             loader = build_dataloader(train_manifest, loader_config, shuffle=True)
+            saved_generator_state = resume_loader_generator_states.get(
+                json.dumps(key)
+            )
+            if (
+                saved_generator_state is not None
+                and loader.generator is not None
+            ):
+                loader.generator.set_state(saved_generator_state)
             train_loader_cache[key] = loader
         return loader, train_manifest, teacher_cache_manifest
 
@@ -2024,6 +2134,7 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
             if score is None and not select_eval_manifests and should_rank_eval:
                 score = _metric_value_from_flat(eval_flat, config.selection_metric) or _selection_score(_select_primary_metrics(rank_results, primary_rank_label))
 
+            stop_after_evaluation = False
             if score is not None:
                 history_row["selection_score"] = float(score)
                 target_gap = None
@@ -2076,7 +2187,6 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                             "best_score": float(score),
                         },
                     )
-                    _save_training_state(epoch=epoch, step=global_step, reason="best", snapshot=False)
                     _write_progress(
                         "best_updated",
                         epoch=epoch,
@@ -2094,8 +2204,7 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                     early_stopped = True
                     stop_reason = "early_stopping"
                     history_row["early_stop_triggered"] = 1
-                    history_rows.append(history_row)
-                    _persist_training_history(epoch, force_plot=True)
+                    stop_after_evaluation = True
                     _write_progress(
                         "early_stopping",
                         epoch=epoch,
@@ -2103,10 +2212,32 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                         selection_score=float(score),
                         epochs_without_improve=int(epochs_without_improve),
                     )
-                    break
-
+            history_row["lr_after_eval"] = float(
+                optimizer.param_groups[0]["lr"]
+            )
             history_rows.append(history_row)
-            _persist_training_history(epoch)
+            _persist_training_history(
+                epoch,
+                force_plot=stop_after_evaluation,
+            )
+            if should_rank_eval or should_select_eval:
+                _save_training_state(
+                    epoch=epoch,
+                    step=global_step,
+                    reason="evaluation",
+                    snapshot=False,
+                )
+                last_state_save_step = global_step
+                last_state_save_ts = time.monotonic()
+                if (
+                    config.interrupt_after_evaluation_epoch is not None
+                    and epoch == config.interrupt_after_evaluation_epoch
+                ):
+                    raise PlannedTrainingInterruption(
+                        f"planned interruption after evaluation epoch {epoch}"
+                    )
+            if stop_after_evaluation:
+                break
 
         if not checkpoint_path.exists():
             save_checkpoint_package(
@@ -2291,6 +2422,15 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
             mlflow.pytorch.log_model(final_model, artifact_path="model")
         log_dict_artifact(summary, "reports/run_summary.json")
         return summary
+    except PlannedTrainingInterruption:
+        run_status = "KILLED"
+        stop_reason = "planned_interruption"
+        _write_progress(
+            "planned_interruption",
+            epoch=last_completed_epoch,
+            global_step=global_step,
+        )
+        raise
     except KeyboardInterrupt:
         run_status = "KILLED"
         stop_reason = "interrupted"

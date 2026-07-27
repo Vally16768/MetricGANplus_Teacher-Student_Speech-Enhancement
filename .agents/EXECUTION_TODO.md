@@ -1,9 +1,9 @@
 # Iterative execution TODO
 
-Status: **active**  
-Last evidence update: **2026-07-27**  
-Current phase: **P1 — close the converged S0 baseline**  
-Next action: **P1.5 — build the merged epoch-20 versus converged report**
+Status: **active**
+Last evidence update: **2026-07-27**
+Current phase: **P2 — repair resume robustness**
+Next action: **P2.6 — run the clean CUDA resume-equivalence smoke**
 
 This is the detailed execution board for the active research sequence. The
 campaign-wide summary remains `.agents/TODO.md`; this file owns the subtask
@@ -52,9 +52,9 @@ with its immutable continuation and establish the selected WB/NB checkpoints.
 | P1.2 | Evaluate NB on all frozen splits | `val_select`, `val_rank`, test; NB/8 kHz reference; PESQ-NB metadata and support | passed |
 | P1.3 | Verify both selected models and training states | model/training-state hashes, ancestry, selected/best/stop epochs, scheduler/early-stop record | passed |
 | P1.4 | Compare epoch 20 with converged checkpoints | same split/protocol comparison; no cross-band score comparison | passed |
-| P1.5 | Build merged baseline report, tables and plots | T0/S0-WB/S0-NB metrics, 20→converged deltas, curves, support, limitations | in-progress |
-| P1.6 | Run independent merged-package audit | zero unresolved issues; paths and public/private boundaries reconciled | pending |
-| P1.7 | Decide baseline closure gate | valid or failed with cause; update C14/C41 and this board | pending |
+| P1.5 | Build merged baseline report, tables and plots | T0/S0-WB/S0-NB metrics, 20→converged deltas, curves, support, limitations | passed |
+| P1.6 | Run independent merged-package audit | zero unresolved issues; paths and public/private boundaries reconciled | passed |
+| P1.7 | Decide baseline closure gate | valid or failed with cause; update C14/C41 and this board | passed |
 
 Observed immutable continuation evidence:
 
@@ -81,9 +81,14 @@ Selected artifact hashes:
 
 Continuation evidence root:
 `local/runs/20260727-official-students-cont50-s0-a1` (private/ignored).
-Its existing two-cell audit reports zero issues, two models and 36 report
-samples. P1.6 still requires the merged baseline/continuation closure audit,
-not merely reuse of that two-cell audit.
+Its two-cell audit reports zero issues, two models and 36 report samples. The
+separate merged baseline/continuation closure audit is recorded below.
+
+Closure evidence root:
+`local/runs/20260727-converged-s0-baseline-a1` (private/ignored). The
+`close-baseline` command bound all three source model hashes, generated the
+comparison CSV/report/convergence plot and independently reconciled 3/3 cells,
+3/3 models and 54 reported samples with zero issues.
 
 Ceiling rule: if a future NB best occurs at the configured maximum epoch, mark
 it `ceiling-limited`, do not claim convergence and do not extend the ceiling
@@ -101,15 +106,15 @@ finished normally.
 
 | ID | Item | Required evidence | Status |
 |---|---|---|---|
-| P2.1 | Reproduce and localize the resume-state defect | focused failing test or state-order trace | blocked |
-| P2.2 | Save scheduler and early-stopping state after every evaluation | minimal training-loop change; architecture/training docs updated | blocked |
-| P2.3 | Add interrupt/resume equivalence test | LR, bad-epoch/patience count, best epoch/score/hash and next action match uninterrupted control | blocked |
-| P2.4 | Run focused and full unit suites | all tests pass in shared venv | blocked |
-| P2.5 | Run project guard and canonical config validation | zero guard issues; plan/config validation passes | blocked |
-| P2.6 | Run clean real-entry-point CUDA resume smoke | interrupted/resumed package reconciles; no dataset mutation | blocked |
-| P2.7 | Commit and push verified repair | clean snapshot and recorded commit | blocked |
+| P2.1 | Reproduce and localize the resume-state defect | focused failing test or state-order trace | passed |
+| P2.2 | Save scheduler and early-stopping state after every evaluation | minimal training-loop change; architecture/training docs updated | passed |
+| P2.3 | Add interrupt/resume equivalence test | LR, bad-epoch/patience count, best epoch/score/hash and next action match uninterrupted control | passed |
+| P2.4 | Run focused and full unit suites | all tests pass in shared venv | passed |
+| P2.5 | Run project guard and canonical config validation | zero guard issues; plan/config validation passes | passed |
+| P2.6 | Run clean real-entry-point CUDA resume smoke | interrupted/resumed package reconciles; no dataset mutation | in-progress |
+| P2.7 | Commit and push verified repair | clean snapshot and recorded commit | pending |
 
-Unblock condition: P1.7 passes or records a closure decision.
+Unblock condition satisfied: P1.7 passed.
 
 ## P3 — Sanitize and promote the valid S0 baseline
 
@@ -186,3 +191,6 @@ calibration, evaluation protocol, provenance and claim set.
 |---|---|---|---|
 | 2026-07-27 | Created the iterative board after NB completion | continuation status `audited`; audit zero issues; WB best 34/stop 42; NB best 41/stop 49 | P1.5 merged baseline report |
 | 2026-07-27 | Bound the board to the project skill and validated the control plane | skill validator passed; 48/48 tests passed; project guard reported 0 issues | P1.5 merged baseline report |
+| 2026-07-27 | Closed the converged S0 baseline | `20260727-converged-s0-baseline-a1`; 3 cells/models, 54 samples, zero audit issues | P2 resume robustness |
+| 2026-07-27 | Localized and repaired post-evaluation resume state ordering | focused interrupted/resumed control test matches LR, patience, best state and history | P2.4 full suite |
+| 2026-07-27 | Passed static resume-repair validation | 51/51 tests; canonical config/plan valid; project guard zero issues | P2.6 clean CUDA smoke |

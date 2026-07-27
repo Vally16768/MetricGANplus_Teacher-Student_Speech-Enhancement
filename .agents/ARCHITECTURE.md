@@ -131,8 +131,11 @@ only by bandwidth-matched `val_select/PESQ`, and uses
 stopping waits eight non-improving validation epochs, leaving a recovery window
 after an LR reduction. If an earlier immutable run ended at its epoch ceiling,
 `continue-students` restores its model, optimizer, scheduler, AMP scaler,
-history and selection state into a new run directory; it never overwrites the
-source package.
+history, selection state, RNG state and train-loader generator state into a new
+run directory; it never overwrites the source package. After every evaluation,
+the durable state is written only after the plateau scheduler, best checkpoint,
+patience counter and history row are updated. An evaluation state resumes at
+the next epoch rather than repeating the completed epoch.
 
 ## A3 — Bandwidth and metric protocol
 
@@ -230,6 +233,11 @@ close-baseline
   -> recompute 20-to-converged deltas
   -> convergence plot + final tables + model/source hashes
   -> three-cell converged-baseline package + independent audit
+smoke-resume
+  -> one uninterrupted CUDA control
+  -> one fault-injected stop after a durable evaluation checkpoint
+  -> resume to the same final epoch
+  -> compare LR, scheduler, patience, best/final model and history state
 monitor-run / audit-run
   -> live stage/cell state / independent package reconciliation
 ```
@@ -296,6 +304,8 @@ Evidence:
 - converged-baseline closure is generated only through `close-baseline`, which
   verifies the baseline/continuation ancestry and source model hashes before
   writing the merged report.
+- resume-equivalence validation uses `smoke-resume`; its fault injection occurs
+  only after the post-evaluation state is atomically persisted.
 
 ## A6 — Selection boundaries
 
