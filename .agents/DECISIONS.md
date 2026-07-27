@@ -245,3 +245,24 @@ established a valid executed checkpoint but did not establish convergence.
 
 Constraint: test remains reporting-only. Continuations must retain the source
 manifest/cache hashes and cannot overwrite or relabel the epoch-20 package.
+
+## D-022 — Use a calibration-gated teacher-improvement protocol
+
+Decision: after the S0 continuation finishes and is audited, the next T1 work
+follows `.agents/TEACHER_IMPROVEMENT_PLAN.md`. It first calibrates the
+SpeechBrain discriminator on at least 100 held-out current-generator outputs
+without updating G, then compares the frozen official T0, a conservative
+fine-tuning control and a metric-aware branch. A generator update is permitted
+only while the current-output calibration gate passes.
+
+Cause: the alternating pilot gained only `+0.00221` true `val_select`
+PESQ-WB, while current-output discriminator MAE degraded and its generator
+scores escaped the calibrated range. The next experiment must distinguish
+ordinary fine-tuning from a genuine metric-discriminator effect and prevent an
+unreliable proxy from steering the generator.
+
+Constraint: the plan is deferred and does not alter the active S0
+continuation. T1 still requires at least `+0.01` PESQ-WB with STOI/SI-SDR
+guardrails before C1 or S1 work. The synthesis hypothesis remains a separate
+TTS campaign with its own generator outputs, targets, calibration, data,
+evaluation and claims.

@@ -12,6 +12,7 @@ This directory is the canonical control plane for the research project.
 | [ACADEMIC.md](ACADEMIC.md) | Evidence language, reporting and article-ready outputs | claims, reports, publication |
 | [DECISIONS.md](DECISIONS.md) | Decisions and their causes | before changing project policy |
 | [TODO.md](TODO.md) | Ordered cleanup/implementation/experiment gates | every active campaign task |
+| [TEACHER_IMPROVEMENT_PLAN.md](TEACHER_IMPROVEMENT_PLAN.md) | Deferred calibration-first T1 plan and separate TTS-transfer protocol | after S0 completion, before C32/C37 implementation |
 
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).

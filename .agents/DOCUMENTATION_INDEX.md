@@ -16,6 +16,7 @@ status. Historical experiment directories are evidence, not canonical docs.
 | `.agents/ACADEMIC.md` | publication contract | canonical |
 | `.agents/DECISIONS.md` | decision log | canonical |
 | `.agents/TODO.md` | ordered execution and gate status | canonical |
+| `.agents/TEACHER_IMPROVEMENT_PLAN.md` | deferred teacher-improvement and separate TTS-transfer protocol | canonical planned |
 | `docs/ARTIFACT_POLICY.md` | artifact policy | active, reconcile with this control plane |
 | `docs/audits/2026-07-26-initial-audit.md` | initial forensic audit | historical observed |
 | `docs/audits/2026-07-26-cleanup-campaign-audit.md` | cleanup classification and dataset observation | active observed |

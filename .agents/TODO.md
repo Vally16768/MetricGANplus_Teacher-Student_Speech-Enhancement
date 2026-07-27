@@ -36,7 +36,7 @@ Update this register whenever a gate changes state.
 | C29 | Run and promote full multi-seed campaign | only after a teacher-only successor to C31 passes; independent audit and article-ready report | blocked |
 | C30 | Implement alternating MetricGAN+ discriminator refresh | SpeechBrain 4-conv D, clean=1 and true normalized noisy/enhanced labels, current/history/current updates, local FP16 replay, resumable D state; 45/45 tests and corrected clean A2 smoke/audit pass | passed |
 | C31 | Validate alternating T1 in clean smoke/pilot | clean pilot `...-a1` audited 7/7 cells/models and 84/84 samples, but T1 gained only +0.00221 PESQ-WB and D current-output MAE degraded 1.50→1.76; full blocked | failed |
-| C32 | Isolate the next teacher-only fidelity trial | require 100 current examples/epoch, current-output calibration guard and immediate stop before cache/S1 work when the teacher gate fails | pending |
+| C32 | Isolate the next teacher-only fidelity trial | execute `.agents/TEACHER_IMPROVEMENT_PLAN.md` only after C41 audit; require 100 current examples/refresh, calibration gate and immediate stop before cache/S1 when the teacher gate fails | pending |
 | C33 | Define the ordered three-phase program | phase 1 official T0→C0→S0; phase 2 metric-aware WB teacher gate; phase 3 C1→fresh S1 only after gate | passed |
 | C34 | Implement an official-baseline-only campaign | `smoke/pilot/run-baseline`; exactly T0, S0-WB, S0-NB; subset-aware report/audit | passed |
 | C35 | Validate baseline-only implementation | 46/46 tests; plan/guard pass; clean protocol metadata; A1 CUDA smoke audited 3/3 cells/models, 18/18 samples, zero issues and zero cached inputs | passed |
@@ -46,6 +46,7 @@ Update this register whenever a gate changes state.
 | C39 | Evaluate the TTS metric-discriminator hypothesis separately | select TTS generator/data, recalibrate metric on synthesis outputs and keep claims/provenance outside enhancement campaign | blocked |
 | C40 | Replace the 20-epoch student ceiling | commit `330e501`; max 50, plateau factor 0.5/patience 2/min LR 1e-6, early stop patience 8; 48/48 tests and clean three-cell CUDA smoke with zero audit issues | passed |
 | C41 | Continue ceiling-limited official students | immutable two-cell continuation from audited C36 states; preserve optimizer/scheduler/scaler/history and source hashes; report/audit | in-progress |
+| C42 | Freeze the deferred teacher-improvement protocol | indexed canonical plan with E0/E1/E2 ablations, discriminator calibration gate, teacher promotion gate and separate TTS boundary | passed |
 
 ## Execution rule
 
