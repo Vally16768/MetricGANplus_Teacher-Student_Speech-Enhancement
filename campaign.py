@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import hashlib
 import json
@@ -56,6 +57,7 @@ BASELINE_SCOPE = "official_teacher_students_baseline"
 TWO_STAGE_SCOPE = "teacher_improvement_two_stage"
 STUDENT_CONTINUATION_CELL_ORDER = ("S0-WB", "S0-NB")
 STUDENT_CONTINUATION_SCOPE = "official_student_training_continuation"
+CONVERGED_BASELINE_SCOPE = "official_teacher_students_converged_baseline"
 
 
 def sha256(path: str | Path) -> str:
@@ -969,7 +971,7 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
     campaign_scope = str(
         summary.get("campaign_scope") or TWO_STAGE_SCOPE
     )
-    if campaign_scope == BASELINE_SCOPE:
+    if campaign_scope in {BASELINE_SCOPE, CONVERGED_BASELINE_SCOPE}:
         canonical_cells = BASELINE_CELL_ORDER
     elif campaign_scope == STUDENT_CONTINUATION_SCOPE:
         canonical_cells = STUDENT_CONTINUATION_CELL_ORDER
@@ -1072,7 +1074,7 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
     if verification_only and bool(status.get("valid_for_promotion")):
         issues.append("verification-only run incorrectly marked promotable")
     teacher_gate = dict(summary.get("teacher_promotion_gate") or {})
-    if campaign_scope == BASELINE_SCOPE:
+    if campaign_scope in {BASELINE_SCOPE, CONVERGED_BASELINE_SCOPE}:
         baseline_contract = dict(summary.get("baseline_contract") or {})
         if summary.get("selected_teacher") != "T0-WB-OFFICIAL":
             issues.append("baseline selected teacher is not T0-WB-OFFICIAL")
@@ -1090,6 +1092,56 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
             != teacher_model.get("sha256")
         ):
             issues.append("baseline teacher checkpoint hash mismatch")
+        if campaign_scope == CONVERGED_BASELINE_SCOPE:
+            closure = dict(summary.get("baseline_closure_contract") or {})
+            if not bool(closure.get("passed")):
+                issues.append("converged baseline closure contract did not pass")
+            if closure.get("source_cells") != {
+                "T0-WB-OFFICIAL": "baseline",
+                "S0-WB": "continuation",
+                "S0-NB": "continuation",
+            }:
+                issues.append("converged baseline source-cell mapping mismatch")
+            source_models = dict(closure.get("source_model_sha256") or {})
+            for cell in BASELINE_CELL_ORDER:
+                if source_models.get(cell) != dict(
+                    model_inventory.get(cell) or {}
+                ).get("sha256"):
+                    issues.append(
+                        f"converged baseline source model hash mismatch: {cell}"
+                    )
+            epoch20 = dict(closure.get("epoch20_val_select_pesq") or {})
+            converged = dict(closure.get("converged_val_select_pesq") or {})
+            declared_deltas = dict(closure.get("val_select_pesq_delta") or {})
+            for cell in STUDENT_CONTINUATION_CELL_ORDER:
+                try:
+                    observed = float(converged[cell]) - float(epoch20[cell])
+                    if abs(observed - float(declared_deltas[cell])) > 1e-9:
+                        issues.append(
+                            f"converged baseline delta mismatch: {cell}"
+                        )
+                    final_score = float(
+                        dict(cells[cell].get("val_select_metrics") or {})[
+                            "pesq_mean"
+                        ]
+                    )
+                    if abs(final_score - float(converged[cell])) > 1e-9:
+                        issues.append(
+                            f"converged baseline final-score mismatch: {cell}"
+                        )
+                except (KeyError, TypeError, ValueError):
+                    issues.append(
+                        f"invalid converged baseline metric binding: {cell}"
+                    )
+            for artifact_key in (
+                "convergence_plot",
+                "epoch_comparison_csv",
+            ):
+                artifact_path = Path(str(summary.get(artifact_key) or ""))
+                if not artifact_path.is_file():
+                    issues.append(
+                        f"missing converged baseline artifact: {artifact_key}"
+                    )
     elif campaign_scope == STUDENT_CONTINUATION_SCOPE:
         continuation = dict(summary.get("student_continuation_contract") or {})
         if continuation.get("students") != list(STUDENT_CONTINUATION_CELL_ORDER):
@@ -1724,6 +1776,360 @@ def continue_official_students(
     )
 
 
+def close_converged_baseline(
+    *,
+    baseline_run_dir: str | Path,
+    continuation_run_dir: str | Path,
+    run_id: str,
+) -> dict[str, Any]:
+    """Merge an audited epoch-20 baseline and its audited continuation."""
+    baseline_root = Path(baseline_run_dir).expanduser().resolve()
+    continuation_root = Path(continuation_run_dir).expanduser().resolve()
+    if baseline_root.parent != continuation_root.parent:
+        raise ValueError("Baseline and continuation must share one local run root.")
+    run_root = baseline_root.parent / run_id
+    if run_root.exists():
+        raise FileExistsError(f"Closure run already exists: {run_root}")
+
+    baseline_audit = audit_campaign_run(baseline_root)
+    continuation_audit = audit_campaign_run(continuation_root)
+    if not baseline_audit["valid"]:
+        raise ValueError(f"Baseline source audit failed: {baseline_audit['issues']}")
+    if not continuation_audit["valid"]:
+        raise ValueError(
+            f"Continuation source audit failed: {continuation_audit['issues']}"
+        )
+
+    def load_json(path: Path) -> dict[str, Any]:
+        return dict(json.loads(path.read_text(encoding="utf-8")))
+
+    baseline_summary = load_json(
+        baseline_root / "metrics" / "campaign_summary.json"
+    )
+    continuation_summary = load_json(
+        continuation_root / "metrics" / "campaign_summary.json"
+    )
+    baseline_provenance = load_json(
+        baseline_root / "provenance" / "provenance.json"
+    )
+    continuation_provenance = load_json(
+        continuation_root / "provenance" / "provenance.json"
+    )
+    if baseline_summary.get("campaign_scope") != BASELINE_SCOPE:
+        raise ValueError("The baseline source is not an official baseline package.")
+    if continuation_summary.get("campaign_scope") != STUDENT_CONTINUATION_SCOPE:
+        raise ValueError("The continuation source is not a student continuation.")
+    continuation_contract = dict(
+        continuation_summary.get("student_continuation_contract") or {}
+    )
+    if continuation_contract.get("source_run_id") != baseline_root.name:
+        raise ValueError("Continuation ancestry does not name the baseline source.")
+
+    baseline_cells = dict(baseline_summary.get("cells") or {})
+    continuation_cells = dict(continuation_summary.get("cells") or {})
+    cells = {
+        "T0-WB-OFFICIAL": copy.deepcopy(
+            baseline_cells["T0-WB-OFFICIAL"]
+        ),
+        "S0-WB": copy.deepcopy(continuation_cells["S0-WB"]),
+        "S0-NB": copy.deepcopy(continuation_cells["S0-NB"]),
+    }
+    baseline_inventory = dict(baseline_summary.get("model_inventory") or {})
+    continuation_inventory = dict(
+        continuation_summary.get("model_inventory") or {}
+    )
+    source_hashes = {
+        "T0-WB-OFFICIAL": dict(
+            baseline_inventory["T0-WB-OFFICIAL"]
+        )["sha256"],
+        "S0-WB": dict(continuation_inventory["S0-WB"])["sha256"],
+        "S0-NB": dict(continuation_inventory["S0-NB"])["sha256"],
+    }
+    sources = dict(continuation_contract.get("sources") or {})
+    for cell in STUDENT_CONTINUATION_CELL_ORDER:
+        source_hash = dict(sources.get(cell) or {}).get("model_sha256")
+        original_hash = dict(baseline_inventory.get(cell) or {}).get("sha256")
+        if source_hash != original_hash:
+            raise ValueError(
+                f"Continuation source hash does not match baseline: {cell}"
+            )
+
+    epoch20 = {
+        cell: float(
+            dict(baseline_cells[cell].get("val_select_metrics") or {})[
+                "pesq_mean"
+            ]
+        )
+        for cell in STUDENT_CONTINUATION_CELL_ORDER
+    }
+    converged = {
+        cell: float(
+            dict(continuation_cells[cell].get("val_select_metrics") or {})[
+                "pesq_mean"
+            ]
+        )
+        for cell in STUDENT_CONTINUATION_CELL_ORDER
+    }
+    deltas = {
+        cell: converged[cell] - epoch20[cell]
+        for cell in STUDENT_CONTINUATION_CELL_ORDER
+    }
+    closure_contract = {
+        "passed": True,
+        "baseline_run_id": baseline_root.name,
+        "continuation_run_id": continuation_root.name,
+        "source_cells": {
+            "T0-WB-OFFICIAL": "baseline",
+            "S0-WB": "continuation",
+            "S0-NB": "continuation",
+        },
+        "source_model_sha256": source_hashes,
+        "epoch20_val_select_pesq": epoch20,
+        "converged_val_select_pesq": converged,
+        "val_select_pesq_delta": deltas,
+        "selection": {
+            cell: {
+                "best_epoch": int(cells[cell]["best_epoch"]),
+                "stop_epoch": int(cells[cell]["stop_epoch"]),
+                "stop_reason": str(cells[cell]["stop_reason"]),
+                "ceiling_limited": bool(
+                    int(cells[cell]["best_epoch"]) >= 50
+                ),
+            }
+            for cell in STUDENT_CONTINUATION_CELL_ORDER
+        },
+    }
+    baseline_contract = {
+        "passed": True,
+        "teacher": "T0-WB-OFFICIAL",
+        "students": list(STUDENT_CONTINUATION_CELL_ORDER),
+        "teacher_checkpoint_sha256": source_hashes["T0-WB-OFFICIAL"],
+    }
+    git = _git_state()
+    provenance = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "status": "evaluated",
+        "mode": "full",
+        "campaign_scope": CONVERGED_BASELINE_SCOPE,
+        "verification_only": False,
+        "git_commit": git["commit"],
+        "git_dirty": git["dirty"],
+        "sources": {
+            "baseline": {
+                "run_id": baseline_root.name,
+                "git_commit": baseline_provenance.get("git_commit"),
+                "summary_sha256": sha256(
+                    baseline_root / "metrics" / "campaign_summary.json"
+                ),
+            },
+            "continuation": {
+                "run_id": continuation_root.name,
+                "git_commit": continuation_provenance.get("git_commit"),
+                "summary_sha256": sha256(
+                    continuation_root / "metrics" / "campaign_summary.json"
+                ),
+            },
+        },
+        "baseline_closure_contract": closure_contract,
+    }
+    _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+    source_config = continuation_root / "provenance" / "config_resolved.yaml"
+    (run_root / "provenance").mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_config, run_root / "provenance" / "config_resolved.yaml")
+
+    report = _write_report(
+        run_root=run_root,
+        cells=cells,
+        proxies={},
+        selected_teacher="T0-WB-OFFICIAL",
+        teacher_gate=None,
+        mode="full",
+        verification_only=False,
+        campaign_scope=CONVERGED_BASELINE_SCOPE,
+        cell_order=BASELINE_CELL_ORDER,
+        comparison_pairs={},
+        baseline_contract=baseline_contract,
+    )
+    report["baseline_closure_contract"] = closure_contract
+
+    comparison_csv = run_root / "metrics" / "epoch20_vs_converged.csv"
+    with comparison_csv.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=[
+                "cell",
+                "pesq_mode",
+                "epoch20_best_epoch",
+                "epoch20_val_select_pesq",
+                "converged_best_epoch",
+                "converged_stop_epoch",
+                "converged_val_select_pesq",
+                "delta",
+                "stop_reason",
+                "ceiling_limited",
+            ],
+        )
+        writer.writeheader()
+        for cell in STUDENT_CONTINUATION_CELL_ORDER:
+            writer.writerow(
+                {
+                    "cell": cell,
+                    "pesq_mode": "nb" if cell.endswith("-NB") else "wb",
+                    "epoch20_best_epoch": baseline_cells[cell]["best_epoch"],
+                    "epoch20_val_select_pesq": epoch20[cell],
+                    "converged_best_epoch": cells[cell]["best_epoch"],
+                    "converged_stop_epoch": cells[cell]["stop_epoch"],
+                    "converged_val_select_pesq": converged[cell],
+                    "delta": deltas[cell],
+                    "stop_reason": cells[cell]["stop_reason"],
+                    "ceiling_limited": closure_contract["selection"][cell][
+                        "ceiling_limited"
+                    ],
+                }
+            )
+
+    figure, axes = plt.subplots(1, 2, figsize=(11, 4.5))
+    for axis, cell, color in zip(
+        axes,
+        STUDENT_CONTINUATION_CELL_ORDER,
+        ("tab:blue", "tab:orange"),
+    ):
+        history_path = (
+            continuation_root / "cells" / cell / "training_history.csv"
+        )
+        epochs: list[int] = []
+        scores: list[float] = []
+        with history_path.open(newline="", encoding="utf-8") as handle:
+            for row in csv.DictReader(handle):
+                if row.get("val_select_pesq") not in {None, ""}:
+                    epochs.append(int(row["epoch"]))
+                    scores.append(float(row["val_select_pesq"]))
+        axis.plot(epochs, scores, color=color, label="val_select PESQ")
+        axis.axvline(20, color="black", linestyle="--", label="old ceiling")
+        axis.axvline(
+            int(cells[cell]["best_epoch"]),
+            color="green",
+            linestyle=":",
+            label="selected",
+        )
+        axis.set_title(
+            f"{cell} ({'PESQ-NB' if cell.endswith('-NB') else 'PESQ-WB'})"
+        )
+        axis.set_xlabel("Epoch")
+        axis.set_ylabel("PESQ")
+        axis.grid(alpha=0.25)
+        axis.legend(fontsize=8)
+    figure.suptitle("S0 continuation: epoch-20 baseline to early stopping")
+    figure.tight_layout()
+    convergence_plot = run_root / "reports" / "convergence_comparison.png"
+    figure.savefig(convergence_plot, dpi=160)
+    plt.close(figure)
+
+    lines = [
+        "# Converged official-teacher S0 baseline closure",
+        "",
+        "Evidence status: **reproduced and audited candidate**.",
+        "",
+        "The official MetricGAN+ WB teacher is unchanged. The two students were "
+        "continued from immutable epoch-20 optimizer states under the declared "
+        "max-50, plateau-LR and early-stopping policy.",
+        "",
+        "## Epoch-20 versus converged selection",
+        "",
+        "| Cell | Protocol | Epoch-20 | Converged | Delta | Stop |",
+        "|---|---|---:|---:|---:|---|",
+    ]
+    for cell in STUDENT_CONTINUATION_CELL_ORDER:
+        protocol = "PESQ-NB" if cell.endswith("-NB") else "PESQ-WB"
+        lines.append(
+            f"| {cell} | {protocol} | {epoch20[cell]:.6f} | "
+            f"{converged[cell]:.6f} | {deltas[cell]:+.6f} | "
+            f"best {cells[cell]['best_epoch']}, "
+            f"{cells[cell]['stop_reason']} at {cells[cell]['stop_epoch']} |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Final profile-matched metrics",
+            "",
+            "| Cell | Split | PESQ | STOI | SI-SDR | Delta-SNR | Support |",
+            "|---|---|---:|---:|---:|---:|---:|",
+        ]
+    )
+    for cell in BASELINE_CELL_ORDER:
+        for key, label in (
+            ("val_rank_metrics", "val_rank"),
+            ("val_select_metrics", "val_select"),
+            ("test_metrics", "test"),
+        ):
+            metrics = dict(cells[cell].get(key) or {})
+            lines.append(
+                f"| {cell} | {label} | "
+                f"{float(metrics.get('pesq_mean', float('nan'))):.6f} | "
+                f"{float(metrics.get('stoi_mean', float('nan'))):.6f} | "
+                f"{float(metrics.get('sisdr_mean', float('nan'))):.6f} | "
+                f"{float(metrics.get('delta_snr_mean', float('nan'))):.6f} | "
+                f"{int(metrics.get('count') or 0)} |"
+            )
+    lines.extend(
+        [
+            "",
+            "WB and NB PESQ use different bandwidth protocols and are never "
+            "pooled or directly ranked against one another.",
+            "",
+            "Both students stopped through early stopping and neither selected "
+            "the epoch-50 ceiling. The result is one-seed evidence; uncertainty "
+            "across seeds is not established.",
+            "",
+            "Source packages:",
+            f"- baseline: `{baseline_root.name}`",
+            f"- continuation: `{continuation_root.name}`",
+            "",
+        ]
+    )
+    report_path = run_root / "reports" / "report.md"
+    report_path.write_text("\n".join(lines), encoding="utf-8")
+    report["report"] = report_path.as_posix()
+    report["convergence_plot"] = convergence_plot.as_posix()
+    report["epoch_comparison_csv"] = comparison_csv.as_posix()
+    _atomic_json(run_root / "metrics" / "campaign_summary.json", report)
+
+    provenance["report"] = report_path.as_posix()
+    _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+    _atomic_json(
+        run_root / "status.json",
+        {
+            "status": "evaluated",
+            "campaign_mode": "full",
+            "campaign_scope": CONVERGED_BASELINE_SCOPE,
+            "current_stage": "AUDIT",
+            "valid_for_promotion": False,
+        },
+    )
+    audit = audit_campaign_run(run_root)
+    provenance["status"] = "audited" if audit["valid"] else "failed"
+    provenance["audit"] = audit
+    _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+    _atomic_json(
+        run_root / "status.json",
+        {
+            "status": "audited" if audit["valid"] else "failed",
+            "campaign_mode": "full",
+            "campaign_scope": CONVERGED_BASELINE_SCOPE,
+            "current_stage": None,
+            "valid_for_promotion": bool(audit["valid"] and not git["dirty"]),
+        },
+    )
+    if not audit["valid"]:
+        raise RuntimeError(f"Converged baseline audit failed: {audit['issues']}")
+    return {
+        "run_root": run_root.as_posix(),
+        "audit": audit,
+        "baseline_closure_contract": closure_contract,
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -1749,6 +2155,10 @@ def parse_args() -> argparse.Namespace:
     continuation = subparsers.add_parser("continue-students")
     continuation.add_argument("--source-run-dir", required=True)
     continuation.add_argument("--run-id", required=True)
+    closure = subparsers.add_parser("close-baseline")
+    closure.add_argument("--baseline-run-dir", required=True)
+    closure.add_argument("--continuation-run-dir", required=True)
+    closure.add_argument("--run-id", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -1762,6 +2172,12 @@ def main() -> None:
         result = audit_campaign_run(args.run_dir)
     elif args.command == "monitor-run":
         result = monitor_campaign_run(args.run_dir)
+    elif args.command == "close-baseline":
+        result = close_converged_baseline(
+            baseline_run_dir=args.baseline_run_dir,
+            continuation_run_dir=args.continuation_run_dir,
+            run_id=args.run_id,
+        )
     else:
         config = load_campaign_config(args.config)
     if args.command == "validate":
@@ -1849,6 +2265,7 @@ def main() -> None:
             raise
     elif args.command not in {
         "audit-run",
+        "close-baseline",
         "monitor-run",
         "continue-students",
     }:

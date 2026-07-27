@@ -1,6 +1,6 @@
 # Architecture register
 
-Status: `official-baseline-phase-implementation`; no full run is promoted.
+Status: `converged-baseline-closure`; no full run is promoted yet.
 
 ## A0 — End-to-end research pipeline
 
@@ -220,6 +220,16 @@ pilot-all
   -> same graph on a larger frozen subset; clean source required
 run-all
   -> same graph with full manifests/hyperparameters; clean source required
+continue-students
+  -> immutable epoch-20 S0 states
+  -> restore model/optimizer/scheduler/scaler/history
+  -> max-50 plateau-LR + early stopping
+close-baseline
+  -> independently audit epoch-20 baseline + continuation
+  -> bind T0 from baseline and selected S0-WB/S0-NB from continuation
+  -> recompute 20-to-converged deltas
+  -> convergence plot + final tables + model/source hashes
+  -> three-cell converged-baseline package + independent audit
 monitor-run / audit-run
   -> live stage/cell state / independent package reconciliation
 ```
@@ -280,6 +290,12 @@ Evidence:
 - official-baseline-only smoke:
   `20260727-official-baseline-smoke-s0-a1` (three expected/observed cells,
   official cache reuse, no proxy/T1/S1, 18 sample files and zero audit issues).
+- official student continuation:
+  `20260727-official-students-cont50-s0-a1` (WB best 34/stop 42, NB best
+  41/stop 49, both early-stopped; two cells/models and zero audit issues).
+- converged-baseline closure is generated only through `close-baseline`, which
+  verifies the baseline/continuation ancestry and source model hashes before
+  writing the merged report.
 
 ## A6 — Selection boundaries
 

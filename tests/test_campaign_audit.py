@@ -10,6 +10,7 @@ from campaign import (
     BASELINE_CELL_ORDER,
     BASELINE_SCOPE,
     CELL_ORDER,
+    CONVERGED_BASELINE_SCOPE,
     STUDENT_CONTINUATION_CELL_ORDER,
     STUDENT_CONTINUATION_SCOPE,
     _best_teacher,
@@ -17,6 +18,7 @@ from campaign import (
     _student_schedule,
     _teacher_cache_identity,
     audit_campaign_run,
+    close_converged_baseline,
     monitor_campaign_run,
     sha256,
 )
@@ -76,10 +78,24 @@ class CampaignAuditTests(unittest.TestCase):
                             }
                         )
             cells[cell] = split_payloads
+            cells[cell]["best_epoch"] = 0 if cell.startswith("T0-") else 20
             if continuation:
+                cells[cell]["best_epoch"] = 25
                 cells[cell]["stop_epoch"] = 30
+                cells[cell]["stop_reason"] = "early_stopping"
+                history = root / "cells" / cell / "training_history.csv"
+                history.parent.mkdir(parents=True, exist_ok=True)
+                with history.open("w", newline="", encoding="utf-8") as handle:
+                    writer = csv.DictWriter(
+                        handle,
+                        fieldnames=["epoch", "val_select_pesq"],
+                    )
+                    writer.writeheader()
+                    writer.writerow({"epoch": 20, "val_select_pesq": 2.4})
+                    writer.writerow({"epoch": 25, "val_select_pesq": 2.5})
             model = root / "models" / f"{cell}.pt"
             model.write_bytes(cell.encode("utf-8"))
+            cells[cell]["checkpoint_out"] = model.as_posix()
             inventory[cell] = {
                 "path": model.as_posix(),
                 "bytes": model.stat().st_size,
@@ -171,6 +187,10 @@ class CampaignAuditTests(unittest.TestCase):
             json.dumps({"run_id": "fixture", "verification_only": True}),
             encoding="utf-8",
         )
+        (root / "provenance" / "config_resolved.yaml").write_text(
+            "dataset:\n  name: VoiceBank+DEMAND\n",
+            encoding="utf-8",
+        )
 
     def test_complete_run_reconciles(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -200,6 +220,62 @@ class CampaignAuditTests(unittest.TestCase):
         self.assertEqual(result["campaign_scope"], STUDENT_CONTINUATION_SCOPE)
         self.assertEqual(result["cell_count"], 2)
         self.assertEqual(result["model_count"], 2)
+
+    def test_converged_baseline_closure_binds_sources_and_audits(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            runs = Path(raw)
+            baseline = runs / "baseline"
+            continuation = runs / "continuation"
+            self.make_run(baseline, baseline=True)
+            self.make_run(continuation, continuation=True)
+            continuation_summary_path = (
+                continuation / "metrics" / "campaign_summary.json"
+            )
+            continuation_summary = json.loads(
+                continuation_summary_path.read_text(encoding="utf-8")
+            )
+            contract = continuation_summary["student_continuation_contract"]
+            contract["source_run_id"] = baseline.name
+            baseline_summary = json.loads(
+                (baseline / "metrics" / "campaign_summary.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+            for cell in STUDENT_CONTINUATION_CELL_ORDER:
+                baseline_model = Path(
+                    baseline_summary["model_inventory"][cell]["path"]
+                )
+                source_model = Path(contract["sources"][cell]["model"])
+                source_model.write_bytes(baseline_model.read_bytes())
+                contract["sources"][cell]["model_sha256"] = sha256(
+                    source_model
+                )
+            continuation_summary_path.write_text(
+                json.dumps(continuation_summary),
+                encoding="utf-8",
+            )
+            result = close_converged_baseline(
+                baseline_run_dir=baseline,
+                continuation_run_dir=continuation,
+                run_id="closure",
+            )
+            closure = runs / "closure"
+            audit = audit_campaign_run(closure)
+            summary = json.loads(
+                (closure / "metrics" / "campaign_summary.json").read_text(
+                    encoding="utf-8"
+                )
+            )
+        self.assertTrue(result["audit"]["valid"], result["audit"]["issues"])
+        self.assertTrue(audit["valid"], audit["issues"])
+        self.assertEqual(
+            summary["campaign_scope"],
+            CONVERGED_BASELINE_SCOPE,
+        )
+        self.assertEqual(
+            set(summary["cells"]),
+            set(BASELINE_CELL_ORDER),
+        )
 
     def test_model_tampering_is_detected(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
