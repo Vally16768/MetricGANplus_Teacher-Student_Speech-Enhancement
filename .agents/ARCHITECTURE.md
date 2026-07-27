@@ -147,16 +147,37 @@ separate columns/figures and are not pooled.
 [frozen bandwidth-specific PESQ proxy]
                     |
                     v
-[predicted PESQ] -> [- predicted PESQ] -> generator gradient
+[predicted PESQ]
+       |
+       v
+[normalize (-0.5..4.5) to (0..1)]
+       |
+       v
+[MSE to target score 1 + official-output trust anchor]
+       |
+       v
+[generator gradient]
 ```
 
 The non-differentiable PESQ implementation creates labels for a learned proxy;
 PESQ itself is not differentiated through. `T0_PESQ` is the stage-T1 teacher
-metric condition. The canonical S0/S1 student comparison uses `D1` in both
-stages, with identical architecture, seed and schedule, so the changed teacher
-is the only intended experimental variable. A future direct student-metric
-ablation must restore distinct WB/NB proxies and cannot be mixed into this
-teacher-effect experiment.
+metric condition. Its bounded score target follows the official MetricGAN
+generator objective instead of maximizing an unbounded proxy output. T1 also
+reads the local T0 teacher cache and anchors its waveform to the accepted
+official output; the fine-tune learning rate is `1e-5`. These protections were
+introduced after pilot A1 showed strong fixed-candidate proxy correlation but
+severe current-output exploitation.
+
+The canonical S0/S1 student comparison uses `D1` in both stages, with identical
+architecture, seed and schedule, so the changed teacher is the only intended
+experimental variable. A future direct student-metric ablation must restore
+distinct WB/NB proxies and cannot be mixed into this teacher-effect experiment.
+
+The official training recipe additionally refreshes its discriminator using
+current, noisy and historical samples. The bounded frozen-proxy branch is not
+claimed to be an exact reproduction of that alternating training loop. If the
+new smoke/pilot still exposes distribution shift, current-output relabeling and
+proxy refresh are required before another full run.
 
 `MetricGANGeneratorObjective` exposes the same optimization interface for a
 future TTS generator. That extension is only `planned`: the enhancement proxy

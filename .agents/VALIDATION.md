@@ -113,5 +113,7 @@ metric/reference profile matches the run profile
   calibrated to Pearson 0.9539 and Spearman 0.9325 on 96 held-out candidates.
 - both T1 branches reduced true `val_select` PESQ despite optimization; the
   gate retained T0 and the full campaign remains blocked.
+- bounded MetricGAN target-score and T0 trust-anchor unit tests passed; the
+  complete suite is 41/41 after the corrective loss change.
 - the next required gate is a tested bounded/refreshable teacher metric
   objective followed by a new clean smoke and monitored pilot.

@@ -31,7 +31,7 @@ Update this register whenever a gate changes state.
 | C24 | Validate local persistent teacher caches | Desktop-local, content-addressed, FP16 teacher outputs, no noisy/clean duplication, resume and quantization tests | passed |
 | C25 | Run two-stage GPU smoke and independent audit | A3: clean commit; 7 cells/models, 42/42 samples, cache dedup, zero audit issues; verification-only | passed |
 | C26 | Run monitored two-stage pilot | clean commit `0756a68`; 7 cells/models, 84/84 samples, zero audit issues; T1 PESQ gate failed and T0 fallback passed | failed |
-| C27 | Replace unsafe teacher proxy optimization | official-style bounded target-score loss; trust-region or refreshed current-output labels; unit/CUDA smoke | in-progress |
+| C27 | Replace unsafe teacher proxy optimization | bounded target-score loss, T0 trust anchor and official log-spectral features implemented; 41/41 tests; clean CUDA smoke pending | in-progress |
 | C28 | Rerun clean smoke and monitored pilot | true `val_select` PESQ gain >= 0.01 with STOI/SI-SDR guardrails | blocked |
 | C29 | Run and promote full multi-seed campaign | only after C28 passes; independent audit and article-ready report | blocked |
 

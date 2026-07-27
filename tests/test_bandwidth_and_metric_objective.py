@@ -113,6 +113,53 @@ class MetricObjectiveTests(unittest.TestCase):
         self.assertEqual(tuple(prediction.shape), (2,))
         self.assertIsNotNone(candidate.grad)
 
+    def test_generator_objective_matches_bounded_metricgan_target(self) -> None:
+        proxy = ConstantProxy()
+        objective = MetricGANGeneratorObjective(proxy)
+        candidate = torch.ones(1, 1, 8, requires_grad=True)
+        reference = torch.zeros_like(candidate)
+        loss, prediction = objective(candidate, reference)
+        self.assertAlmostEqual(float(prediction), 4.0, places=6)
+        self.assertAlmostEqual(float(loss), 0.01, places=6)
+        loss.backward()
+        self.assertLess(float(candidate.grad.mean()), 0.0)
+
+        target_candidate = torch.full((1, 1, 8), 1.5)
+        target_loss, target_prediction = objective(
+            target_candidate,
+            torch.zeros_like(target_candidate),
+        )
+        self.assertAlmostEqual(float(target_prediction), 4.5, places=6)
+        self.assertAlmostEqual(float(target_loss), 0.0, places=6)
+
+    def test_teacher_metric_recipe_uses_official_anchor(self) -> None:
+        loss_fn = CompositeEnhancementLoss(
+            "T0_PESQ",
+            sample_rate=16000,
+            n_fft=512,
+            hop_length=256,
+            win_length=512,
+            pesq_proxy=ConstantProxy(),
+            metric_proxy_weight=0.25,
+            teacher_anchor_weight=0.75,
+        )
+        enhanced = torch.randn(1, 1, 2048, requires_grad=True)
+        clean = torch.randn_like(enhanced)
+        noisy = torch.randn_like(enhanced)
+        teacher = enhanced.detach().clone()
+        breakdown = loss_fn(
+            enhanced,
+            clean,
+            noisy,
+            epoch=1,
+            total_epochs=1,
+            teacher_wav=teacher,
+        )
+        self.assertAlmostEqual(float(breakdown.teacher_wave), 0.0, places=7)
+        self.assertGreaterEqual(float(breakdown.pesq_proxy), 0.0)
+        breakdown.total.backward()
+        self.assertIsNotNone(enhanced.grad)
+
     def test_student_metric_recipe_adds_proxy_gradient(self) -> None:
         loss_fn = CompositeEnhancementLoss(
             "D1_PESQ",

@@ -43,6 +43,9 @@ metric_discriminator:
   scope: "teacher_finetune_only"
   generator_weight: 0.25
   frozen_during_generator_update: true
+  generator_target: "mse_to_normalized_clean_score_1"
+  teacher_anchor_weight: 0.75
+  teacher_finetune_lr: 0.00001
 
 stages:
   - name: "official_teacher_baseline"

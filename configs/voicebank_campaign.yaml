@@ -40,10 +40,11 @@ training:
   proxy_train_rows: 256
   proxy_validation_rows: 64
   proxy_batch_size: 8
-  teacher_branch_lr: 0.0001
+  teacher_branch_lr: 0.00001
   student_lr: 0.0005
   proxy_lr: 0.001
   metric_proxy_weight: 0.25
+  teacher_anchor_weight: 0.75
   teacher_min_pesq_gain: 0.01
   teacher_max_stoi_drop: 0.002
   teacher_max_sisdr_drop: 0.25

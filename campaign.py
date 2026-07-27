@@ -434,6 +434,7 @@ def _experiment_config(
         evaluate_init_checkpoint=bool(evaluate_init_checkpoint),
         pesq_proxy_checkpoint=proxy_checkpoint,
         metric_proxy_weight=float(effective["metric_proxy_weight"]),
+        teacher_anchor_weight=float(effective["teacher_anchor_weight"]),
         eval_dnsmos=False,
         sample_count=int(evaluation["sample_count"]),
         benchmark_seconds=int(evaluation["benchmark_seconds"]),
@@ -1111,6 +1112,7 @@ def run_all(
         "epochs": int(effective["teacher_branch_epochs"]),
         "init_checkpoint": str(cells["T0-WB-OFFICIAL"]["checkpoint_out"]),
         "evaluate_init_checkpoint": True,
+        "teacher_cache_manifest": official_cache_manifests["wb"],
     }
     cells["T1-WB-BASE"] = _run_cell(
         **common_finetuned_teacher,

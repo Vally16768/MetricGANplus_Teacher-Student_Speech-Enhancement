@@ -195,16 +195,31 @@ class LossBreakdown:
 
 
 class MetricGANGeneratorObjective(nn.Module):
-    """Differentiable generator objective backed by a frozen metric proxy.
+    """Bounded MetricGAN-style objective backed by a frozen metric proxy.
 
     For enhancement, ``source`` is the noisy waveform. For a future TTS
     experiment it may be omitted, but the proxy must first be recalibrated on
     outputs from that synthesis domain.
+
+    The official MetricGAN recipe normalizes PESQ from ``[-0.5, 4.5]`` to
+    ``[0, 1]`` and minimizes MSE to the clean-speech target score ``1``.
+    Maximizing an unbounded predicted PESQ instead lets a generator exploit a
+    frozen proxy outside its calibration distribution.
     """
 
-    def __init__(self, metric_proxy: nn.Module) -> None:
+    def __init__(
+        self,
+        metric_proxy: nn.Module,
+        *,
+        metric_min: float = -0.5,
+        metric_max: float = 4.5,
+    ) -> None:
         super().__init__()
+        if metric_max <= metric_min:
+            raise ValueError("metric_max must be greater than metric_min.")
         self.metric_proxy = metric_proxy
+        self.metric_min = float(metric_min)
+        self.metric_max = float(metric_max)
         self.metric_proxy.eval()
         for parameter in self.metric_proxy.parameters():
             parameter.requires_grad_(False)
@@ -218,7 +233,45 @@ class MetricGANGeneratorObjective(nn.Module):
     ) -> tuple[torch.Tensor, torch.Tensor]:
         proxy_source = torch.zeros_like(candidate) if source is None else source
         predicted_quality = self.metric_proxy(proxy_source, candidate, reference)
-        return -predicted_quality.mean(), predicted_quality
+        normalized_quality = (predicted_quality - self.metric_min) / (
+            self.metric_max - self.metric_min
+        )
+        target_quality = torch.ones_like(normalized_quality)
+        return torch.mean((normalized_quality - target_quality) ** 2), predicted_quality
+
+
+class MetricGANFeatureLoss(nn.Module):
+    """Official MetricGAN log-spectral feature MSE."""
+
+    def __init__(self, n_fft: int, hop_length: int, win_length: int) -> None:
+        super().__init__()
+        self.n_fft = int(n_fft)
+        self.hop_length = int(hop_length)
+        self.win_length = int(win_length)
+        self.register_buffer(
+            "_window",
+            torch.hamming_window(self.win_length),
+            persistent=False,
+        )
+
+    def _features(self, waveform: torch.Tensor) -> torch.Tensor:
+        if waveform.dim() == 3:
+            waveform = waveform.squeeze(1)
+        window = self._window.to(device=waveform.device, dtype=waveform.dtype)
+        spectrum = torch.stft(
+            waveform,
+            n_fft=self.n_fft,
+            hop_length=self.hop_length,
+            win_length=self.win_length,
+            window=window,
+            center=True,
+            pad_mode="reflect",
+            return_complex=True,
+        )
+        return torch.log1p(spectrum.abs().clamp_min(1e-8).sqrt())
+
+    def forward(self, enhanced: torch.Tensor, clean: torch.Tensor) -> torch.Tensor:
+        return torch.mean((self._features(enhanced) - self._features(clean)) ** 2)
 
 
 class CompositeEnhancementLoss(nn.Module):
@@ -232,6 +285,7 @@ class CompositeEnhancementLoss(nn.Module):
         win_length: int = 320,
         pesq_proxy: nn.Module | None = None,
         metric_proxy_weight: float = 0.25,
+        teacher_anchor_weight: float = 0.75,
     ):
         super().__init__()
         self.recipe = recipe.upper()
@@ -255,11 +309,19 @@ class CompositeEnhancementLoss(nn.Module):
         self.wave_loss = nn.SmoothL1Loss(beta=0.5)
         self.teacher_mask_loss = nn.L1Loss()
         self.complex_loss = ComplexSTFTLoss()
+        self.metricgan_feature_loss = MetricGANFeatureLoss(
+            n_fft=n_fft,
+            hop_length=hop_length,
+            win_length=win_length,
+        )
         self.sisdr_loss = SISDRLoss()
         self.pesq_proxy = pesq_proxy
         self.metric_proxy_weight = float(metric_proxy_weight)
-        if self.metric_proxy_weight < 0.0:
-            raise ValueError("metric_proxy_weight must be non-negative.")
+        if not 0.0 <= self.metric_proxy_weight <= 1.0:
+            raise ValueError("metric_proxy_weight must be in [0, 1].")
+        self.teacher_anchor_weight = float(teacher_anchor_weight)
+        if not 0.0 <= self.teacher_anchor_weight <= 1.0:
+            raise ValueError("teacher_anchor_weight must be in [0, 1].")
         self.metric_objective = (
             MetricGANGeneratorObjective(pesq_proxy)
             if pesq_proxy is not None
@@ -281,9 +343,16 @@ class CompositeEnhancementLoss(nn.Module):
         wave = self.wave_loss(enhanced, clean)
         zero = enhanced.new_tensor(0.0)
         if self.recipe in {"T0", "T0_PESQ"}:
-            spectral = self.complex_loss(enhanced, clean)
+            spectral = self.metricgan_feature_loss(enhanced, clean)
             sisdr = self.sisdr_loss(enhanced, clean)
-            t0_total = 0.70 * spectral + 0.25 * wave + 0.05 * sisdr
+            teacher_wave = zero
+            t0_total = spectral
+            if teacher_wav is not None:
+                teacher_wave = self.wave_loss(enhanced, teacher_wav)
+                t0_total = (
+                    (1.0 - self.teacher_anchor_weight) * spectral
+                    + self.teacher_anchor_weight * teacher_wave
+                )
             pesq_proxy_loss = zero
             predicted_pesq = zero
             total = t0_total
@@ -297,9 +366,8 @@ class CompositeEnhancementLoss(nn.Module):
                 )
                 predicted_pesq = predictions.mean()
                 total = (
-                    0.60 * t0_total
+                    (1.0 - self.metric_proxy_weight) * t0_total
                     + self.metric_proxy_weight * pesq_proxy_loss
-                    + 0.15 * sisdr
                 )
             return LossBreakdown(
                 total=total,
@@ -309,7 +377,7 @@ class CompositeEnhancementLoss(nn.Module):
                 noise_gate=zero,
                 speech_preserve=zero,
                 teacher_mask=zero,
-                teacher_wave=zero,
+                teacher_wave=teacher_wave,
                 pesq_proxy=pesq_proxy_loss,
                 predicted_pesq=predicted_pesq,
             )

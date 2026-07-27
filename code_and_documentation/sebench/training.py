@@ -144,6 +144,7 @@ class ExperimentConfig:
     quantize_dynamic: bool = False
     bandwidth: str | None = None
     metric_proxy_weight: float = 0.25
+    teacher_anchor_weight: float = 0.75
 
 
 def _normalize_runtime_devices(device: str, gpu_ids: list[int] | None) -> tuple[str, list[int]]:
@@ -1360,6 +1361,7 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
         win_length=config.win_length,
         pesq_proxy=pesq_proxy_model,
         metric_proxy_weight=config.metric_proxy_weight,
+        teacher_anchor_weight=config.teacher_anchor_weight,
     )
     trainable_params = [parameter for parameter in model.parameters() if parameter.requires_grad]
     if not trainable_params:

@@ -137,3 +137,22 @@ labels are metadata and cannot create duplicate content for the same identity.
 Cause: caching avoids repeated teacher inference while preventing duplicated
 dataset audio, Kingston writes and avoidable disk use. Cache precision is
 validated on load; caches remain regenerable and are never Git artifacts.
+
+## D-016 — Bound teacher metric optimization and anchor it to T0
+
+Decision: normalize predicted PESQ from `[-0.5, 4.5]` to `[0, 1]` and minimize
+MSE to the MetricGAN clean target score `1`. During T1 fine-tuning, use the
+content-addressed T0 cache as a waveform trust anchor with weight `0.75`, use
+the official 512/256/512 Hamming/log-spectral feature loss and lower the
+fine-tune learning rate to `1e-5`.
+
+Cause: pilot `20260727-official-two-stage-pilot-s0-a1` showed Pearson 0.9539 on
+fixed held-out proxy candidates, while unconstrained generator updates
+increased predicted training PESQ and reduced true `val_select` PESQ from
+2.8238 to 2.4457 after one epoch. The original SpeechBrain recipe minimizes
+score error toward a bounded normalized target and retrains its discriminator;
+it does not maximize raw predicted PESQ.
+
+Constraint: the current frozen-proxy branch is a safety-corrected ablation, not
+an exact reproduction of the official alternating discriminator/history loop.
+Full training remains blocked unless true PESQ passes the predeclared gate.

@@ -92,11 +92,14 @@ nu produc rezultate promovabile.
 ## Discriminatorul metric și extensia TTS
 
 PESQ nu este folosit direct ca o funcție diferențiabilă. Un predictor PESQ
-înghețat furnizează gradientul pentru generator. În campania canonică actuală,
-ablation-ul metric este aplicat teacher-ului WB. Studenții S0 și S1 folosesc
-același obiectiv de distilare `D1`, aceeași arhitectură și același schedule;
-singura variabilă intenționată este teacher-ul. Un viitor ablation metric direct
-pe studenți trebuie declarat separat și ar necesita proxy-uri WB/NB distincte.
+înghețat furnizează gradientul pentru generator. Scorul prezis este normalizat
+la intervalul MetricGAN `[0, 1]` și optimizat prin MSE către ținta curată `1`;
+T1 este ancorat și la output-ul checkpoint-ului oficial T0 din cache-ul local.
+În campania canonică actuală, ablation-ul metric este aplicat teacher-ului WB.
+Studenții S0 și S1 folosesc același obiectiv de distilare `D1`, aceeași
+arhitectură și același schedule; singura variabilă intenționată este
+teacher-ul. Un viitor ablation metric direct pe studenți trebuie declarat
+separat și ar necesita proxy-uri WB/NB distincte.
 
 Interfața `MetricGANGeneratorObjective` poate fi conectată ulterior la un
 generator TTS. Aceasta este momentan o direcție planificată: proxy-ul trebuie
