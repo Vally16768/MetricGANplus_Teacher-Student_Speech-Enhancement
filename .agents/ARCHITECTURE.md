@@ -241,6 +241,9 @@ Evidence:
   strong fixed-proxy calibration but true-PESQ degradation, T0 fallback, audit
   zero issues). This blocks full training until the teacher objective is made
   bounded and robust to current-output distribution shift.
+- bounded-objective smoke:
+  `20260727-bounded-teacher-smoke-s0-a1` on commit `27838d9` (seven
+  cells/models, 42 samples, no T1 collapse, T0 fallback, audit zero issues).
 
 ## A6 — Selection boundaries
 

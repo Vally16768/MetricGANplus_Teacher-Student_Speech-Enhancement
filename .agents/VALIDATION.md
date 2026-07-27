@@ -115,5 +115,9 @@ metric/reference profile matches the run profile
   gate retained T0 and the full campaign remains blocked.
 - bounded MetricGAN target-score and T0 trust-anchor unit tests passed; the
   complete suite is 41/41 after the corrective loss change.
+- bounded-teacher clean GPU smoke A1 passed on commit `27838d9`: seven cells,
+  seven models, 42/42 samples and zero independent-audit issues.
+- bounded T1 control/metric epoch deltas were only -0.0004/-0.0007 PESQ-WB,
+  eliminating the earlier ~0.4 PESQ collapse; neither passed the gain gate.
 - the next required gate is a tested bounded/refreshable teacher metric
   objective followed by a new clean smoke and monitored pilot.

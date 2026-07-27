@@ -25,6 +25,7 @@ status. Historical experiment directories are evidence, not canonical docs.
 | `docs/audits/2026-07-27-official-teacher-baseline.md` | official checkpoint reconciliation and two-stage corrective design | active observed |
 | `docs/audits/2026-07-27-two-stage-smoke-a3.md` | clean-snapshot seven-cell smoke, failed-gate fallback and cache-dedup audit | active observed |
 | `docs/audits/2026-07-27-two-stage-pilot-a1.md` | monitored seven-cell pilot, proxy-exploitation evidence and failed teacher gate | active observed |
+| `docs/audits/2026-07-27-bounded-teacher-smoke-a1.md` | bounded target-score/T0-anchor clean GPU smoke and independent audit | active observed |
 | `experiments/README.md` | experiment directory explanation | active, consolidate later |
 | `code_and_documentation/configs/research_plan_voicebank_wb_nb.yaml` | machine-independent canonical WB/NB campaign contract | canonical configuration, non-Markdown |
 

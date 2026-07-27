@@ -69,6 +69,7 @@ experiments/runs/<run_id>/
 | `20260727-official-two-stage-smoke-s0-a2` | superseded smoke | corrected T0 fallback and audited 7/7 cells, but identical stage-labeled caches were duplicated | no |
 | `20260727-official-two-stage-smoke-s0-a3` | smoke-passed/audited | clean commit `8d36d62`; 7 cells/models, 42/42 samples, T0 fallback, one deduplicated FP16 cache, zero issues | no |
 | `20260727-official-two-stage-pilot-s0-a1` | pilot-passed/audited; T1 gate failed | clean commit `0756a68`; 7 cells/models, 84/84 samples, strong fixed-proxy calibration but true-PESQ degradation; T0 fallback and cache reuse passed; zero audit issues | no |
+| `20260727-bounded-teacher-smoke-s0-a1` | smoke-passed/audited | clean commit `27838d9`; bounded T1 stayed within 0.0007 PESQ of T0, failed the positive-gain gate, restored T0; 7 cells/models, 42/42 samples, zero issues | no |
 
 There is currently no promoted end-to-end run from the current repository
 snapshot.
