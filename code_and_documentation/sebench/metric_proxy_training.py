@@ -19,7 +19,11 @@ from sebench.audio import load_mono_audio, manifest_hash, resample_mono_audio
 from sebench.bandwidth import resolve_bandwidth
 from sebench.checkpoints import load_model_from_checkpoint
 from sebench.data import read_pair_manifest
-from sebench.losses import PESQProxyRegressor, save_pesq_proxy_checkpoint
+from sebench.losses import (
+    PESQProxyRegressor,
+    SpeechBrainMetricDiscriminator,
+    save_pesq_proxy_checkpoint,
+)
 
 
 def _rankdata(values: np.ndarray) -> np.ndarray:
@@ -196,7 +200,7 @@ def build_proxy_records(
 
 
 def _evaluate_proxy(
-    model: PESQProxyRegressor,
+    model: PESQProxyRegressor | SpeechBrainMetricDiscriminator,
     loader: DataLoader,
     *,
     device: str,
@@ -245,6 +249,7 @@ def train_metric_proxy(
     hidden_channels: int = 32,
     projection_dim: int = 64,
     seed: int = 0,
+    model_kind: str = "pesq_proxy_regressor",
 ) -> dict[str, Any]:
     torch.manual_seed(int(seed))
     profile = resolve_bandwidth(
@@ -273,15 +278,30 @@ def train_metric_proxy(
         num_workers=0,
         collate_fn=_collate,
     )
-    model = PESQProxyRegressor(
-        sample_rate=profile.sample_rate,
-        n_fft=profile.n_fft,
-        hop_length=profile.hop_length,
-        win_length=profile.win_length,
-        hidden_channels=int(hidden_channels),
-        projection_dim=int(projection_dim),
-        bandwidth=profile.name,
-    ).to(device)
+    if model_kind == SpeechBrainMetricDiscriminator.checkpoint_kind:
+        if profile.name != "wb":
+            raise ValueError("SpeechBrain MetricGAN discriminator pretraining is WB-only.")
+        model: PESQProxyRegressor | SpeechBrainMetricDiscriminator = (
+            SpeechBrainMetricDiscriminator(
+                sample_rate=16_000,
+                n_fft=512,
+                hop_length=256,
+                win_length=512,
+                bandwidth="wb",
+            )
+        ).to(device)
+    elif model_kind == "pesq_proxy_regressor":
+        model = PESQProxyRegressor(
+            sample_rate=profile.sample_rate,
+            n_fft=profile.n_fft,
+            hop_length=profile.hop_length,
+            win_length=profile.win_length,
+            hidden_channels=int(hidden_channels),
+            projection_dim=int(projection_dim),
+            bandwidth=profile.name,
+        ).to(device)
+    else:
+        raise ValueError(f"Unsupported metric proxy model kind: {model_kind}")
     optimizer = torch.optim.AdamW(model.parameters(), lr=float(lr), weight_decay=1e-4)
     loss_fn = torch.nn.MSELoss()
     history: list[dict[str, float]] = []
@@ -292,12 +312,20 @@ def train_metric_proxy(
         model.train()
         losses: list[float] = []
         for batch in train_loader:
-            prediction = model(
-                batch["noisy"].to(device),
-                batch["candidate"].to(device),
-                batch["clean"].to(device),
-            )
-            loss = loss_fn(prediction, batch["target"].to(device))
+            if isinstance(model, SpeechBrainMetricDiscriminator):
+                prediction = model.normalized_score(
+                    batch["candidate"].to(device),
+                    batch["clean"].to(device),
+                )
+                target = (batch["target"].to(device) + 0.5) / 5.0
+            else:
+                prediction = model(
+                    batch["noisy"].to(device),
+                    batch["candidate"].to(device),
+                    batch["clean"].to(device),
+                )
+                target = batch["target"].to(device)
+            loss = loss_fn(prediction, target)
             optimizer.zero_grad(set_to_none=True)
             loss.backward()
             optimizer.step()
@@ -369,6 +397,7 @@ def train_metric_proxy(
         "bandwidth": profile.name,
         "sample_rate": profile.sample_rate,
         "pesq_mode": profile.pesq_mode,
+        "model_kind": model_kind,
         "checkpoint": checkpoint_path.as_posix(),
         "records_path": records_payload.get("records_path"),
         "train_record_count": len(train_records),

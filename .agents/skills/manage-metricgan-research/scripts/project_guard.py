@@ -25,6 +25,7 @@ ARCHITECTURE_SOURCES = (
     "code_and_documentation/sebench/contracts.py",
     "code_and_documentation/sebench/erb.py",
     "code_and_documentation/sebench/losses.py",
+    "code_and_documentation/sebench/metricgan_alternating.py",
     "code_and_documentation/sebench/metric_proxy_training.py",
     "code_and_documentation/sebench/models.py",
     "code_and_documentation/sebench/research_plan.py",

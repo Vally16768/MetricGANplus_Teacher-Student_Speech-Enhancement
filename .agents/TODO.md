@@ -34,7 +34,7 @@ Update this register whenever a gate changes state.
 | C27 | Replace unsafe teacher proxy optimization | bounded target-score loss, T0 trust anchor, official log-spectral features, 41/41 tests and clean 7-cell CUDA smoke | passed |
 | C28 | Rerun clean smoke and monitored pilot | smoke/pilot executed and audited; bounded proxy stable but true PESQ gate failed | failed |
 | C29 | Run and promote full multi-seed campaign | only after C28 passes; independent audit and article-ready report | blocked |
-| C30 | Implement alternating MetricGAN+ discriminator refresh | true normalized PESQ labels for clean/noisy/current, historical replay, G/D alternation, tests and current-output calibration audit | in-progress |
+| C30 | Implement alternating MetricGAN+ discriminator refresh | SpeechBrain 4-conv D, true normalized labels, current/history/current updates, local FP16 replay, resumable D state; 44/44 tests/validators/guard pass; clean GPU smoke pending | in-progress |
 | C31 | Validate alternating T1 in clean smoke/pilot | T1 gain >= 0.01 PESQ-WB with STOI/SI-SDR guardrails before students/full | blocked |
 
 ## Execution rule

@@ -373,6 +373,7 @@ def _experiment_config(
     include_test: bool = True,
     evaluate_init_checkpoint: bool = False,
     frontend: dict[str, int] | None = None,
+    alternating_metric_discriminator: bool = False,
     mode: str,
 ) -> ExperimentConfig:
     profile = resolve_bandwidth(bandwidth)
@@ -435,6 +436,19 @@ def _experiment_config(
         pesq_proxy_checkpoint=proxy_checkpoint,
         metric_proxy_weight=float(effective["metric_proxy_weight"]),
         teacher_anchor_weight=float(effective["teacher_anchor_weight"]),
+        metric_discriminator_mode=(
+            "alternating" if alternating_metric_discriminator else "frozen"
+        ),
+        metric_discriminator_lr=float(effective["metric_discriminator_lr"]),
+        metric_discriminator_rows=int(effective["metric_discriminator_rows"]),
+        metric_discriminator_history_portion=float(
+            effective["metric_discriminator_history_portion"]
+        ),
+        metric_discriminator_replay_root=(
+            (cell_root / "metricgan_replay").as_posix()
+            if alternating_metric_discriminator
+            else None
+        ),
         eval_dnsmos=False,
         sample_count=int(evaluation["sample_count"]),
         benchmark_seconds=int(evaluation["benchmark_seconds"]),
@@ -626,6 +640,7 @@ def _proxy(
             batch_size=int(effective["proxy_batch_size"]),
             lr=float(effective["proxy_lr"]),
             seed=int(effective["seed"]),
+            model_kind="speechbrain_metric_discriminator",
         )
         _mark_stage(
             run_root,
@@ -1124,6 +1139,7 @@ def run_all(
         cell="T1-WB-METRIC",
         loss_recipe="T0_PESQ",
         proxy_checkpoint=str(proxies["wb"]["checkpoint"]),
+        alternating_metric_discriminator=True,
     )
     selected_teacher, selected_summary, teacher_gate = _best_teacher(
         cells["T0-WB-OFFICIAL"],

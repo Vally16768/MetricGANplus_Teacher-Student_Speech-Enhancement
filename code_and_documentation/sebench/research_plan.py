@@ -104,6 +104,25 @@ def validate_research_plan(plan: dict[str, Any]) -> dict[str, Any]:
         )
     if discriminator.get("scope") != "teacher_finetune_only":
         raise ValueError("The canonical PESQ proxy is scoped to teacher fine-tuning.")
+    if discriminator.get("architecture") != (
+        "speechbrain_metric_discriminator_4conv_spectral_norm"
+    ):
+        raise ValueError(
+            "The canonical teacher branch requires the SpeechBrain MetricGAN "
+            "discriminator architecture."
+        )
+    if list(discriminator.get("update_order") or []) != [
+        "current_clean_enhanced_noisy",
+        "historical_enhanced",
+        "current_clean_enhanced_noisy",
+    ]:
+        raise ValueError(
+            "MetricGAN discriminator updates must follow current/history/current."
+        )
+    if discriminator.get("replay_location") != "desktop_local_only":
+        raise ValueError("MetricGAN discriminator replay must be Desktop-local.")
+    if bool(discriminator.get("cache_inputs", True)):
+        raise ValueError("MetricGAN replay must not copy noisy/clean inputs.")
 
     stages = list(plan.get("stages") or [])
     required = {
@@ -143,6 +162,8 @@ def validate_research_plan(plan: dict[str, Any]) -> dict[str, Any]:
             "target_metric": "PESQ",
             "proxy_profiles": ["wb"],
             "scope": "teacher_finetune_only",
+            "architecture": discriminator["architecture"],
+            "update_order": list(discriminator["update_order"]),
         },
         "stage_count": len(names),
         "tts_status": tts["status"],

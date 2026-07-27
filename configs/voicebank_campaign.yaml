@@ -43,6 +43,9 @@ training:
   teacher_branch_lr: 0.00001
   student_lr: 0.0005
   proxy_lr: 0.001
+  metric_discriminator_lr: 0.0005
+  metric_discriminator_rows: 100
+  metric_discriminator_history_portion: 0.2
   metric_proxy_weight: 0.25
   teacher_anchor_weight: 0.75
   teacher_min_pesq_gain: 0.01
@@ -67,6 +70,7 @@ pilot:
   proxy_train_rows: 64
   proxy_validation_rows: 16
   proxy_batch_size: 4
+  metric_discriminator_rows: 32
   eval_batch_size: 4
   sample_count: 2
   benchmark_seconds: 2
@@ -82,6 +86,7 @@ smoke:
   proxy_train_rows: 2
   proxy_validation_rows: 1
   proxy_batch_size: 2
+  metric_discriminator_rows: 2
   eval_batch_size: 2
   sample_count: 1
   benchmark_seconds: 1

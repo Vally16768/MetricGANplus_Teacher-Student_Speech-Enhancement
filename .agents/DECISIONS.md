@@ -173,3 +173,24 @@ before each generator epoch and replays historical outputs.
 
 Constraint: test metrics cannot tune this loop. Selection remains confined to
 the frozen `val_select` split and the existing promotion guardrails.
+
+## D-018 — Use the SpeechBrain discriminator and local generated-only replay
+
+Decision: canonical T1 uses the SpeechBrain MetricGAN discriminator architecture
+(four 5x5 spectral-normalized convolutions, mean pooling and 50/10/1 linear
+head). Before every generator epoch it executes current clean/enhanced/noisy,
+historical enhanced and current clean/enhanced/noisy D updates with
+`(PESQ + 0.5) / 5` targets, then freezes D for the generator update.
+
+Generated current enhanced waveforms are cached as FP16 only inside the ignored
+Desktop run directory. Replay metadata references VoiceBank noisy/clean files
+in place and caches noisy PESQ scores, but never copies dataset inputs.
+
+Cause: this is the defining behavior and architecture of the original
+SpeechBrain recipe missing from both failed frozen-proxy pilots. It directly
+addresses generator-induced distribution shift while preserving the external
+read-only dataset and reproducible resume state.
+
+Constraint: implementation status is not evidence of improvement. C30 remains
+open until a clean GPU smoke passes; pilot/full remain gated by true
+`val_select` PESQ and STOI/SI-SDR.

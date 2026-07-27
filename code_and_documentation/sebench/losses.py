@@ -6,8 +6,9 @@ from typing import Any
 
 import torch
 from torch import nn
+from torch.nn.utils import spectral_norm
 
-from sebench.bandwidth import validate_frontend
+from sebench.bandwidth import resolve_bandwidth, validate_frontend
 from sebench.erb import waveform_to_erb_mask
 
 
@@ -162,21 +163,183 @@ class PESQProxyRegressor(nn.Module):
         }
 
 
-def save_pesq_proxy_checkpoint(path: str | Path, model: PESQProxyRegressor) -> None:
+def _metricgan_layer(
+    in_size: int,
+    out_size: int | None = None,
+    *,
+    layer_type: type[nn.Module] = nn.Linear,
+    **kwargs: Any,
+) -> nn.Module:
+    """SpeechBrain MetricGAN layer initialization with spectral normalization."""
+    if out_size is None:
+        out_size = in_size
+    layer = spectral_norm(layer_type(in_size, out_size, **kwargs))
+    nn.init.xavier_uniform_(layer.weight_orig, gain=1.0)
+    nn.init.zeros_(layer.bias)
+    return layer
+
+
+class SpeechBrainMetricDiscriminator(nn.Module):
+    """MetricGAN discriminator matching SpeechBrain's published architecture.
+
+    The native network estimates normalized PESQ. ``forward`` exposes raw PESQ
+    for compatibility with :class:`MetricGANGeneratorObjective`; discriminator
+    training uses :meth:`normalized_score` directly.
+    """
+
+    checkpoint_kind = "speechbrain_metric_discriminator"
+
+    def __init__(
+        self,
+        *,
+        sample_rate: int = 16000,
+        n_fft: int = 512,
+        hop_length: int = 256,
+        win_length: int = 512,
+        bandwidth: str = "wb",
+        kernel_size: tuple[int, int] = (5, 5),
+        base_channels: int = 15,
+    ) -> None:
+        super().__init__()
+        self.sample_rate = int(sample_rate)
+        self.n_fft = int(n_fft)
+        self.hop_length = int(hop_length)
+        self.win_length = int(win_length)
+        self.bandwidth = resolve_bandwidth(
+            bandwidth,
+            sample_rate=self.sample_rate,
+        ).name
+        if (self.n_fft, self.hop_length, self.win_length) != (512, 256, 512):
+            raise ValueError(
+                "SpeechBrain MetricGAN discriminator requires frontend "
+                "512/256/512."
+            )
+        self.kernel_size = tuple(int(value) for value in kernel_size)
+        self.base_channels = int(base_channels)
+        self.register_buffer(
+            "_window",
+            torch.hamming_window(self.win_length),
+            persistent=False,
+        )
+        self.batch_norm = nn.BatchNorm2d(num_features=2, momentum=0.01)
+        self.conv1 = _metricgan_layer(
+            2,
+            self.base_channels,
+            layer_type=nn.Conv2d,
+            kernel_size=self.kernel_size,
+        )
+        self.conv2 = _metricgan_layer(
+            self.base_channels,
+            layer_type=nn.Conv2d,
+            kernel_size=self.kernel_size,
+        )
+        self.conv3 = _metricgan_layer(
+            self.base_channels,
+            layer_type=nn.Conv2d,
+            kernel_size=self.kernel_size,
+        )
+        self.conv4 = _metricgan_layer(
+            self.base_channels,
+            layer_type=nn.Conv2d,
+            kernel_size=self.kernel_size,
+        )
+        self.linear1 = _metricgan_layer(self.base_channels, 50)
+        self.linear2 = _metricgan_layer(50, 10)
+        self.linear3 = _metricgan_layer(10, 1)
+        self.activation = nn.LeakyReLU(negative_slope=0.3)
+
+    def _features(self, waveform: torch.Tensor) -> torch.Tensor:
+        if waveform.dim() == 3:
+            waveform = waveform.squeeze(1)
+        window = self._window.to(device=waveform.device, dtype=waveform.dtype)
+        spectrum = torch.stft(
+            waveform,
+            n_fft=self.n_fft,
+            hop_length=self.hop_length,
+            win_length=self.win_length,
+            window=window,
+            center=True,
+            pad_mode="reflect",
+            return_complex=True,
+        )
+        return torch.log1p(spectrum.abs().clamp_min(1e-8).sqrt())
+
+    def normalized_score(
+        self,
+        candidate: torch.Tensor,
+        reference: torch.Tensor,
+    ) -> torch.Tensor:
+        features = torch.stack(
+            [self._features(candidate), self._features(reference)],
+            dim=1,
+        )
+        value = self.batch_norm(features)
+        for layer in (self.conv1, self.conv2, self.conv3, self.conv4):
+            value = self.activation(layer(value))
+        value = torch.mean(value, dim=(2, 3))
+        value = self.activation(self.linear1(value))
+        value = self.activation(self.linear2(value))
+        return self.linear3(value).squeeze(-1)
+
+    def forward(
+        self,
+        noisy: torch.Tensor,
+        candidate: torch.Tensor,
+        reference: torch.Tensor,
+    ) -> torch.Tensor:
+        del noisy
+        return 5.0 * self.normalized_score(candidate, reference) - 0.5
+
+    def config_dict(self) -> dict[str, Any]:
+        return {
+            "sample_rate": self.sample_rate,
+            "n_fft": self.n_fft,
+            "hop_length": self.hop_length,
+            "win_length": self.win_length,
+            "bandwidth": self.bandwidth,
+            "kernel_size": self.kernel_size,
+            "base_channels": self.base_channels,
+        }
+
+
+def save_pesq_proxy_checkpoint(
+    path: str | Path,
+    model: PESQProxyRegressor | SpeechBrainMetricDiscriminator,
+) -> None:
     out_path = Path(path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    torch.save({"config": model.config_dict(), "state_dict": model.state_dict()}, out_path)
+    torch.save(
+        {
+            "kind": getattr(model, "checkpoint_kind", "pesq_proxy_regressor"),
+            "config": model.config_dict(),
+            "state_dict": model.state_dict(),
+        },
+        out_path,
+    )
 
 
-def load_pesq_proxy_checkpoint(path: str | Path, device: str | torch.device = "cpu") -> PESQProxyRegressor:
+def load_pesq_proxy_checkpoint(
+    path: str | Path,
+    device: str | torch.device = "cpu",
+    *,
+    freeze: bool = True,
+) -> PESQProxyRegressor | SpeechBrainMetricDiscriminator:
     payload = torch.load(Path(path), map_location="cpu", weights_only=True)
     config = dict(payload.get("config") or {})
-    model = PESQProxyRegressor(**config)
+    kind = str(payload.get("kind") or "pesq_proxy_regressor")
+    if kind == SpeechBrainMetricDiscriminator.checkpoint_kind:
+        model: PESQProxyRegressor | SpeechBrainMetricDiscriminator = (
+            SpeechBrainMetricDiscriminator(**config)
+        )
+    elif kind == "pesq_proxy_regressor":
+        model = PESQProxyRegressor(**config)
+    else:
+        raise ValueError(f"Unsupported PESQ proxy checkpoint kind: {kind}")
     model.load_state_dict(payload["state_dict"])
     model.to(device)
     model.eval()
     for parameter in model.parameters():
-        parameter.requires_grad_(False)
+        parameter.requires_grad_(not freeze)
     return model
 
 

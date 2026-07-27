@@ -44,6 +44,12 @@ metric_discriminator:
   generator_weight: 0.25
   frozen_during_generator_update: true
   generator_target: "mse_to_normalized_clean_score_1"
+  architecture: "speechbrain_metric_discriminator_4conv_spectral_norm"
+  update_order: ["current_clean_enhanced_noisy", "historical_enhanced", "current_clean_enhanced_noisy"]
+  true_label_normalization: "(PESQ + 0.5) / 5"
+  history_portion: 0.2
+  replay_location: "desktop_local_only"
+  cache_inputs: false
   teacher_anchor_weight: 0.75
   teacher_finetune_lr: 0.00001
 

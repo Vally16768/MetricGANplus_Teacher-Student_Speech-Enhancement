@@ -33,9 +33,12 @@ the workflow matching the task.
   for WB; NB reference and PESQ-NB for NB. Never compare scores produced under
   different bandwidth protocols as if they were one metric.
 - Use a WB metric-discriminator checkpoint for canonical T1 teacher
-  fine-tuning. If a direct student-metric ablation is separately declared, use
-  distinct WB and NB proxies; a WB proxy is not valid for NB, and an
-  enhancement proxy is not TTS evidence.
+  fine-tuning. Before every T1 generator epoch, update the SpeechBrain
+  four-convolution discriminator in current clean/enhanced/noisy, historical
+  enhanced, current clean/enhanced/noisy order with true normalized PESQ
+  labels. Freeze D during the generator update. If a direct student-metric
+  ablation is separately declared, use distinct WB and NB proxies; a WB proxy
+  is not valid for NB, and an enhancement proxy is not TTS evidence.
 - Reject MP-SENet, FullSubNet, CMGAN and unrelated project artifacts from the
   canonical pipeline.
 - Keep datasets, audio, generated caches and machine-local configs out of Git.
@@ -105,6 +108,11 @@ the dataset and Git. Key them by teacher checkpoint, frozen training manifest
 and cache contract; stage labels must not duplicate identical content. Store
 regenerable teacher targets in validated FP16, and do not copy noisy/clean
 dataset audio into the cache.
+
+Metric-discriminator replay follows the same location rule. Cache only
+generated enhanced outputs as FP16 plus their PESQ labels and external input
+references. Reuse noisy scores locally, never copy noisy/clean audio, and
+record current-output calibration for every discriminator refresh.
 
 Use `campaign.py monitor-run --run-dir <run-dir>` throughout pilot/full
 execution. Reconcile the active campaign stage with the current cell epoch,

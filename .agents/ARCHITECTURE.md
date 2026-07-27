@@ -1,7 +1,7 @@
 # Architecture register
 
-Status: `bounded-frozen-proxy-pilot-gate-failed`; alternating discriminator
-refresh is required; no full run is promoted.
+Status: `alternating-discriminator-implemented-awaiting-gpu-smoke`; no full run
+is promoted.
 
 ## A0 — End-to-end research pipeline
 
@@ -19,7 +19,7 @@ refresh is required; no full run is promoted.
               |             +--> [fresh WB student S0]
               |             +--> [fresh NB student S0]
               |
-              +--> [T1 control + T1 PESQ-proxy fine-tuning]
+              +--> [T1 control + T1 alternating MetricGAN fine-tuning]
                             |
                             v
                   [true WB val_select gate]
@@ -141,43 +141,43 @@ separate columns/figures and are not pooled.
 ## A4 — Metric discriminator and generator objective
 
 ```text
-(source/noisy, candidate/enhanced, clean reference)
-                    |
-                    v
-[frozen bandwidth-specific PESQ proxy]
-                    |
-                    v
-[predicted PESQ]
-       |
-       v
-[normalize (-0.5..4.5) to (0..1)]
-       |
-       v
-[MSE to target score 1 + official-output trust anchor]
-       |
-       v
-[generator gradient]
+before each G epoch:
+ current clean/enhanced/noisy --true (PESQ+0.5)/5--> D updates
+ historical enhanced --------stored true score------> D replay
+ current clean/enhanced/noisy ----------------------> D updates
+                                      |
+                                      v
+                freeze SpeechBrain D [4x Conv2D spectral norm
+                                      -> channel mean -> 50 -> 10 -> 1]
+                                      |
+ current enhanced + clean ------------+--> MSE(D score, 1)
+                                              + T0 trust anchor
+                                              -> generator gradient
 ```
 
-The non-differentiable PESQ implementation creates labels for a learned proxy;
-PESQ itself is not differentiated through. `T0_PESQ` is the stage-T1 teacher
-metric condition. Its bounded score target follows the official MetricGAN
-generator objective instead of maximizing an unbounded proxy output. T1 also
-reads the local T0 teacher cache and anchors its waveform to the accepted
-official output; the fine-tune learning rate is `1e-5`. These protections were
-introduced after pilot A1 showed strong fixed-candidate proxy correlation but
-severe current-output exploitation.
+The non-differentiable PESQ implementation creates labels for D; PESQ itself is
+not differentiated through. `T0_PESQ` is the stage-T1 teacher metric condition.
+D now matches SpeechBrain's four valid-convolution, spectral-normalized
+architecture and its current/history/current refresh order. The generator
+target is the official normalized clean score `1`; D is frozen during G.
+T1 also reads the local T0 teacher cache and anchors its waveform to the
+accepted official output; the fine-tune learning rate is `1e-5`.
+
+Generated current teacher outputs and historical replay live only inside the
+ignored Desktop run directory as FP16. Their index stores true enhanced/noisy
+PESQ labels and references the external clean/noisy paths without copying
+dataset audio. Noisy scores are reused from a local JSON cache. D optimizer,
+checkpoint and refresh history are part of the resumable T1 state.
 
 The canonical S0/S1 student comparison uses `D1` in both stages, with identical
 architecture, seed and schedule, so the changed teacher is the only intended
 experimental variable. A future direct student-metric ablation must restore
 distinct WB/NB proxies and cannot be mixed into this teacher-effect experiment.
 
-The official training recipe additionally refreshes its discriminator using
-current, noisy and historical samples. The bounded frozen-proxy branch is not
-claimed to be an exact reproduction of that alternating training loop. If the
-new smoke/pilot still exposes distribution shift, current-output relabeling and
-proxy refresh are required before another full run.
+The earlier bounded frozen-proxy branch remains historical negative evidence,
+not the canonical T1 implementation. The alternating branch still requires a
+clean real-GPU smoke and pilot; code presence alone does not establish teacher
+improvement.
 
 `MetricGANGeneratorObjective` exposes the same optimization interface for a
 future TTS generator. That extension is only `planned`: the enhancement proxy
@@ -222,6 +222,8 @@ Evidence:
 - orchestration: `campaign.py`;
 - proxy dataset/training/calibration:
   `code_and_documentation/sebench/metric_proxy_training.py`;
+- alternating current/history/current update and local replay:
+  `code_and_documentation/sebench/metricgan_alternating.py`;
 - teacher cache: `code_and_documentation/sebench/teacher_cache.py`;
 - configuration: `configs/voicebank_campaign.yaml`;
 - post-cleanup GPU smoke:

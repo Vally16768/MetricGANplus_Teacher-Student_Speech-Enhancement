@@ -33,7 +33,12 @@ from sebench.audio import load_mono_audio, loop_to_length, manifest_hash, save_m
 from sebench.bandwidth import resolve_bandwidth
 from sebench.checkpoints import load_checkpoint_package, load_model_from_checkpoint, save_checkpoint_package
 from sebench.data import ManifestRow, VoiceBankDemandDataset, read_pair_manifest
-from sebench.losses import CompositeEnhancementLoss, load_pesq_proxy_checkpoint
+from sebench.losses import (
+    CompositeEnhancementLoss,
+    SpeechBrainMetricDiscriminator,
+    load_pesq_proxy_checkpoint,
+)
+from sebench.metricgan_alternating import refresh_metricgan_discriminator
 from sebench.mlflow_utils import (
     DEFAULT_ARTIFACT_ROOT,
     DEFAULT_EXPERIMENT_NAME,
@@ -145,6 +150,11 @@ class ExperimentConfig:
     bandwidth: str | None = None
     metric_proxy_weight: float = 0.25
     teacher_anchor_weight: float = 0.75
+    metric_discriminator_mode: str = "frozen"
+    metric_discriminator_lr: float = 5e-4
+    metric_discriminator_rows: int = 100
+    metric_discriminator_history_portion: float = 0.2
+    metric_discriminator_replay_root: str | None = None
 
 
 def _normalize_runtime_devices(device: str, gpu_ids: list[int] | None) -> tuple[str, list[int]]:
@@ -1348,9 +1358,41 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
         }
     )
 
+    alternating_discriminator = config.metric_discriminator_mode == "alternating"
+    if config.metric_discriminator_mode not in {"frozen", "alternating"}:
+        raise ValueError(
+            "metric_discriminator_mode must be `frozen` or `alternating`."
+        )
     pesq_proxy_model = None
     if config.pesq_proxy_checkpoint:
-        pesq_proxy_model = load_pesq_proxy_checkpoint(config.pesq_proxy_checkpoint, device=config.device)
+        pesq_proxy_model = load_pesq_proxy_checkpoint(
+            config.pesq_proxy_checkpoint,
+            device=config.device,
+            freeze=not alternating_discriminator,
+        )
+    discriminator_optimizer: torch.optim.Optimizer | None = None
+    discriminator_checkpoint_path: Path | None = None
+    discriminator_refresh_history: list[dict[str, Any]] = []
+    if alternating_discriminator:
+        if config.loss_recipe.upper() != "T0_PESQ":
+            raise ValueError(
+                "Alternating MetricGAN discriminator is restricted to T0_PESQ."
+            )
+        if not isinstance(pesq_proxy_model, SpeechBrainMetricDiscriminator):
+            raise ValueError(
+                "Alternating mode requires a SpeechBrainMetricDiscriminator checkpoint."
+            )
+        if not config.metric_discriminator_replay_root:
+            raise ValueError(
+                "Alternating mode requires a Desktop-local discriminator replay root."
+            )
+        discriminator_optimizer = torch.optim.Adam(
+            pesq_proxy_model.parameters(),
+            lr=float(config.metric_discriminator_lr),
+        )
+        discriminator_checkpoint_path = (
+            checkpoint_path.parent / "metric_discriminator.pt"
+        )
 
     loss_fn = CompositeEnhancementLoss(
         config.loss_recipe,
@@ -1434,6 +1476,21 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
             scheduler.load_state_dict(state_payload["scheduler_state"])
         if autocast_scaler is not None and state_payload.get("scaler_state"):
             autocast_scaler.load_state_dict(state_payload["scaler_state"])
+        if (
+            discriminator_optimizer is not None
+            and state_payload.get("metric_discriminator_state")
+            and isinstance(pesq_proxy_model, SpeechBrainMetricDiscriminator)
+        ):
+            pesq_proxy_model.load_state_dict(
+                state_payload["metric_discriminator_state"]
+            )
+            if state_payload.get("metric_discriminator_optimizer_state"):
+                discriminator_optimizer.load_state_dict(
+                    state_payload["metric_discriminator_optimizer_state"]
+                )
+            discriminator_refresh_history = list(
+                state_payload.get("metric_discriminator_refresh_history") or []
+            )
 
         best_score = float(state_payload.get("best_score", best_score))
         best_epoch = int(state_payload.get("best_epoch", best_epoch))
@@ -1498,6 +1555,7 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
         "selection_metric": config.selection_metric,
         "selection_guardrail_metric": config.selection_guardrail_metric,
         "selection_guardrail_min": config.selection_guardrail_min,
+        "metric_discriminator_mode": config.metric_discriminator_mode,
     }
 
     checkpoint_every_steps = max(int(config.checkpoint_every_steps or 0), 0)
@@ -1511,7 +1569,7 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
 
     def _build_training_state(epoch: int, step: int, reason: str) -> dict[str, Any]:
         base_model = _unwrap_runtime_model(model)
-        return {
+        payload = {
             "epoch": int(epoch),
             "global_step": int(step),
             "reason": reason,
@@ -1529,6 +1587,19 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
             "epochs_without_improve": int(epochs_without_improve),
             "history_rows": list(history_rows),
         }
+        if isinstance(pesq_proxy_model, SpeechBrainMetricDiscriminator):
+            payload["metric_discriminator_state"] = (
+                pesq_proxy_model.state_dict()
+            )
+            payload["metric_discriminator_optimizer_state"] = (
+                discriminator_optimizer.state_dict()
+                if discriminator_optimizer is not None
+                else None
+            )
+            payload["metric_discriminator_refresh_history"] = list(
+                discriminator_refresh_history
+            )
+        return payload
 
     def _save_training_state(epoch: int, step: int, reason: str, *, snapshot: bool) -> None:
         payload = _build_training_state(epoch=epoch, step=step, reason=reason)
@@ -1755,6 +1826,59 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                 train_manifest=current_train_manifest,
                 teacher_cache_manifest=current_teacher_cache_manifest or "",
             )
+            discriminator_metrics: dict[str, float] = {}
+            if alternating_discriminator:
+                if (
+                    not isinstance(
+                        pesq_proxy_model, SpeechBrainMetricDiscriminator
+                    )
+                    or discriminator_optimizer is None
+                    or discriminator_checkpoint_path is None
+                ):
+                    raise RuntimeError(
+                        "Alternating discriminator was not initialized."
+                    )
+                _write_progress(
+                    "metric_discriminator_refresh",
+                    epoch=epoch,
+                    global_step=global_step,
+                    train_manifest=current_train_manifest,
+                )
+                refresh = refresh_metricgan_discriminator(
+                    discriminator=pesq_proxy_model,
+                    optimizer=discriminator_optimizer,
+                    generator=_unwrap_runtime_model(model),
+                    train_manifest=current_train_manifest,
+                    replay_root=str(config.metric_discriminator_replay_root),
+                    checkpoint_out=discriminator_checkpoint_path,
+                    epoch=epoch,
+                    device=config.device,
+                    max_rows=int(config.metric_discriminator_rows),
+                    history_portion=float(
+                        config.metric_discriminator_history_portion
+                    ),
+                    seed=int(config.seed),
+                    grad_clip=float(config.grad_clip),
+                    progress_callback=_eval_progress,
+                )
+                discriminator_refresh_history.append(refresh)
+                discriminator_metrics = {
+                    "discriminator_current_first_mse": float(
+                        refresh["current_first_mse"]
+                    ),
+                    "discriminator_historical_mse": float(
+                        refresh["historical_mse"]
+                    ),
+                    "discriminator_current_second_mse": float(
+                        refresh["current_second_mse"]
+                    ),
+                    "discriminator_current_mae_pesq": float(
+                        refresh["calibration"]["mae"]
+                    ),
+                    "discriminator_current_pearson": float(
+                        refresh["calibration"]["pearson"]
+                    ),
+                }
 
             def _step_callback(_step_in_epoch: int, running_train: dict[str, float]) -> None:
                 nonlocal global_step, last_state_save_step, last_state_save_ts, periodic_save_count
@@ -1813,6 +1937,7 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                 autocast_scaler,
                 step_callback=_step_callback,
             )
+            train_metrics.update(discriminator_metrics)
             epoch_seconds = time.monotonic() - epoch_start_ts
             _write_progress(
                 "epoch_train_complete",
@@ -2013,6 +2138,14 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
         mlflow.log_artifact(checkpoint_path.as_posix(), artifact_path="checkpoints")
         mlflow.log_artifact(final_checkpoint_path.as_posix(), artifact_path="checkpoints")
         mlflow.log_artifact(training_state_path.as_posix(), artifact_path="checkpoints")
+        if (
+            discriminator_checkpoint_path is not None
+            and discriminator_checkpoint_path.is_file()
+        ):
+            mlflow.log_artifact(
+                discriminator_checkpoint_path.as_posix(),
+                artifact_path="checkpoints",
+            )
         if history_json_path.exists():
             mlflow.log_artifact(history_json_path.as_posix(), artifact_path="reports")
         if history_csv_path.exists():
@@ -2120,6 +2253,14 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                 "history_json": history_json_path.as_posix(),
                 "history_csv": history_csv_path.as_posix(),
                 "history_plot": history_plot_path.as_posix(),
+                "metric_discriminator_checkpoint": (
+                    discriminator_checkpoint_path.as_posix()
+                    if discriminator_checkpoint_path is not None
+                    else None
+                ),
+                "metric_discriminator_refresh_history": list(
+                    discriminator_refresh_history
+                ),
                 "val_rank_metrics": primary_rank_metrics,
                 "val_select_metrics": primary_select_metrics,
                 "test_metrics": primary_test_metrics,

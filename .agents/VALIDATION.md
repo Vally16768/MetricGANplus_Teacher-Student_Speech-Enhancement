@@ -11,7 +11,7 @@
 | Training loop | unit tests + real entry-point short train + resume test |
 | Evaluation/metrics | fixture metric test + sample-count reconciliation |
 | Bandwidth/profile | explicit WB/NB contract + reference/mode metadata test |
-| Metric discriminator | proxy calibration + frozen weights + generator gradient smoke + true-metric ablation |
+| Metric discriminator | exact layer contract + normalized labels + current/history/current update + local replay/no-input-copy test + frozen-during-G check + current-output calibration + true-metric ablation |
 | Official checkpoint | pinned revision + SHA-256 + exact tensor mapping + offline package round-trip + true PESQ diagnostic |
 | Teacher cache | outside dataset + no input duplication + dtype/error bound + resume + manifest fallback |
 | Architecture | all relevant tests + architecture register/hash update |
@@ -124,4 +124,10 @@ metric/reference profile matches the run profile
 - pilot control PESQ moved 2.8238→2.8093→2.7964; bounded metric PESQ moved
   2.8238→2.8197→2.8131. Both retained epoch-0 T0 and blocked full.
 - the next required gate is an alternating current/noisy/historical
-  discriminator refresh implementation, followed by a new smoke and pilot.
+  discriminator refresh clean GPU smoke, followed by a monitored pilot.
+- alternating implementation unit tests cover PESQ normalization, SpeechBrain
+  spectral-normalized layer/checkpoint contract, three-pass refresh, FP16
+  generated-output replay, no noisy/clean copies and D freezing after refresh.
+- 44/44 unit/integration tests, the canonical research-plan validator, the real
+  `campaign.py validate` entry point and the project guard pass after the
+  alternating implementation; clean GPU execution remains the open gate.
