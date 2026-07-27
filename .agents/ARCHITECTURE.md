@@ -1,7 +1,6 @@
 # Architecture register
 
-Status: `alternating-discriminator-implemented-awaiting-gpu-smoke`; no full run
-is promoted.
+Status: `official-baseline-phase-implementation`; no full run is promoted.
 
 ## A0 — End-to-end research pipeline
 
@@ -192,6 +191,12 @@ publication.
 ```text
 validate
   -> immutable manifest/profile checks
+smoke-baseline / pilot-baseline / run-baseline
+  -> T0-WB-OFFICIAL at epoch 0
+  -> persistent dual-profile cache C0
+  -> S0-WB + S0-NB from fresh identical schedules
+  -> three-cell true-metric report + independent audit
+  -> stop before proxy/T1/S1
 smoke-all
   -> T0-WB-OFFICIAL at epoch 0
   -> persistent dual-profile cache C0
@@ -211,9 +216,11 @@ monitor-run / audit-run
 ```
 
 `smoke-all` is allowed on dirty source only with the explicit
-`--allow-dirty-smoke` flag. `pilot-all` and `run-all` require a clean source
-snapshot. Smoke and pilot are marked `verification_only` and cannot be
-promoted. All training nodes enforce the shared venv and CUDA contract.
+`--allow-dirty-smoke` flag; the same applies to `smoke-baseline`.
+`pilot-all`, `run-all`, `pilot-baseline` and `run-baseline` require a clean
+source snapshot. Smoke and pilot are marked `verification_only` and cannot be
+promoted. A clean full baseline may be promoted independently of the later T1
+gate. All training nodes enforce the shared venv and CUDA contract.
 Generated files live below the configured run root, never below the dataset
 root. Teacher caches are content-addressed by teacher checkpoint, training
 manifest and cache-contract hashes, remain in the Desktop-local ignored runtime
@@ -261,6 +268,9 @@ Evidence:
   `20260727-alternating-teacher-pilot-s0-a1` on commit `9ad2b85` (seven
   cells/models, 84 samples, +0.00221 `val_select` PESQ below gate,
   current-output D calibration degradation, T0 fallback, audit zero issues).
+- official-baseline-only smoke:
+  `20260727-official-baseline-smoke-s0-a1` (three expected/observed cells,
+  official cache reuse, no proxy/T1/S1, 18 sample files and zero audit issues).
 
 ## A6 — Selection boundaries
 

@@ -74,6 +74,7 @@ experiments/runs/<run_id>/
 | `20260727-alternating-teacher-smoke-s0-a1` | smoke-passed/audited; superseded | clean commit `8df612f`; structural three-pass D/G execution exposed warm-start clean-label mismatch; preserved, no pilot use | no |
 | `20260727-alternating-teacher-smoke-s0-a2` | smoke-passed/audited | clean commit `f5003ef`; corrected clean=1 target, current/history/current D refresh, local generated-only replay; 7 cells/models, 42/42 samples, zero issues; T0 fallback | no |
 | `20260727-alternating-teacher-pilot-s0-a1` | execution-passed/audited; T1 gate failed | clean commit `9ad2b85`; 7 cells/models, 84/84 samples, zero issues; T1 val PESQ +0.00221 was below gate and test PESQ was -0.02029; T0 fallback | no |
+| `20260727-official-baseline-smoke-s0-a1` | smoke-passed/audited | dirty-smoke implementation snapshot; exact three-cell T0→C0→S0 scope, no proxy/T1/S1, 3 models, 18/18 samples, zero cached inputs and zero audit issues | no |
 
 There is currently no promoted end-to-end run from the current repository
 snapshot.

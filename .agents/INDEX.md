@@ -16,9 +16,9 @@ This directory is the canonical control plane for the research project.
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
 
-Current release state: **official teacher and two-stage causal-max campaign
-passed two clean-snapshot seven-cell pilots; both frozen-proxy teacher
-improvement formulations failed the PESQ gate and full training is blocked**.
+Current release state: **the official T0 teacher is pinned and validated; an
+independent three-cell T0→C0→S0 baseline phase is being prepared before any
+new teacher modification. Earlier T1 formulations failed the PESQ gate**.
 
 Open blockers:
 
@@ -34,3 +34,5 @@ Open blockers:
   next branch must refresh its discriminator on current/noisy/historical
   outputs as in MetricGAN+.
 - There is no promoted end-to-end run produced from the current clean snapshot.
+- The official full baseline must complete before the next teacher-only metric
+  trial and before any S1 retraining.

@@ -34,6 +34,8 @@ Runtime-sensitive changes also require the real entry point:
 ```bash
 "$PYTHON" campaign.py validate
 "$PYTHON" campaign.py smoke-all --run-id <verification-id> --allow-dirty-smoke
+"$PYTHON" campaign.py smoke-baseline --run-id <verification-id> --allow-dirty-smoke
+"$PYTHON" campaign.py run-baseline --run-id <baseline-id>
 "$PYTHON" campaign.py monitor-run --run-dir local/runs/<run-id>
 "$PYTHON" campaign.py audit-run --run-dir local/runs/<run-id>
 ```
@@ -146,3 +148,12 @@ metric/reference profile matches the run profile
 - T1 gained only +0.00221 PESQ-WB on `val_select`, below the +0.01 gate, while
   current-output D MAE degraded from 1.5002 to 1.7555; T0 fallback passed and
   full training remains blocked.
+- baseline-only audit fixtures reconcile exactly three expected cells and do
+  not require a T1 promotion gate; a full baseline still requires a clean
+  committed snapshot and its own independent package audit.
+- baseline-only CUDA smoke A1 completed the exact T0/S0-WB/S0-NB scope,
+  produced 3/3 hashed models and 18/18 sample files, and passed the independent
+  audit with zero issues.
+- the smoke package contains no proxy/T1/S1 cells; its WB/NB metric/reference
+  metadata match and its reused FP16 cache contains zero noisy/clean input
+  files.

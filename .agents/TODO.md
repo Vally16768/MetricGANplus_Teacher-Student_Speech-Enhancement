@@ -37,6 +37,13 @@ Update this register whenever a gate changes state.
 | C30 | Implement alternating MetricGAN+ discriminator refresh | SpeechBrain 4-conv D, clean=1 and true normalized noisy/enhanced labels, current/history/current updates, local FP16 replay, resumable D state; 45/45 tests and corrected clean A2 smoke/audit pass | passed |
 | C31 | Validate alternating T1 in clean smoke/pilot | clean pilot `...-a1` audited 7/7 cells/models and 84/84 samples, but T1 gained only +0.00221 PESQ-WB and D current-output MAE degraded 1.50→1.76; full blocked | failed |
 | C32 | Isolate the next teacher-only fidelity trial | require 100 current examples/epoch, current-output calibration guard and immediate stop before cache/S1 work when the teacher gate fails | pending |
+| C33 | Define the ordered three-phase program | phase 1 official T0→C0→S0; phase 2 metric-aware WB teacher gate; phase 3 C1→fresh S1 only after gate | passed |
+| C34 | Implement an official-baseline-only campaign | `smoke/pilot/run-baseline`; exactly T0, S0-WB, S0-NB; subset-aware report/audit | passed |
+| C35 | Validate baseline-only implementation | 46/46 tests; plan/guard pass; clean protocol metadata; A1 CUDA smoke audited 3/3 cells/models, 18/18 samples, zero issues and zero cached inputs | passed |
+| C36 | Run the full official baseline | full frozen manifests, official content-addressed FP16 cache, 20-epoch fresh WB/NB causal-max students, report/audit | pending |
+| C37 | Improve the WB enhancement teacher with a metric discriminator | teacher-only trials; true PESQ-WB/STOI/SI-SDR gate; no S1 or full run before gate | blocked |
+| C38 | Retrain students from an accepted T1 teacher | new content-addressed C1; fresh S1-WB/S1-NB with S0-matched architecture/seed/schedule | blocked |
+| C39 | Evaluate the TTS metric-discriminator hypothesis separately | select TTS generator/data, recalibrate metric on synthesis outputs and keep claims/provenance outside enhancement campaign | blocked |
 
 ## Execution rule
 

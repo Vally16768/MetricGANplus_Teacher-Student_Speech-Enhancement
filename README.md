@@ -79,15 +79,19 @@ export METRICGAN_RUN_ROOT=/path/to/repository/local/runs
 export METRICGAN_SHARED_VENV=/path/to/shared-venv
 
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py validate
+"$METRICGAN_SHARED_VENV/bin/python" campaign.py run-baseline --run-id <baseline-id>
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py pilot-all --run-id <pilot-id>
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py run-all --run-id <immutable-id>
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py monitor-run --run-dir <run-dir>
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py audit-run --run-dir <run-dir>
 ```
 
-`pilot-all` și `run-all` refuză un worktree murdar. `smoke-all` poate fi folosit
-numai pentru verificare tehnică, cu `--allow-dirty-smoke`. Smoke-ul și pilotul
-nu produc rezultate promovabile.
+`run-baseline` execută numai T0 oficial, cache-ul C0 și studenții S0-WB/S0-NB,
+apoi se oprește cu raport și audit. Nu construiește proxy și nu pornește
+T1/S1. `pilot-all`, `run-all`, `pilot-baseline` și `run-baseline` refuză un
+worktree murdar. `smoke-all` și `smoke-baseline` pot fi folosite numai pentru
+verificare tehnică, cu `--allow-dirty-smoke`. Smoke-ul și pilotul nu produc
+rezultate promovabile.
 
 ## Discriminatorul metric și extensia TTS
 

@@ -89,12 +89,18 @@ Require:
 Execute in order:
 
 ```text
-prepare_data -> split audit -> pinned official WB teacher T0
+phase 1: prepare_data -> split audit -> pinned official WB teacher T0
 -> content-addressed local WB+NB cache C0 -> fresh S0-WB + S0-NB
--> T1 control/metric teacher fine-tuning -> true-metric teacher gate
--> content-addressed local WB+NB cache C1 -> fresh S1-WB + S1-NB
+-> baseline report + independent audit
+phase 2: T1 control/metric teacher fine-tuning -> true-metric teacher gate
+phase 3: content-addressed local WB+NB cache C1 -> fresh S1-WB + S1-NB
 -> paired bandwidth-matched evaluation -> report -> audit
 ```
+
+Use `smoke-baseline`, `pilot-baseline` or `run-baseline` for phase 1. These
+commands must stop after the three-cell T0/S0 package and must not build a
+proxy, alter the teacher or train S1. Audit the expected cell set declared by
+the package rather than assuming every run is a seven-cell comparison.
 
 Stop downstream work when a gate fails. Do not reinterpret a partial run as
 end-to-end evidence.
@@ -147,9 +153,10 @@ speech-enhancement campaign.
 ## Validate and promote results
 
 Use `scripts/run_contract.py validate --stage canonical`.
-Use `campaign.py audit-run --run-dir <run-dir>` first to reconcile the
-seven-cell campaign CSV, profile metadata, teacher promotion gate, reported
-samples, model sizes/hashes and report artifacts.
+Use `campaign.py audit-run --run-dir <run-dir>` first to reconcile the declared
+three-cell baseline or seven-cell comparison CSV, profile metadata, applicable
+baseline/teacher gate, reported samples, model sizes/hashes and report
+artifacts.
 
 Promote only when:
 

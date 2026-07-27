@@ -212,3 +212,21 @@ after the failed gate only reproduced S0 and consumed GPU time.
 
 Constraint: test remains reporting-only. Do not tune discriminator epochs,
 learning rates or stopping from the observed test delta.
+
+## D-020 — Materialize the official baseline before changing the teacher
+
+Decision: execute the research program as three separately auditable phases.
+Phase 1 contains only the pinned official T0 teacher, one content-addressed
+Desktop-local WB/NB FP16 cache and fresh S0-WB/S0-NB students. Phase 2 changes
+only the WB enhancement teacher and stops at its true-metric gate. Phase 3
+creates C1 and fresh S1 students only after T1 passes.
+
+Cause: the official teacher is already credible and must establish the student
+baseline independently. Mixing T1 development into the same launch wastes GPU
+time after failed gates and makes it harder to distinguish baseline evidence
+from teacher-improvement evidence.
+
+Constraint: the TTS idea is a separate domain experiment. It may reuse the
+metric-generator interface, but a TTS generator requires its own data,
+calibration and evaluation; its output cannot directly supervise the
+VoiceBank enhancement students.

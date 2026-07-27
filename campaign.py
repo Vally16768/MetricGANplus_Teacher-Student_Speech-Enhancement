@@ -51,6 +51,10 @@ CELL_ORDER = (
     "S1-NB",
 )
 
+BASELINE_CELL_ORDER = CELL_ORDER[:3]
+BASELINE_SCOPE = "official_teacher_students_baseline"
+TWO_STAGE_SCOPE = "teacher_improvement_two_stage"
+
 
 def sha256(path: str | Path) -> str:
     digest = hashlib.sha256()
@@ -718,9 +722,13 @@ def _best_teacher(
     return name, selected, gate
 
 
-def _metric_rows(cells: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+def _metric_rows(
+    cells: dict[str, dict[str, Any]],
+    *,
+    cell_order: tuple[str, ...] = CELL_ORDER,
+) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
-    for cell in CELL_ORDER:
+    for cell in cell_order:
         summary = cells[cell]
         bandwidth = "nb" if "-NB" in cell else "wb"
         for split_key, split_label in (
@@ -748,9 +756,13 @@ def _write_report(
     cells: dict[str, dict[str, Any]],
     proxies: dict[str, dict[str, Any]],
     selected_teacher: str,
-    teacher_gate: dict[str, Any],
+    teacher_gate: dict[str, Any] | None,
     mode: str,
     verification_only: bool,
+    campaign_scope: str = TWO_STAGE_SCOPE,
+    cell_order: tuple[str, ...] = CELL_ORDER,
+    comparison_pairs: dict[str, tuple[str, str]] | None = None,
+    baseline_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     metrics_dir = run_root / "metrics"
     reports_dir = run_root / "reports"
@@ -758,7 +770,7 @@ def _write_report(
     metrics_dir.mkdir(parents=True, exist_ok=True)
     reports_dir.mkdir(parents=True, exist_ok=True)
     models_dir.mkdir(parents=True, exist_ok=True)
-    rows = _metric_rows(cells)
+    rows = _metric_rows(cells, cell_order=cell_order)
     csv_path = metrics_dir / "canonical_metrics.csv"
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(
@@ -769,12 +781,20 @@ def _write_report(
         writer.writerows(rows)
 
     deltas: dict[str, dict[str, float]] = {}
-    pairs = {
-        "teacher_control_vs_official": ("T0-WB-OFFICIAL", "T1-WB-BASE"),
-        "teacher_metric_vs_official": ("T0-WB-OFFICIAL", "T1-WB-METRIC"),
-        "student_wb_after_teacher_upgrade": ("S0-WB", "S1-WB"),
-        "student_nb_after_teacher_upgrade": ("S0-NB", "S1-NB"),
-    }
+    pairs = comparison_pairs
+    if pairs is None:
+        pairs = {
+            "teacher_control_vs_official": (
+                "T0-WB-OFFICIAL",
+                "T1-WB-BASE",
+            ),
+            "teacher_metric_vs_official": (
+                "T0-WB-OFFICIAL",
+                "T1-WB-METRIC",
+            ),
+            "student_wb_after_teacher_upgrade": ("S0-WB", "S1-WB"),
+            "student_nb_after_teacher_upgrade": ("S0-NB", "S1-NB"),
+        }
     for label, (baseline, metric) in pairs.items():
         baseline_metrics = dict(cells[baseline].get("test_metrics") or {})
         metric_metrics = dict(cells[metric].get("test_metrics") or {})
@@ -787,9 +807,9 @@ def _write_report(
     figure, axis = plt.subplots(figsize=(9, 4.5))
     pesq = [
         float(cells[cell].get("test_metrics", {}).get("pesq_mean", float("nan")))
-        for cell in CELL_ORDER
+        for cell in cell_order
     ]
-    axis.bar(CELL_ORDER, pesq)
+    axis.bar(cell_order, pesq)
     axis.set_ylabel("PESQ")
     axis.set_title("VoiceBank+DEMAND campaign: profile-matched test PESQ")
     axis.tick_params(axis="x", rotation=35)
@@ -812,9 +832,10 @@ def _write_report(
     summary = {
         "schema_version": 1,
         "dataset": "VoiceBank+DEMAND",
+        "campaign_scope": campaign_scope,
+        "expected_cells": list(cell_order),
         "verification_only": verification_only,
         "selected_teacher": selected_teacher,
-        "teacher_promotion_gate": teacher_gate,
         "cells": cells,
         "metric_proxies": proxies,
         "paired_deltas": deltas,
@@ -822,20 +843,30 @@ def _write_report(
         "canonical_metrics_csv": csv_path.as_posix(),
         "test_pesq_plot": figure_path.as_posix(),
     }
+    if teacher_gate is not None:
+        summary["teacher_promotion_gate"] = teacher_gate
+    if baseline_contract is not None:
+        summary["baseline_contract"] = baseline_contract
 
     lines = [
         "# VoiceBank MetricGAN+ campaign report",
         "",
         f"Status: {'verification-only ' + mode if verification_only else 'evaluated campaign'}",
         "",
-        f"Selected teacher by val_select PESQ: `{selected_teacher}`.",
-        "",
-        "## Paired stage deltas",
+        (
+            "Official T0 checkpoint distilled into fresh WB and NB students."
+            if campaign_scope == BASELINE_SCOPE
+            else f"Selected teacher by val_select PESQ: `{selected_teacher}`."
+        ),
         "",
     ]
-    for label, values in deltas.items():
-        rendered = ", ".join(f"{key}={value:+.4f}" for key, value in values.items())
-        lines.append(f"- {label}: {rendered or 'no comparable metrics'}")
+    if deltas:
+        lines.extend(["## Paired stage deltas", ""])
+        for label, values in deltas.items():
+            rendered = ", ".join(
+                f"{key}={value:+.4f}" for key, value in values.items()
+            )
+            lines.append(f"- {label}: {rendered or 'no comparable metrics'}")
     lines.extend(
         [
             "",
@@ -872,10 +903,24 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
     summary = load_json(summary_path)
     status = load_json(status_path)
     provenance = load_json(provenance_path)
-    cells = dict(summary.get("cells") or {})
-    if set(cells) != set(CELL_ORDER):
+    campaign_scope = str(
+        summary.get("campaign_scope") or TWO_STAGE_SCOPE
+    )
+    canonical_cells = (
+        BASELINE_CELL_ORDER if campaign_scope == BASELINE_SCOPE else CELL_ORDER
+    )
+    declared_cells = tuple(summary.get("expected_cells") or canonical_cells)
+    if declared_cells != canonical_cells:
         issues.append(
-            f"cell set mismatch: expected={sorted(CELL_ORDER)} actual={sorted(cells)}"
+            f"declared cell order mismatch for {campaign_scope}: "
+            f"expected={list(canonical_cells)} actual={list(declared_cells)}"
+        )
+    expected_cells = canonical_cells
+    cells = dict(summary.get("cells") or {})
+    if set(cells) != set(expected_cells):
+        issues.append(
+            f"cell set mismatch: expected={sorted(expected_cells)} "
+            f"actual={sorted(cells)}"
         )
 
     csv_values: dict[tuple[str, str, str], str] = {}
@@ -888,7 +933,7 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
                 csv_values[(row["cell"], row["split"], row["metric"])] = row["value"]
 
     reported_samples: set[Path] = set()
-    for cell in CELL_ORDER:
+    for cell in expected_cells:
         payload = dict(cells.get(cell) or {})
         bandwidth = "nb" if "-NB" in cell else "wb"
         profile = PROFILES[bandwidth]
@@ -935,7 +980,7 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
                     issues.append(f"CSV mismatch: {cell}/{split_label}/{key}")
 
     model_inventory = dict(summary.get("model_inventory") or {})
-    for cell in CELL_ORDER:
+    for cell in expected_cells:
         model = dict(model_inventory.get(cell) or {})
         path = Path(str(model.get("path") or ""))
         if not path.is_file():
@@ -961,14 +1006,34 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
     if verification_only and bool(status.get("valid_for_promotion")):
         issues.append("verification-only run incorrectly marked promotable")
     teacher_gate = dict(summary.get("teacher_promotion_gate") or {})
-    if not teacher_gate:
-        issues.append("missing teacher promotion gate")
-    elif not verification_only and not bool(teacher_gate.get("passed")):
-        issues.append("full run teacher promotion gate did not pass")
+    if campaign_scope == BASELINE_SCOPE:
+        baseline_contract = dict(summary.get("baseline_contract") or {})
+        if summary.get("selected_teacher") != "T0-WB-OFFICIAL":
+            issues.append("baseline selected teacher is not T0-WB-OFFICIAL")
+        if not bool(baseline_contract.get("passed")):
+            issues.append("official baseline contract did not pass")
+        if set(summary.get("metric_proxies") or {}) != set():
+            issues.append("baseline package must not contain metric proxies")
+        if baseline_contract.get("students") != ["S0-WB", "S0-NB"]:
+            issues.append("baseline student contract mismatch")
+        teacher_model = dict(
+            model_inventory.get("T0-WB-OFFICIAL") or {}
+        )
+        if (
+            baseline_contract.get("teacher_checkpoint_sha256")
+            != teacher_model.get("sha256")
+        ):
+            issues.append("baseline teacher checkpoint hash mismatch")
+    else:
+        if not teacher_gate:
+            issues.append("missing teacher promotion gate")
+        elif not verification_only and not bool(teacher_gate.get("passed")):
+            issues.append("full run teacher promotion gate did not pass")
 
     result = {
         "schema_version": 1,
         "run_id": provenance.get("run_id"),
+        "campaign_scope": campaign_scope,
         "valid": not issues,
         "verification_only": verification_only,
         "cell_count": len(cells),
@@ -982,12 +1047,82 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
     return result
 
 
+def _finish_run(
+    *,
+    run_root: Path,
+    provenance: dict[str, Any],
+    report: dict[str, Any],
+    mode: str,
+    git: dict[str, Any],
+    promotion_gate_passed: bool,
+) -> dict[str, Any]:
+    provenance["status"] = "evaluated"
+    provenance["selected_teacher"] = report["selected_teacher"]
+    if "teacher_promotion_gate" in report:
+        provenance["teacher_promotion_gate"] = report["teacher_promotion_gate"]
+    if "baseline_contract" in report:
+        provenance["baseline_contract"] = report["baseline_contract"]
+    provenance["report"] = report["report"]
+    _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+    _atomic_json(
+        run_root / "status.json",
+        {
+            "status": "evaluated",
+            "campaign_mode": mode,
+            "campaign_scope": report["campaign_scope"],
+            "current_stage": "AUDIT",
+            "valid_for_promotion": False,
+        },
+    )
+    _mark_stage(run_root, stage="AUDIT", status="running")
+    package_audit = audit_campaign_run(run_root)
+    _mark_stage(
+        run_root,
+        stage="AUDIT",
+        status="completed" if package_audit["valid"] else "failed",
+        details=_stage_details(package_audit),
+        error=None if package_audit["valid"] else str(package_audit["issues"]),
+    )
+    if not package_audit["valid"]:
+        raise RuntimeError(
+            f"Campaign package audit failed: {package_audit['issues']}"
+        )
+    final_status = {
+        "smoke": "smoke-passed",
+        "pilot": "pilot-passed",
+        "full": "audited",
+    }[mode]
+    provenance["status"] = final_status
+    provenance["audit"] = package_audit
+    _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+    _atomic_json(
+        run_root / "status.json",
+        {
+            "status": final_status,
+            "campaign_mode": mode,
+            "campaign_scope": report["campaign_scope"],
+            "current_stage": None,
+            "valid_for_promotion": bool(
+                mode == "full" and not git["dirty"] and promotion_gate_passed
+            ),
+        },
+    )
+    progress_path = run_root / "tracking" / "campaign_progress.json"
+    progress = json.loads(progress_path.read_text(encoding="utf-8"))
+    progress["status"] = final_status
+    progress["finished_utc"] = _utc_now()
+    progress["current_stage"] = None
+    _atomic_json(progress_path, progress)
+    return {"run_root": run_root.as_posix(), **report}
+
+
 def run_all(
     config: dict[str, Any],
     *,
     run_id: str,
     mode: str,
     allow_dirty_smoke: bool,
+    baseline_only: bool = False,
 ) -> dict[str, Any]:
     if mode not in {"smoke", "pilot", "full"}:
         raise ValueError(f"Unsupported campaign mode: {mode}")
@@ -1011,6 +1146,7 @@ def run_all(
         "run_id": run_id,
         "status": "running",
         "mode": mode,
+        "campaign_scope": BASELINE_SCOPE if baseline_only else TWO_STAGE_SCOPE,
         "verification_only": verification_only,
         "git_commit": git["commit"],
         "git_dirty": git["dirty"],
@@ -1110,6 +1246,47 @@ def run_all(
             mode=mode,
         )
 
+    if baseline_only:
+        baseline_contract = {
+            "passed": True,
+            "teacher": "T0-WB-OFFICIAL",
+            "teacher_checkpoint_sha256": sha256(
+                str(cells["T0-WB-OFFICIAL"]["checkpoint_out"])
+            ),
+            "cache_manifests": official_cache_manifests,
+            "students": ["S0-WB", "S0-NB"],
+        }
+        _mark_stage(
+            run_root,
+            stage="BASELINE-SELECTION",
+            status="completed",
+            details=baseline_contract,
+        )
+        report = execute(
+            "REPORT",
+            lambda: _write_report(
+                run_root=run_root,
+                cells=cells,
+                proxies=proxies,
+                selected_teacher="T0-WB-OFFICIAL",
+                teacher_gate=None,
+                mode=mode,
+                verification_only=verification_only,
+                campaign_scope=BASELINE_SCOPE,
+                cell_order=BASELINE_CELL_ORDER,
+                comparison_pairs={},
+                baseline_contract=baseline_contract,
+            ),
+        )
+        return _finish_run(
+            run_root=run_root,
+            provenance=provenance,
+            report=report,
+            mode=mode,
+            git=git,
+            promotion_gate_passed=True,
+        )
+
     proxies["wb"] = execute(
         "PROXY-WB",
         lambda: _proxy(
@@ -1194,51 +1371,14 @@ def run_all(
             verification_only=verification_only,
         ),
     )
-    provenance["status"] = "evaluated"
-    provenance["selected_teacher"] = selected_teacher
-    provenance["teacher_promotion_gate"] = teacher_gate
-    provenance["report"] = report["report"]
-    _atomic_json(run_root / "provenance" / "provenance.json", provenance)
-    _atomic_json(
-        run_root / "status.json",
-        {
-            "status": "evaluated",
-            "campaign_mode": mode,
-            "current_stage": "AUDIT",
-            "valid_for_promotion": False,
-        },
+    return _finish_run(
+        run_root=run_root,
+        provenance=provenance,
+        report=report,
+        mode=mode,
+        git=git,
+        promotion_gate_passed=bool(teacher_gate["passed"]),
     )
-    package_audit = execute("AUDIT", lambda: audit_campaign_run(run_root))
-    if not package_audit["valid"]:
-        raise RuntimeError(
-            f"Campaign package audit failed: {package_audit['issues']}"
-        )
-    final_status = {
-        "smoke": "smoke-passed",
-        "pilot": "pilot-passed",
-        "full": "audited",
-    }[mode]
-    provenance["status"] = final_status
-    provenance["audit"] = package_audit
-    _atomic_json(run_root / "provenance" / "provenance.json", provenance)
-    _atomic_json(
-        run_root / "status.json",
-        {
-            "status": final_status,
-            "campaign_mode": mode,
-            "current_stage": None,
-            "valid_for_promotion": bool(
-                mode == "full" and not git["dirty"] and teacher_gate["passed"]
-            ),
-        },
-    )
-    progress_path = run_root / "tracking" / "campaign_progress.json"
-    progress = json.loads(progress_path.read_text(encoding="utf-8"))
-    progress["status"] = final_status
-    progress["finished_utc"] = _utc_now()
-    progress["current_stage"] = None
-    _atomic_json(progress_path, progress)
-    return {"run_root": run_root.as_posix(), **report}
 
 
 def parse_args() -> argparse.Namespace:
@@ -1256,6 +1396,13 @@ def parse_args() -> argparse.Namespace:
     pilot.add_argument("--run-id", required=True)
     full = subparsers.add_parser("run-all")
     full.add_argument("--run-id", required=True)
+    baseline_smoke = subparsers.add_parser("smoke-baseline")
+    baseline_smoke.add_argument("--run-id", required=True)
+    baseline_smoke.add_argument("--allow-dirty-smoke", action="store_true")
+    baseline_pilot = subparsers.add_parser("pilot-baseline")
+    baseline_pilot.add_argument("--run-id", required=True)
+    baseline_full = subparsers.add_parser("run-baseline")
+    baseline_full.add_argument("--run-id", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -1273,17 +1420,28 @@ def main() -> None:
         config = load_campaign_config(args.config)
     if args.command == "validate":
         result = validate_campaign_config(config)
-    elif args.command in {"smoke-all", "pilot-all", "run-all"}:
+    elif args.command in {
+        "smoke-all",
+        "pilot-all",
+        "run-all",
+        "smoke-baseline",
+        "pilot-baseline",
+        "run-baseline",
+    }:
         try:
             mode = {
                 "smoke-all": "smoke",
                 "pilot-all": "pilot",
                 "run-all": "full",
+                "smoke-baseline": "smoke",
+                "pilot-baseline": "pilot",
+                "run-baseline": "full",
             }[args.command]
             result = run_all(
                 config,
                 run_id=args.run_id,
                 mode=mode,
+                baseline_only=args.command.endswith("-baseline"),
                 allow_dirty_smoke=bool(
                     getattr(args, "allow_dirty_smoke", False)
                 ),

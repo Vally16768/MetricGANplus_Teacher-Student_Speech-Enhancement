@@ -7,6 +7,8 @@ import unittest
 from pathlib import Path
 
 from campaign import (
+    BASELINE_CELL_ORDER,
+    BASELINE_SCOPE,
     CELL_ORDER,
     _best_teacher,
     _effective_training,
@@ -18,7 +20,7 @@ from campaign import (
 
 
 class CampaignAuditTests(unittest.TestCase):
-    def make_run(self, root: Path) -> None:
+    def make_run(self, root: Path, *, baseline: bool = False) -> None:
         (root / "metrics").mkdir(parents=True)
         (root / "models").mkdir()
         (root / "provenance").mkdir()
@@ -26,7 +28,8 @@ class CampaignAuditTests(unittest.TestCase):
         rows: list[dict[str, object]] = []
         cells = {}
         inventory = {}
-        for cell in CELL_ORDER:
+        cell_order = BASELINE_CELL_ORDER if baseline else CELL_ORDER
+        for cell in cell_order:
             bandwidth = "nb" if "-NB" in cell else "wb"
             sample_rate = 8000 if bandwidth == "nb" else 16000
             sample = root / "samples" / f"{cell}.wav"
@@ -81,17 +84,30 @@ class CampaignAuditTests(unittest.TestCase):
         plot = root / "reports" / "plot.png"
         plot.write_bytes(b"PNG-fixture")
         summary = {
+            "campaign_scope": BASELINE_SCOPE if baseline else "teacher_improvement_two_stage",
+            "expected_cells": list(cell_order),
             "verification_only": True,
-            "teacher_promotion_gate": {
-                "passed": False,
-                "verification_override": True,
-            },
+            "selected_teacher": "T0-WB-OFFICIAL",
             "cells": cells,
             "model_inventory": inventory,
             "canonical_metrics_csv": metrics_csv.as_posix(),
             "test_pesq_plot": plot.as_posix(),
             "report": report.as_posix(),
         }
+        if baseline:
+            summary["baseline_contract"] = {
+                "passed": True,
+                "teacher": "T0-WB-OFFICIAL",
+                "students": ["S0-WB", "S0-NB"],
+                "teacher_checkpoint_sha256": inventory[
+                    "T0-WB-OFFICIAL"
+                ]["sha256"],
+            }
+        else:
+            summary["teacher_promotion_gate"] = {
+                "passed": False,
+                "verification_override": True,
+            }
         (root / "metrics" / "campaign_summary.json").write_text(
             json.dumps(summary),
             encoding="utf-8",
@@ -113,6 +129,16 @@ class CampaignAuditTests(unittest.TestCase):
         self.assertTrue(result["valid"], result["issues"])
         self.assertEqual(result["cell_count"], 7)
         self.assertEqual(result["model_count"], 7)
+
+    def test_official_baseline_run_reconciles_three_cells(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self.make_run(root, baseline=True)
+            result = audit_campaign_run(root)
+        self.assertTrue(result["valid"], result["issues"])
+        self.assertEqual(result["campaign_scope"], BASELINE_SCOPE)
+        self.assertEqual(result["cell_count"], 3)
+        self.assertEqual(result["model_count"], 3)
 
     def test_model_tampering_is_detected(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
