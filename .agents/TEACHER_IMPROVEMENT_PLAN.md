@@ -1,13 +1,14 @@
 # Teacher improvement and TTS-transfer plan
 
-Status: **active — P4 implementation and validation**.
+Status: **executed — strict calibration failed; no T1/S1**.
 
 Owner: the MetricGAN+ research campaign.
 
-Activation gate satisfied by baseline release commit `e6388d4`: P1–P3 in
-`.agents/EXECUTION_TODO.md` passed, including the merged S0 audit, resume
-repair and sanitized baseline promotion. This plan does not retroactively
-alter or replace S0 evidence.
+Activation gate was satisfied by the corrected baseline release
+`20260727-converged-s0-baseline-v2`. P1–P3 passed, including the merged S0
+audit, resume repair and sanitized promotion. A2 and the predeclared A3 retry
+both failed current-output calibration with zero generator updates; this plan
+therefore stopped before E1/E2, C1 and S1.
 
 ## Research questions
 

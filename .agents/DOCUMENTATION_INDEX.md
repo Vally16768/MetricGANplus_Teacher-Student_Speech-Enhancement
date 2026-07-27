@@ -17,8 +17,9 @@ status. Historical experiment directories are evidence, not canonical docs.
 | `.agents/DECISIONS.md` | decision log | canonical |
 | `.agents/TODO.md` | ordered execution and gate status | canonical |
 | `.agents/EXECUTION_TODO.md` | detailed iterative P1–P6 execution board and evidence ledger | canonical active |
-| `.agents/TEACHER_IMPROVEMENT_PLAN.md` | deferred teacher-improvement and separate TTS-transfer protocol | canonical planned |
+| `.agents/TEACHER_IMPROVEMENT_PLAN.md` | executed failed T1 calibration protocol and separate TTS-transfer boundary | canonical negative outcome |
 | `docs/ARTIFACT_POLICY.md` | artifact policy | active, reconcile with this control plane |
+| `docs/FINAL_RESULTS.md` | canonical article-facing S0 table, negative T1 outcome and claim-to-artifact map | canonical reproduced |
 | `docs/audits/2026-07-26-initial-audit.md` | initial forensic audit | historical observed |
 | `docs/audits/2026-07-26-cleanup-campaign-audit.md` | cleanup classification and dataset observation | active observed |
 | `docs/audits/2026-07-26-legacy-surface-removal.md` | authorized legacy removal and recovery anchors | active observed |
@@ -35,6 +36,7 @@ status. Historical experiment directories are evidence, not canonical docs.
 | `docs/audits/2026-07-27-official-baseline-full-a1.md` | audited full official baseline, bandwidth-matched metrics and 20-epoch convergence diagnosis | active observed |
 | `docs/audits/2026-07-27-converged-s0-baseline-v1.md` | original converged S0 promotion audit; metrics superseded by true-length v2 | historical superseded |
 | `docs/audits/2026-07-27-converged-s0-baseline-v2.md` | corrective true-length evaluation and canonical S0 promotion audit | active reproduced |
+| `docs/audits/2026-07-27-teacher-calibration-t1-negative.md` | final calibrated-discriminator failure, stop decision and downstream non-execution | active reproduced negative evidence |
 | `experiments/README.md` | experiment directory explanation | active, consolidate later |
 | `experiments/runs/20260727-converged-s0-baseline-v1/reports/report.md` | padding-sensitive historical metric table | immutable superseded evidence |
 | `experiments/runs/20260727-converged-s0-baseline-v2/reports/report.md` | canonical true-length S0 metric table and correction statement | immutable reproduced evidence |

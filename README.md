@@ -106,7 +106,8 @@ mai mic; creează un director nou și restaurează starea completă fără să
 suprascrie rularea sursă.
 
 `calibrate-teacher` ține E0 înghețat, actualizează numai discriminatorul și
-aplică gate-ul pe 100 de output-uri curente held-out. `pilot-teacher` pornește
+aplică același gate strict după cel mult două refresh-uri, fiecare cu 100 de
+output-uri curente held-out. `pilot-teacher` pornește
 numai după un gate de calibrare trecut și execută exclusiv E0/E1/E2; un gate D
 eșuat sare peste update-ul generatorului. Aceste comenzi nu creează C1 și nu
 antrenează studenți.
@@ -131,6 +132,15 @@ training, grafice, config portabil, proveniență și hash-uri. Nu conține
 VoiceBank+DEMAND, audio generat, cache teacher, replay sau training state.
 Raportul complet este
 [`reports/report.md`](experiments/runs/20260727-converged-s0-baseline-v2/reports/report.md).
+
+## Rezultatul fazei T1
+
+Diagnosticul strict al discriminatorului pe output-urile curente a eșuat după
+cele două refresh-uri predeclarate. Gate-ul final a avut MAE PESQ normalizat
+`0.2133`, Pearson `0.5545` și Spearman `0.5435`, față de limitele
+`0.06/0.80/0.80`. Generatorul nu a primit niciun update; E1/E2, C1 și
+studenții S1 nu au fost porniți. Raportul negativ auditabil este
+[`2026-07-27-teacher-calibration-t1-negative.md`](docs/audits/2026-07-27-teacher-calibration-t1-negative.md).
 
 ## Discriminatorul metric și extensia TTS
 

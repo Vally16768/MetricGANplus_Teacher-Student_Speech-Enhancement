@@ -74,6 +74,11 @@ metric/reference profile matches the run profile
   epoch rows contain no redundant evaluation, independent audit zero issues.
 - unit/integration suite: 62/62 passed after the predeclared calibration-retry
   and frozen-evaluation reuse change.
+- final strict calibration A3: 2/2 refreshes on 100 update plus 100 disjoint
+  held-out outputs; final gate failed at normalized MAE 0.2133, Pearson 0.5545
+  and Spearman 0.5435; zero generator updates and zero audit issues.
+- final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
+  sanitized negative JSON source hashes and privacy scan all passed.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.
@@ -143,14 +148,15 @@ metric/reference profile matches the run profile
   seven cells/models, 84/84 samples and zero issues.
 - pilot control PESQ moved 2.8238→2.8093→2.7964; bounded metric PESQ moved
   2.8238→2.8197→2.8131. Both retained epoch-0 T0 and blocked full.
-- the next required gate is an alternating current/noisy/historical
-  discriminator refresh clean GPU smoke, followed by a monitored pilot.
+- at that historical stage, the next gate was an alternating
+  current/noisy/historical discriminator refresh smoke and pilot; both were
+  subsequently executed below.
 - alternating implementation unit tests cover PESQ normalization, SpeechBrain
   spectral-normalized layer/checkpoint contract, three-pass refresh, FP16
   generated-output replay, no noisy/clean copies and D freezing after refresh.
 - 45/45 unit/integration tests, the canonical research-plan validator, the real
-  `campaign.py validate` entry point and the project guard pass after the
-  alternating implementation; clean GPU execution remains the open gate.
+  `campaign.py validate` entry point and the project guard passed before the
+  later clean GPU evidence recorded below.
 - first clean alternating smoke A1 completed and audited 7/7 cells, 42/42
   samples and zero issues, but exposed a warm-start-only clean-label mismatch:
   library PESQ could exceed 4.5 while official D_clean is exactly 1. The run is
@@ -193,4 +199,4 @@ metric/reference profile matches the run profile
   early-stopped at 49. Neither is ceiling-limited.
 - the updated project skill and iterative execution board pass the skill
   validator, 48/48 unit/integration tests and the project guard with zero
-  issues. The merged baseline/continuation report is the next active gate.
+  issues; this was the pre-closure control-plane checkpoint.

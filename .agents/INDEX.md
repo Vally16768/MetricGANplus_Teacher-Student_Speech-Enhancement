@@ -13,22 +13,18 @@ This directory is the canonical control plane for the research project.
 | [DECISIONS.md](DECISIONS.md) | Decisions and their causes | before changing project policy |
 | [TODO.md](TODO.md) | Ordered cleanup/implementation/experiment gates | every active campaign task |
 | [EXECUTION_TODO.md](EXECUTION_TODO.md) | Detailed P1–P6 execution board, dependencies, evidence and next action | at the start and end of every project iteration |
-| [TEACHER_IMPROVEMENT_PLAN.md](TEACHER_IMPROVEMENT_PLAN.md) | Deferred calibration-first T1 plan and separate TTS-transfer protocol | after S0 completion, before C32/C37 implementation |
+| [TEACHER_IMPROVEMENT_PLAN.md](TEACHER_IMPROVEMENT_PLAN.md) | Executed calibration-first T1 protocol and separate future TTS-transfer boundary | T1 audit or future successor design |
 
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
 
-Current release state: **the official T0 teacher is pinned; the max-50 S0-WB
-and S0-NB continuation completed through early stopping and its two-cell
-package audit has zero issues. The merged epoch-20→converged baseline report,
-resume repair and promotion remain ahead of any new teacher modification**.
+Current release state: **the corrected true-length S0 baseline v2 is promoted
+and canonical. S0-WB selected epoch 34/stop 42 and S0-NB selected 41/49. The
+strict current-output T1 calibration failed after its one permitted retry, so
+there is no T1, C1 or S1 result**.
 
 Open blockers:
 
-- The original epoch-20 baseline and immutable continuation still need one
-  merged report and independent closure audit.
-- The post-evaluation scheduler/early-stopping resume state needs a deterministic
-  interrupt/resume repair and CUDA smoke before the next experiment.
-- There is no promoted, sanitized S0 baseline package yet.
-- Teacher-only T1 remains blocked until S0 promotion; S1 remains blocked until
-  the true-metric teacher gate passes.
+- final P6 documentation/audit/commit must close the active execution board;
+- any new T1 formulation requires a separate predeclared successor experiment;
+- the TTS metric-critic hypothesis remains a separate future campaign.

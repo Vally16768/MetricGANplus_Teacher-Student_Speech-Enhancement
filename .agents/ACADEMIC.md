@@ -41,3 +41,6 @@ A promoted study must provide:
 
 Maintain one canonical results table. Historical, invalidated and corrected
 values may coexist only when clearly labeled and mapped.
+
+The current canonical table and claim-to-artifact map are in
+`docs/FINAL_RESULTS.md`.

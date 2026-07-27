@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "dataset": "VoiceBank+DEMAND",
+  "evidence_status": "reproduced_negative",
+  "outcome": {
+    "calibration_gate_passed": false,
+    "generator_update_count": 0,
+    "t1_created": false,
+    "c1_created": false,
+    "s1_wb_trained": false,
+    "s1_nb_trained": false
+  },
+  "source": {
+    "code_commit": "21af6b5c4604c1e1c1d18adb4cee1b49b99401ec",
+    "e0_package": "20260727-converged-s0-baseline-v2",
+    "e0_checkpoint_sha256": "5ece6fbd1ac16cca6df11ea724fb5e3710d6611049f54bbc8d126c79dbbc65d8",
+    "profile": {
+      "bandwidth": "wb",
+      "sample_rate": 16000,
+      "pesq_mode": "wb"
+    }
+  },
+  "manifest_sha256": {
+    "train_fit": "5715037a664ecb6a7302393a8b973e8744261d95e9487af17c397cdd65642bf6",
+    "val_rank": "5d3df5fa11ca64186117620d07f0beeeac0563ba93cffc85bcba48f38ad62a9e",
+    "val_select": "328e86032d166dc68d01482658b4073f25624ba0d88071c1862c3e0e1ea68d23",
+    "test": "b74a2d9002d1a97a0c7f92d483d9c8840e2898d894222323d47f0aa630684e1d"
+  },
+  "gate_thresholds": {
+    "min_records": 100,
+    "max_normalized_mae": 0.06,
+    "min_pearson": 0.8,
+    "min_spearman": 0.8,
+    "min_prediction_std": 0.02,
+    "range_tolerance_raw": 0.3
+  },
+  "warm_start_proxy_validation": {
+    "count": 96,
+    "mae": 0.5294342450797558,
+    "pearson": 0.8564493663118503,
+    "spearman": 0.8736733058660283
+  },
+  "diagnostics": [
+    {
+      "run_id": "20260727-teacher-calibration-pilot-t1-a2",
+      "source_summary_sha256": "5c5a97da1bb968b5fb000850bee9beea509650ac2d43669cb0059fe458e2102f",
+      "source_audit_sha256": "751fdff7eb44568f621cc75aabaf048cffb15f921cb8200644fc02a4987a3339",
+      "audit_valid": true,
+      "refreshes": [
+        {
+          "epoch": 1,
+          "update_records": 100,
+          "held_out_records": 100,
+          "historical_records": 20,
+          "raw_mae": 0.9837862145900726,
+          "normalized_mae": 0.19675724291801452,
+          "pearson": 0.5379284268445821,
+          "spearman": 0.5504350435043505,
+          "prediction_min": 0.8945186138153076,
+          "prediction_max": 4.864989280700684,
+          "prediction_std": 0.9530408992345012,
+          "target_min": 1.634635090827942,
+          "target_max": 4.401130676269531,
+          "gate_passed": false
+        }
+      ]
+    },
+    {
+      "run_id": "20260727-teacher-calibration-pilot-t1-a3",
+      "source_summary_sha256": "9e75e103ddb1e04c832026ca36d3b52a8560ab6127aa46592b5a1d6f48a6917c",
+      "source_audit_sha256": "3d5c2ace03413b69c6f39faaca5b148a04dd7dc8e0aedd71da4961ce7054caed",
+      "audit_valid": true,
+      "refreshes": [
+        {
+          "epoch": 1,
+          "update_records": 100,
+          "held_out_records": 100,
+          "historical_records": 20,
+          "current_first_mse": 0.020338733905710834,
+          "historical_mse": 0.01856235734294387,
+          "current_second_mse": 0.013712858817500546,
+          "raw_mae": 0.9541419291496277,
+          "normalized_mae": 0.19082838582992553,
+          "pearson": 0.5333602439946494,
+          "spearman": 0.5405940594059405,
+          "prediction_min": 0.8932108879089355,
+          "prediction_max": 4.8319292068481445,
+          "prediction_std": 0.938057567326389,
+          "target_min": 1.634635090827942,
+          "target_max": 4.401130676269531,
+          "gate_passed": false
+        },
+        {
+          "epoch": 2,
+          "update_records": 100,
+          "held_out_records": 100,
+          "historical_records": 40,
+          "current_first_mse": 0.009132378377016722,
+          "historical_mse": 0.007217744415629568,
+          "current_second_mse": 0.007600231435919725,
+          "raw_mae": 1.066304669380188,
+          "normalized_mae": 0.21326093387603762,
+          "pearson": 0.5544879478944412,
+          "spearman": 0.5435343534353435,
+          "prediction_min": 0.7587767839431763,
+          "prediction_max": 5.219599723815918,
+          "prediction_std": 1.0063486796114507,
+          "target_min": 1.504125952720642,
+          "target_max": 3.9593303203582764,
+          "gate_passed": false
+        }
+      ]
+    }
+  ],
+  "public_artifact_policy": {
+    "included": [
+      "aggregate calibration metrics",
+      "gate thresholds and outcomes",
+      "manifest and source artifact hashes",
+      "stop decision"
+    ],
+    "excluded": [
+      "VoiceBank+DEMAND audio",
+      "generated output replay",
+      "failed discriminator checkpoint",
+      "machine-local paths"
+    ]
+  }
+}

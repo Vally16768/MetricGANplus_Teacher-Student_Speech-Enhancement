@@ -2,8 +2,8 @@
 
 Status: **active**
 Last evidence update: **2026-07-27**
-Current phase: **P4 — teacher-only T1 improvement**
-Next action: **P4.7 — strict full-support discriminator calibration**
+Current phase: **P6 — final negative result package**
+Next action: **P6.6 — commit and push the final evidence**
 
 This is the detailed execution board for the active research sequence. The
 campaign-wide summary remains `.agents/TODO.md`; this file owns the subtask
@@ -149,9 +149,9 @@ reporting-only.
 | P4.4 | Complete resume-state tests for G/D loop | G, D, optimizers, scheduler, patience, replay and history restore | passed |
 | P4.5 | Run unit/integration tests and project guard | all required gates pass | passed |
 | P4.6 | Run clean CUDA smoke | current/history/current, clean=1, true noisy/enhanced PESQ, local replay observed | passed |
-| P4.7 | Run strict calibration, then monitored teacher-only pilot | full-support D gate first; E0/E1/E2 only after pass; immutable runs; no cache/S1 | in-progress |
-| P4.8 | Audit teacher gate | true metrics and calibration reconcile independently | pending |
-| P4.9 | Record gate decision | pass selects T1; fail stops downstream work | pending |
+| P4.7 | Run strict calibration, then monitored teacher-only pilot | full-support D gate first; E0/E1/E2 only after pass; immutable runs; no cache/S1 | failed |
+| P4.8 | Audit teacher gate | true metrics and calibration reconcile independently | passed |
+| P4.9 | Record gate decision | pass selects T1; fail stops downstream work | failed |
 
 Unblock condition: P3.7 passes.
 
@@ -161,11 +161,11 @@ Run only if P4.9 passes.
 
 | ID | Item | Required evidence | Status |
 |---|---|---|---|
-| P5.1 | Build content-addressed C1 | accepted T1 hash; frozen manifest; Desktop-local FP16; no input audio copies | blocked |
-| P5.2 | Train S1-WB from zero | S0-matched architecture, seed and max-50/plateau/early-stop policy | blocked |
-| P5.3 | Train S1-NB from zero | same controlled policy; NB reference and PESQ-NB | blocked |
-| P5.4 | Apply convergence rule | ceiling-limited handling without automatic extension | blocked |
-| P5.5 | Audit C1/S1 package | ancestry, hashes, histories, support and bandwidth protocols reconcile | blocked |
+| P5.1 | Build content-addressed C1 | accepted T1 hash; frozen manifest; Desktop-local FP16; no input audio copies | not-applicable |
+| P5.2 | Train S1-WB from zero | S0-matched architecture, seed and max-50/plateau/early-stop policy | not-applicable |
+| P5.3 | Train S1-NB from zero | same controlled policy; NB reference and PESQ-NB | not-applicable |
+| P5.4 | Apply convergence rule | ceiling-limited handling without automatic extension | not-applicable |
+| P5.5 | Audit C1/S1 package | ancestry, hashes, histories, support and bandwidth protocols reconcile | not-applicable |
 
 Unblock condition: accepted T1 teacher.
 
@@ -173,12 +173,12 @@ Unblock condition: accepted T1 teacher.
 
 | ID | Item | Required evidence | Status |
 |---|---|---|---|
-| P6.1 | Compare T1−T0 | WB true metrics with uncertainty and fixed support | blocked |
-| P6.2 | Compare S1-WB−S0-WB | PESQ-WB and WB guard metrics | blocked |
-| P6.3 | Compare S1-NB−S0-NB | PESQ-NB and NB guard metrics | blocked |
-| P6.4 | Generate final tables/figures/report | claim-to-artifact traceability | blocked |
-| P6.5 | Run independent promotion audit | zero unresolved issues or explicit failed result | blocked |
-| P6.6 | Commit and push final accepted evidence | sanitized canonical package only | blocked |
+| P6.1 | Compare T1−T0 | WB true metrics with uncertainty and fixed support | not-applicable |
+| P6.2 | Compare S1-WB−S0-WB | PESQ-WB and WB guard metrics | not-applicable |
+| P6.3 | Compare S1-NB−S0-NB | PESQ-NB and NB guard metrics | not-applicable |
+| P6.4 | Generate final tables/figures/report | claim-to-artifact traceability | passed |
+| P6.5 | Run independent promotion audit | zero unresolved issues or explicit failed result | passed |
+| P6.6 | Commit and push final accepted evidence | sanitized canonical package only | in-progress |
 
 ## Parked — TTS metric-critic study
 
@@ -208,3 +208,5 @@ calibration, evaluation protocol, provenance and claim set.
 | 2026-07-27 | Published corrected padding-invariant S0 baseline v2 | exact three model hashes retained; true-length run and public package audits zero issues; 61/61 tests, plan, guard, contract and privacy checks passed; commit `65b9a9c` pushed | P4.7 strict discriminator calibration |
 | 2026-07-27 | First strict full-support calibration failed safely | A2 audited with zero package issues; 100 held-out, normalized MAE 0.1968, Pearson 0.5379, Spearman 0.5504, range failed; zero G updates | predeclared second and final D refresh attempt |
 | 2026-07-27 | Validated the fixed-generator two-refresh retry flow | 62/62 tests; plan/config/guard pass; CUDA smoke has two refreshes, zero G updates, no redundant epoch/final evaluation and zero audit issues | commit/push, then strict A3 |
+| 2026-07-27 | Final strict calibration retry failed and stopped downstream work | A3 on clean `21af6b5`; two 100+100 refreshes; final normalized MAE 0.2133, Pearson 0.5545, Spearman 0.5435, range failed; zero G updates; audit zero issues | P6 final negative report |
+| 2026-07-27 | Built and audited the final conditional outcome | canonical S0 table, claim map, negative T1 report and sanitized JSON; 62/62 tests; v2/A3 audits, contract, guard, source-hash reconciliation and privacy checks pass | P6.6 commit/push |

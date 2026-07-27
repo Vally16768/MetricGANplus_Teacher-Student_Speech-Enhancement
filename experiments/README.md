@@ -32,3 +32,10 @@ aici.
 `import_manifest.json` este inventarul complet al fișierelor publicate și le
 leagă de dimensiune și SHA-256. Orice modificare ulterioară este detectată de
 `campaign.py audit-run`.
+
+## Rezultate negative
+
+`results/` păstrează numai agregate sanitizate și trasabile pentru trial-uri
+care au eșuat un gate științific. Nu sunt modele promovate. Diagnosticul T1
+curent este
+[`20260727-teacher-calibration-t1-negative.json`](results/20260727-teacher-calibration-t1-negative.json).

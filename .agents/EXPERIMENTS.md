@@ -77,9 +77,15 @@ experiments/runs/<run_id>/
 | `20260727-official-baseline-smoke-s0-a1` | smoke-passed/audited | dirty-smoke implementation snapshot; exact three-cell T0→C0→S0 scope, no proxy/T1/S1, 3 models, 18/18 samples, zero cached inputs and zero audit issues | no |
 | `20260727-official-baseline-full-s0-a1` | execution-passed/audited; students ceiling-limited | clean commit `357c1df`; 3/3 cells/models, 54/54 samples, zero issues; WB best epoch 20/20, NB best epoch 18/20; immutable max-50 continuation required | no |
 | `20260727-student50-policy-smoke-s0-a1` | smoke-passed/audited | clean commit `330e501`; 3/3 cells/models, 18/18 samples, matched protocols and zero issues; verifies the max-50/scheduler/early-stop implementation path | no |
+| `20260727-converged-s0-baseline-v1` | promoted then superseded | exact selected models retained; padded batched BLSTM evaluation superseded by v2 | no |
+| `20260727-converged-s0-baseline-v2` | promoted/canonical | exact T0/S0 hashes, corrected true-length evaluation, artifact and privacy audits passed; commit `65b9a9c` | yes |
+| `20260727-teacher-calibration-pilot-t1-a2` | execution-passed/audited; D gate failed | one strict refresh, 100 held-out, normalized MAE 0.1968, Pearson 0.5379, Spearman 0.5504; zero G updates | no |
+| `20260727-teacher-calibration-retry-smoke-a1` | smoke-passed/audited | two-refresh flow, frozen-evaluation reuse, zero G updates and zero audit issues | no |
+| `20260727-teacher-calibration-pilot-t1-a3` | execution-passed/audited; final D gate failed | two strict refreshes; final normalized MAE 0.2133, Pearson 0.5545, Spearman 0.5435; no E1/E2/C1/S1 | no |
 
-There is currently no promoted end-to-end run from the current repository
-snapshot.
+The converged official-teacher S0 baseline v2 is the current promoted result.
+There is no promoted T1/S1 result because the current-output calibration gate
+failed before any generator update.
 
 The smoke runs prove wiring only. The pilot used 256 training pairs and one
 seed; it validates execution and exposes directional warnings, but its metric
