@@ -73,6 +73,20 @@ def sha256(path: str | Path) -> str:
     return digest.hexdigest()
 
 
+def _run_artifact_path(
+    run_root: Path,
+    value: Any,
+    *,
+    default: str | Path | None = None,
+) -> Path | None:
+    """Resolve portable run-relative artifact references for audit."""
+    raw = value if value not in {None, ""} else default
+    if raw in {None, ""}:
+        return None
+    path = Path(str(raw))
+    return path if path.is_absolute() else run_root / path
+
+
 def _expand(value: Any) -> Any:
     if isinstance(value, str):
         return os.path.expandvars(value)
@@ -997,8 +1011,11 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
         )
 
     csv_values: dict[tuple[str, str, str], str] = {}
-    csv_path = Path(str(summary.get("canonical_metrics_csv") or ""))
-    if not csv_path.is_file():
+    csv_path = _run_artifact_path(
+        run_root,
+        summary.get("canonical_metrics_csv"),
+    )
+    if csv_path is None or not csv_path.is_file():
         issues.append("missing canonical metrics CSV")
     else:
         with csv_path.open(newline="", encoding="utf-8") as handle:
@@ -1031,7 +1048,12 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
             for key, value in metrics.items():
                 if key == "sample_paths":
                     for raw_path in value or []:
-                        sample = Path(str(raw_path))
+                        sample = _run_artifact_path(run_root, raw_path)
+                        if sample is None:
+                            issues.append(
+                                f"invalid reported sample: {cell}/{split_label}"
+                            )
+                            continue
                         reported_samples.add(sample)
                         if not sample.is_file():
                             issues.append(f"missing reported sample: {sample}")
@@ -1055,8 +1077,8 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
     model_inventory = dict(summary.get("model_inventory") or {})
     for cell in expected_cells:
         model = dict(model_inventory.get(cell) or {})
-        path = Path(str(model.get("path") or ""))
-        if not path.is_file():
+        path = _run_artifact_path(run_root, model.get("path"))
+        if path is None or not path.is_file():
             issues.append(f"missing model: {cell}")
             continue
         if int(model.get("bytes") or -1) != path.stat().st_size:
@@ -1069,8 +1091,12 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
         "report": run_root / "reports" / "report.md",
     }
     for path_key, default_path in report_defaults.items():
-        path = Path(str(summary.get(path_key) or default_path))
-        if not path.is_file():
+        path = _run_artifact_path(
+            run_root,
+            summary.get(path_key),
+            default=default_path,
+        )
+        if path is None or not path.is_file():
             issues.append(f"missing report artifact: {path_key}")
 
     verification_only = bool(summary.get("verification_only"))
@@ -1142,8 +1168,11 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
                 "convergence_plot",
                 "epoch_comparison_csv",
             ):
-                artifact_path = Path(str(summary.get(artifact_key) or ""))
-                if not artifact_path.is_file():
+                artifact_path = _run_artifact_path(
+                    run_root,
+                    summary.get(artifact_key),
+                )
+                if artifact_path is None or not artifact_path.is_file():
                     issues.append(
                         f"missing converged baseline artifact: {artifact_key}"
                     )
@@ -2135,6 +2164,421 @@ def close_converged_baseline(
     }
 
 
+def _portable_metric_payload(value: Any) -> Any:
+    """Remove regenerable sample paths while preserving aggregate evidence."""
+    if isinstance(value, dict):
+        return {
+            key: ([] if key == "sample_paths" else _portable_metric_payload(item))
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_portable_metric_payload(item) for item in value]
+    return value
+
+
+def _portable_baseline_cell(
+    cell: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    scalar_keys = (
+        "audit_only",
+        "best_epoch",
+        "best_score",
+        "best_val_rank_pesq",
+        "best_val_select_dnsmos_ovr",
+        "best_val_select_pesq",
+        "context_frames",
+        "early_stopped",
+        "erb_bands",
+        "global_step",
+        "guidance_classic",
+        "inference_seconds_10s",
+        "loss_recipe",
+        "metric_discriminator_mode",
+        "model_family",
+        "postfilter_mode",
+        "postfilter_preset",
+        "qat",
+        "quantize_dynamic",
+        "run_name",
+        "seed",
+        "selection_guardrail_metric",
+        "selection_guardrail_min",
+        "selection_metric",
+        "spectral_native_gate",
+        "stop_epoch",
+        "stop_reason",
+        "target_floor",
+        "threshold_met",
+        "train_postfilter",
+        "variant",
+    )
+    portable = {
+        key: copy.deepcopy(payload[key])
+        for key in scalar_keys
+        if key in payload
+    }
+    for key in (
+        "val_rank_metrics",
+        "val_rank_metrics_by_split",
+        "val_select_metrics",
+        "val_select_metrics_by_split",
+        "test_metrics",
+        "test_metrics_by_split",
+    ):
+        if key in payload:
+            portable[key] = _portable_metric_payload(payload[key])
+    if "continued_from" in payload:
+        source = dict(payload.get("continued_from") or {})
+        portable["continued_from"] = {
+            key: source[key]
+            for key in (
+                "epoch",
+                "best_epoch",
+                "best_score",
+                "model_sha256",
+                "training_state_sha256",
+            )
+            if key in source
+        }
+    portable["checkpoint_out"] = f"models/{cell}.pt"
+    if cell in STUDENT_CONTINUATION_CELL_ORDER:
+        portable["history_csv"] = f"metrics/training/{cell}.csv"
+        portable["history_json"] = f"metrics/training/{cell}.json"
+        portable["history_plot"] = f"reports/training/{cell}.png"
+    return portable
+
+
+def _artifact_manifest(run_root: Path) -> dict[str, Any]:
+    files = []
+    for path in sorted(item for item in run_root.rglob("*") if item.is_file()):
+        relative = path.relative_to(run_root).as_posix()
+        if relative == "import_manifest.json":
+            continue
+        files.append(
+            {
+                "path": relative,
+                "bytes": path.stat().st_size,
+                "sha256": sha256(path),
+            }
+        )
+    return {
+        "schema_version": 1,
+        "files": files,
+        "file_count": len(files),
+        "total_bytes": sum(int(item["bytes"]) for item in files),
+    }
+
+
+def _public_package_issues(run_root: Path) -> list[str]:
+    issues: list[str] = []
+    forbidden_text = (
+        "/home/",
+        "/media/",
+        "/mnt/",
+        "/srv/",
+        "\\\\Users\\\\",
+        "kingston",
+    )
+    forbidden_suffixes = {".wav", ".flac", ".mp3", ".ogg"}
+    for path in sorted(item for item in run_root.rglob("*") if item.is_file()):
+        relative = path.relative_to(run_root).as_posix()
+        if path.suffix.lower() in forbidden_suffixes:
+            issues.append(f"audio artifact is not publicable: {relative}")
+        if path.stat().st_size >= 100 * 1024 * 1024:
+            issues.append(f"artifact exceeds 100 MiB: {relative}")
+        if path.suffix.lower() in {".pt", ".pth", ".ckpt", ".png"}:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8").lower()
+        except UnicodeDecodeError:
+            continue
+        for marker in forbidden_text:
+            if marker.lower() in text:
+                issues.append(f"private location marker {marker!r}: {relative}")
+    return issues
+
+
+def promote_converged_baseline(
+    *,
+    source_run_dir: str | Path,
+    run_id: str,
+) -> dict[str, Any]:
+    """Export an audited converged S0 baseline as a portable Git package."""
+    source_root = Path(source_run_dir).expanduser().resolve()
+    destination = REPO_ROOT / "experiments" / "runs" / run_id
+    if destination.exists():
+        raise FileExistsError(f"Promotion destination already exists: {destination}")
+    source_status = json.loads(
+        (source_root / "status.json").read_text(encoding="utf-8")
+    )
+    source_audit = audit_campaign_run(source_root)
+    if not source_audit["valid"] or not bool(
+        source_status.get("valid_for_promotion")
+    ):
+        raise ValueError("Source baseline is not audited and promotable.")
+    source_summary = json.loads(
+        (source_root / "metrics" / "campaign_summary.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    source_provenance = json.loads(
+        (source_root / "provenance" / "provenance.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    if source_summary.get("campaign_scope") != CONVERGED_BASELINE_SCOPE:
+        raise ValueError("Only a converged S0 baseline may be promoted here.")
+
+    for name in (
+        "provenance",
+        "logs",
+        "metrics",
+        "metrics/training",
+        "models",
+        "reports",
+        "reports/training",
+    ):
+        (destination / name).mkdir(parents=True, exist_ok=True)
+
+    source_inventory = dict(source_summary["model_inventory"])
+    model_inventory: dict[str, Any] = {}
+    for cell in BASELINE_CELL_ORDER:
+        source_model = _run_artifact_path(
+            source_root,
+            dict(source_inventory[cell])["path"],
+        )
+        if source_model is None or not source_model.is_file():
+            raise FileNotFoundError(f"Missing selected source model: {cell}")
+        target_model = destination / "models" / f"{cell}.pt"
+        shutil.copy2(source_model, target_model)
+        torch.load(target_model, map_location="cpu", weights_only=True)
+        observed_hash = sha256(target_model)
+        if observed_hash != dict(source_inventory[cell])["sha256"]:
+            raise ValueError(f"Selected model hash changed during copy: {cell}")
+        model_inventory[cell] = {
+            "path": f"models/{cell}.pt",
+            "sha256": observed_hash,
+            "bytes": target_model.stat().st_size,
+        }
+
+    copies = {
+        "metrics/canonical_metrics.csv": source_summary["canonical_metrics_csv"],
+        "metrics/epoch20_vs_converged.csv": source_summary[
+            "epoch_comparison_csv"
+        ],
+        "reports/test_pesq_by_cell.png": source_summary["test_pesq_plot"],
+        "reports/convergence_comparison.png": source_summary[
+            "convergence_plot"
+        ],
+        "reports/report.md": source_summary["report"],
+    }
+    for target_relative, source_value in copies.items():
+        source_path = _run_artifact_path(source_root, source_value)
+        if source_path is None or not source_path.is_file():
+            raise FileNotFoundError(f"Missing promotion source: {target_relative}")
+        shutil.copy2(source_path, destination / target_relative)
+
+    closure = copy.deepcopy(source_summary["baseline_closure_contract"])
+    continuation_id = str(closure["continuation_run_id"])
+    continuation_root = source_root.parent / continuation_id
+    for cell in STUDENT_CONTINUATION_CELL_ORDER:
+        source_cell = continuation_root / "cells" / cell
+        for suffix, target_relative in (
+            ("training_history.csv", f"metrics/training/{cell}.csv"),
+            ("training_history.json", f"metrics/training/{cell}.json"),
+            ("training_history.png", f"reports/training/{cell}.png"),
+        ):
+            source_path = source_cell / suffix
+            if not source_path.is_file():
+                raise FileNotFoundError(f"Missing training evidence: {source_path}")
+            shutil.copy2(source_path, destination / target_relative)
+
+    cells = {
+        cell: _portable_baseline_cell(
+            cell,
+            dict(source_summary["cells"][cell]),
+        )
+        for cell in BASELINE_CELL_ORDER
+    }
+    portable_summary = {
+        "schema_version": 1,
+        "dataset": "VoiceBank+DEMAND",
+        "campaign_scope": CONVERGED_BASELINE_SCOPE,
+        "expected_cells": list(BASELINE_CELL_ORDER),
+        "verification_only": False,
+        "selected_teacher": "T0-WB-OFFICIAL",
+        "cells": cells,
+        "metric_proxies": {},
+        "paired_deltas": {},
+        "model_inventory": model_inventory,
+        "canonical_metrics_csv": "metrics/canonical_metrics.csv",
+        "test_pesq_plot": "reports/test_pesq_by_cell.png",
+        "report": "reports/report.md",
+        "convergence_plot": "reports/convergence_comparison.png",
+        "epoch_comparison_csv": "metrics/epoch20_vs_converged.csv",
+        "baseline_contract": copy.deepcopy(
+            source_summary["baseline_contract"]
+        ),
+        "baseline_closure_contract": closure,
+        "public_artifact_policy": {
+            "included": [
+                "selected model weights",
+                "aggregate metrics",
+                "student training histories",
+                "figures and report",
+                "portable configuration and hash provenance",
+            ],
+            "excluded": [
+                "VoiceBank+DEMAND audio",
+                "generated evaluation audio",
+                "teacher cache",
+                "training-state checkpoints",
+                "replay buffers",
+            ],
+        },
+    }
+    _atomic_json(
+        destination / "metrics" / "campaign_summary.json",
+        portable_summary,
+    )
+    _atomic_json(destination / "metrics" / "summary.json", portable_summary)
+
+    source_config_path = source_root / "provenance" / "config_resolved.yaml"
+    config = yaml.safe_load(source_config_path.read_text(encoding="utf-8"))
+    config["dataset"].update(
+        {
+            "manifest_root": "${METRICGAN_MANIFEST_ROOT}",
+            "train_fit": "${METRICGAN_MANIFEST_ROOT}/train_fit.csv",
+            "val_rank": "${METRICGAN_MANIFEST_ROOT}/val_rank.csv",
+            "val_select": "${METRICGAN_MANIFEST_ROOT}/val_select.csv",
+            "test": "${METRICGAN_MANIFEST_ROOT}/test.csv",
+        }
+    )
+    config["runtime"].update(
+        {
+            "run_root": "${METRICGAN_RUN_ROOT}",
+            "shared_venv": "${METRICGAN_SHARED_VENV}",
+        }
+    )
+    config["teacher_cache"]["root"] = (
+        "${METRICGAN_RUN_ROOT}/../teacher_cache_store"
+    )
+    config_path = destination / "provenance" / "config_resolved.yaml"
+    config_path.write_text(
+        yaml.safe_dump(config, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    manifest_hashes: dict[str, str] = {}
+    source_config = yaml.safe_load(source_config_path.read_text(encoding="utf-8"))
+    for key in ("train_fit", "val_rank", "val_select", "test"):
+        manifest = Path(str(source_config["dataset"][key]))
+        if not manifest.is_file():
+            raise FileNotFoundError(f"Missing source manifest: {key}")
+        manifest_hashes[key] = sha256(manifest)
+    command = (
+        "METRICGAN_MANIFEST_ROOT=<voicebank-manifests> "
+        "METRICGAN_RUN_ROOT=<desktop-local-runs> "
+        "METRICGAN_SHARED_VENV=<desktop-shared-venv> "
+        "python campaign.py run-baseline --run-id "
+        f"{closure['baseline_run_id']} && "
+        "python campaign.py continue-students --source-run-dir "
+        f"<local-runs>/{closure['baseline_run_id']} --run-id "
+        f"{closure['continuation_run_id']}"
+    )
+    (destination / "provenance" / "command.txt").write_text(
+        command + "\n",
+        encoding="utf-8",
+    )
+    (destination / "provenance" / "environment.txt").write_text(
+        "\n".join(
+            (
+                f"python={platform.python_version()}",
+                f"torch={torch.__version__}",
+                "device=cuda",
+                "dataset=VoiceBank+DEMAND (external, read-only)",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    provenance = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "status": "audited",
+        "evidence_status": "reproduced",
+        "campaign_scope": CONVERGED_BASELINE_SCOPE,
+        "verification_only": False,
+        "git_commit": source_provenance.get("git_commit"),
+        "git_dirty": False,
+        "seed": 0,
+        "config_sha256": sha256(config_path),
+        "manifest_sha256": manifest_hashes,
+        "source_package": {
+            "run_id": source_root.name,
+            "summary_sha256": sha256(
+                source_root / "metrics" / "campaign_summary.json"
+            ),
+            "audit_sha256": sha256(source_root / "reports" / "audit.json"),
+        },
+        "sources": copy.deepcopy(source_provenance.get("sources") or {}),
+        "selected_model_sha256": {
+            cell: model_inventory[cell]["sha256"]
+            for cell in BASELINE_CELL_ORDER
+        },
+        "path_binding": (
+            "Dataset, run-root and shared-venv paths are supplied through "
+            "environment variables; no machine-local path is published."
+        ),
+    }
+    _atomic_json(
+        destination / "provenance" / "provenance.json",
+        provenance,
+    )
+    _atomic_json(
+        destination / "status.json",
+        {
+            "status": "valid",
+            "campaign_mode": "full",
+            "campaign_scope": CONVERGED_BASELINE_SCOPE,
+            "valid_for_promotion": True,
+        },
+    )
+    (destination / "logs" / "promotion.log").write_text(
+        "Portable baseline package created from independently audited S0 "
+        "closure; no dataset, cache, replay, audio, or training state copied.\n",
+        encoding="utf-8",
+    )
+
+    audit = audit_campaign_run(destination)
+    privacy_issues = _public_package_issues(destination)
+    if not audit["valid"] or privacy_issues:
+        raise RuntimeError(
+            "Promoted package validation failed: "
+            f"audit={audit['issues']} privacy={privacy_issues}"
+        )
+    manifest = _artifact_manifest(destination)
+    manifest.update(
+        {
+            "run_id": run_id,
+            "source_run_id": source_root.name,
+            "copy_mode": "selected-and-hash-verified",
+            "excluded_classes": portable_summary[
+                "public_artifact_policy"
+            ]["excluded"],
+        }
+    )
+    _atomic_json(destination / "import_manifest.json", manifest)
+    return {
+        "run_root": destination.as_posix(),
+        "audit": audit,
+        "privacy_issues": privacy_issues,
+        "artifact_count": manifest["file_count"],
+        "total_bytes": manifest["total_bytes"],
+    }
+
+
 def _resume_equivalence_issues(
     control_state: dict[str, Any],
     resumed_state: dict[str, Any],
@@ -2454,6 +2898,9 @@ def parse_args() -> argparse.Namespace:
     closure.add_argument("--baseline-run-dir", required=True)
     closure.add_argument("--continuation-run-dir", required=True)
     closure.add_argument("--run-id", required=True)
+    promotion = subparsers.add_parser("promote-baseline")
+    promotion.add_argument("--source-run-dir", required=True)
+    promotion.add_argument("--run-id", required=True)
     resume_smoke = subparsers.add_parser("smoke-resume")
     resume_smoke.add_argument("--source-run-dir", required=True)
     resume_smoke.add_argument("--run-id", required=True)
@@ -2479,6 +2926,11 @@ def main() -> None:
         result = close_converged_baseline(
             baseline_run_dir=args.baseline_run_dir,
             continuation_run_dir=args.continuation_run_dir,
+            run_id=args.run_id,
+        )
+    elif args.command == "promote-baseline":
+        result = promote_converged_baseline(
+            source_run_dir=args.source_run_dir,
             run_id=args.run_id,
         )
     else:
@@ -2576,6 +3028,7 @@ def main() -> None:
     elif args.command not in {
         "audit-run",
         "close-baseline",
+        "promote-baseline",
         "monitor-run",
         "smoke-resume",
         "continue-students",

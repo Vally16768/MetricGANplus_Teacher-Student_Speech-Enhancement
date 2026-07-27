@@ -15,6 +15,7 @@ from campaign import (
     STUDENT_CONTINUATION_SCOPE,
     _best_teacher,
     _effective_training,
+    _portable_baseline_cell,
     _student_schedule,
     _teacher_cache_identity,
     audit_campaign_run,
@@ -210,6 +211,55 @@ class CampaignAuditTests(unittest.TestCase):
         self.assertEqual(result["campaign_scope"], BASELINE_SCOPE)
         self.assertEqual(result["cell_count"], 3)
         self.assertEqual(result["model_count"], 3)
+
+    def test_audit_resolves_portable_run_relative_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self.make_run(root, baseline=True)
+            summary_path = root / "metrics" / "campaign_summary.json"
+            summary = json.loads(summary_path.read_text(encoding="utf-8"))
+            summary["canonical_metrics_csv"] = "metrics/canonical_metrics.csv"
+            summary["test_pesq_plot"] = "reports/plot.png"
+            summary["report"] = "reports/report.md"
+            for cell, item in summary["model_inventory"].items():
+                item["path"] = f"models/{cell}.pt"
+            summary_path.write_text(json.dumps(summary), encoding="utf-8")
+            result = audit_campaign_run(root)
+        self.assertTrue(result["valid"], result["issues"])
+
+    def test_portable_cell_removes_local_and_sample_paths(self) -> None:
+        portable = _portable_baseline_cell(
+            "S0-WB",
+            {
+                "run_name": "S0-WB",
+                "checkpoint_out": "PRIVATE_ROOT/run/model.pt",
+                "training_state_out": "PRIVATE_ROOT/run/state.pt",
+                "teacher_cache_manifest": "PRIVATE_MOUNT/cache.csv",
+                "history_csv": "PRIVATE_ROOT/history.csv",
+                "continued_from": {
+                    "epoch": 20,
+                    "model": "PRIVATE_ROOT/old.pt",
+                    "model_sha256": "abc",
+                    "training_state": "PRIVATE_ROOT/state.pt",
+                    "training_state_sha256": "def",
+                },
+                "test_metrics": {
+                    "sample_paths": ["PRIVATE_ROOT/sample.wav"],
+                    "pesq_mean": 3.0,
+                },
+            },
+        )
+        rendered = json.dumps(portable)
+        self.assertNotIn("PRIVATE_ROOT", rendered)
+        self.assertNotIn("PRIVATE_MOUNT", rendered)
+        self.assertNotIn("teacher_cache_manifest", portable)
+        self.assertNotIn("training_state_out", portable)
+        self.assertEqual(portable["test_metrics"]["sample_paths"], [])
+        self.assertEqual(portable["checkpoint_out"], "models/S0-WB.pt")
+        self.assertEqual(
+            portable["continued_from"]["training_state_sha256"],
+            "def",
+        )
 
     def test_student_continuation_reconciles_two_cells(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

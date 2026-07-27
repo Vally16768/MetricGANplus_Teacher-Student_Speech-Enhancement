@@ -1,6 +1,6 @@
 # Architecture register
 
-Status: `converged-baseline-closure`; no full run is promoted yet.
+Status: `baseline-promotion`; converged S0 is audited and P3 packaging is active.
 
 ## A0 — End-to-end research pipeline
 
@@ -238,6 +238,13 @@ smoke-resume
   -> one fault-injected stop after a durable evaluation checkpoint
   -> resume to the same final epoch
   -> compare LR, scheduler, patience, best/final model and history state
+promote-baseline
+  -> accept only an audited/promotable converged S0 closure
+  -> copy selected T0/S0-WB/S0-NB weights with SHA-256 verification
+  -> retain aggregate metrics, student histories, plots and report
+  -> replace machine paths with portable environment bindings
+  -> exclude dataset/cache/audio/replay/training-state artifacts
+  -> canonical run-contract + independent package/privacy audit
 monitor-run / audit-run
   -> live stage/cell state / independent package reconciliation
 ```
@@ -306,6 +313,11 @@ Evidence:
   writing the merged report.
 - resume-equivalence validation uses `smoke-resume`; its fault injection occurs
   only after the post-evaluation state is atomically persisted.
+- CUDA resume-equivalence smoke A4 passed with identical LR, patience, best
+  state, selected-model hash and history after a planned interruption. It runs
+  real CUDA forward/backward while freezing optimizer effect for the exact
+  equivalence comparison because the canonical reflection-pad backward kernel
+  does not provide deterministic CUDA gradients.
 
 ## A6 — Selection boundaries
 

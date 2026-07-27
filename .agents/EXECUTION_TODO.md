@@ -2,8 +2,8 @@
 
 Status: **active**
 Last evidence update: **2026-07-27**
-Current phase: **P2 — repair resume robustness**
-Next action: **P2.6 — run the clean CUDA resume-equivalence smoke**
+Current phase: **P3 — sanitize and promote the valid S0 baseline**
+Next action: **P3.1 — build and validate the selected-artifact inventory**
 
 This is the detailed execution board for the active research sequence. The
 campaign-wide summary remains `.agents/TODO.md`; this file owns the subtask
@@ -111,8 +111,8 @@ finished normally.
 | P2.3 | Add interrupt/resume equivalence test | LR, bad-epoch/patience count, best epoch/score/hash and next action match uninterrupted control | passed |
 | P2.4 | Run focused and full unit suites | all tests pass in shared venv | passed |
 | P2.5 | Run project guard and canonical config validation | zero guard issues; plan/config validation passes | passed |
-| P2.6 | Run clean real-entry-point CUDA resume smoke | interrupted/resumed package reconciles; no dataset mutation | in-progress |
-| P2.7 | Commit and push verified repair | clean snapshot and recorded commit | pending |
+| P2.6 | Run clean real-entry-point CUDA resume smoke | interrupted/resumed package reconciles; no dataset mutation | passed |
+| P2.7 | Commit and push verified repair | clean snapshot and recorded commit | passed |
 
 Unblock condition satisfied: P1.7 passed.
 
@@ -122,13 +122,13 @@ Gate: only selected, audited and portable artifacts enter Git.
 
 | ID | Item | Required evidence | Status |
 |---|---|---|---|
-| P3.1 | Build the promotion inventory | selected WB/NB weights, metrics, plots, config, report and hashes only | blocked |
-| P3.2 | Sanitize public provenance | no personal path, username, host, mount, dataset location or server logic | blocked |
-| P3.3 | Verify exclusions | no dataset, teacher cache, generated audio, replay or regenerable bulk | blocked |
-| P3.4 | Validate promoted run contract | canonical run validation and independent metric/artifact reconciliation | blocked |
-| P3.5 | Update `.agents`, README and documentation index | no stale baseline claims or duplicated source of truth | blocked |
-| P3.6 | Run tests and project guard | required gates pass from the promotion snapshot | blocked |
-| P3.7 | Commit and push baseline release | public commit/hash recorded; Git worktree clean | blocked |
+| P3.1 | Build the promotion inventory | selected WB/NB weights, metrics, plots, config, report and hashes only | in-progress |
+| P3.2 | Sanitize public provenance | no personal path, username, host, mount, dataset location or server logic | pending |
+| P3.3 | Verify exclusions | no dataset, teacher cache, generated audio, replay or regenerable bulk | pending |
+| P3.4 | Validate promoted run contract | canonical run validation and independent metric/artifact reconciliation | pending |
+| P3.5 | Update `.agents`, README and documentation index | no stale baseline claims or duplicated source of truth | pending |
+| P3.6 | Run tests and project guard | required gates pass from the promotion snapshot | pending |
+| P3.7 | Commit and push baseline release | public commit/hash recorded; Git worktree clean | pending |
 
 Unblock condition: P1 and P2 pass.
 
@@ -197,3 +197,5 @@ calibration, evaluation protocol, provenance and claim set.
 | 2026-07-27 | Resume smoke A1 stopped before its injected interruption | PyTorch rejected NumPy RNG state encoded as `torch.uint32`; failed run preserved | encode RNG as serializable `int64`, test, rerun A2 |
 | 2026-07-27 | Resume smoke A2 reached final reconciliation but exposed CUDA kernel variance | control/resumed PESQ differed by about `6e-6` while LR/patience/best epoch aligned; exact model hashes differed | deterministic CUDA fault-injection smoke A3 |
 | 2026-07-27 | Resume smoke A3 stopped on an unsupported deterministic CUDA kernel | `reflection_pad1d_backward` has no deterministic CUDA implementation; changing the frontend would invalidate S0 | CUDA forward/backward with optimizer effect frozen for exact state-equivalence A4 |
+| 2026-07-27 | Resume smoke A4 passed exact state equivalence | real CUDA forward/backward; injected stop after epoch 2; resumed/control LR, patience, best state, selected hash and history identical; optimizer effect isolated because the CUDA reflection-pad backward is nondeterministic | P2.7 commit/push |
+| 2026-07-27 | Closed P2 on pushed commit `5c48415` | 52/52 tests, plan/config validation and project guard passed; resume smoke A4 audit has zero issues | P3.1 promotion inventory |

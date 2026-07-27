@@ -48,7 +48,7 @@ Update this register whenever a gate changes state.
 | C41 | Continue ceiling-limited official students | run `...cont50...-a1` audited with 0 issues; WB best 34/stop 42, NB best 41/stop 49, both early-stopped and not ceiling-limited | passed |
 | C42 | Freeze the deferred teacher-improvement protocol | indexed canonical plan with E0/E1/E2 ablations, discriminator calibration gate, teacher promotion gate and separate TTS boundary | passed |
 | C43 | Track the ordered post-NB program iteratively | `.agents/EXECUTION_TODO.md` owns P1–P6 dependencies, evidence, one active item and next action; project skill enforces updates | passed |
-| C44 | Repair post-evaluation resume robustness | deterministic interrupt/resume equivalence for LR, patience, best state and checkpoint; unit/guard/CUDA smoke | in-progress |
+| C44 | Repair post-evaluation resume robustness | commit `5c48415`; 52/52 tests; real CUDA fault-injection A4 reconciled LR, patience, best state, selected hash and history | passed |
 
 ## Execution rule
 
