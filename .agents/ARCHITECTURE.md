@@ -1,6 +1,6 @@
 # Architecture register
 
-Status: `baseline-promotion`; converged S0 is audited and P3 packaging is active.
+Status: `teacher-only-t1`; converged S0 is published and E0 freeze is active.
 
 ## A0 — End-to-end research pipeline
 

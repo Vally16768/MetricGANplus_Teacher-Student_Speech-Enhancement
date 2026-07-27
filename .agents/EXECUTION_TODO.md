@@ -2,8 +2,8 @@
 
 Status: **active**
 Last evidence update: **2026-07-27**
-Current phase: **P3 — sanitize and promote the valid S0 baseline**
-Next action: **P3.7 — commit and push the audited baseline release**
+Current phase: **P4 — teacher-only T1 improvement**
+Next action: **P4.1 — freeze and verify the E0 official-teacher reference**
 
 This is the detailed execution board for the active research sequence. The
 campaign-wide summary remains `.agents/TODO.md`; this file owns the subtask
@@ -128,7 +128,7 @@ Gate: only selected, audited and portable artifacts enter Git.
 | P3.4 | Validate promoted run contract | canonical run validation and independent metric/artifact reconciliation | passed |
 | P3.5 | Update `.agents`, README and documentation index | no stale baseline claims or duplicated source of truth | passed |
 | P3.6 | Run tests and project guard | required gates pass from the promotion snapshot | passed |
-| P3.7 | Commit and push baseline release | public commit/hash recorded; Git worktree clean | in-progress |
+| P3.7 | Commit and push baseline release | public commit/hash recorded; Git worktree clean | passed |
 
 Unblock condition: P1 and P2 pass.
 
@@ -142,15 +142,15 @@ reporting-only.
 
 | ID | Item | Required evidence | Status |
 |---|---|---|---|
-| P4.1 | Freeze E0 official-teacher reference | official checkpoint ancestry and WB protocol | blocked |
-| P4.2 | Implement calibration-only teacher command | no G update; at least 100 current outputs/refresh | blocked |
-| P4.3 | Implement calibration guard | held-out current-output MAE/correlation/range; failed guard skips G | blocked |
-| P4.4 | Complete resume-state tests for G/D loop | G, D, optimizers, scheduler, patience, replay and history restore | blocked |
-| P4.5 | Run unit/integration tests and project guard | all required gates pass | blocked |
-| P4.6 | Run clean CUDA smoke | current/history/current, clean=1, true noisy/enhanced PESQ, local replay observed | blocked |
-| P4.7 | Run monitored teacher-only pilot | E0/E1/E2, immutable run, no cache/S1 | blocked |
-| P4.8 | Audit teacher gate | true metrics and calibration reconcile independently | blocked |
-| P4.9 | Record gate decision | pass selects T1; fail stops downstream work | blocked |
+| P4.1 | Freeze E0 official-teacher reference | official checkpoint ancestry and WB protocol | in-progress |
+| P4.2 | Implement calibration-only teacher command | no G update; at least 100 current outputs/refresh | pending |
+| P4.3 | Implement calibration guard | held-out current-output MAE/correlation/range; failed guard skips G | pending |
+| P4.4 | Complete resume-state tests for G/D loop | G, D, optimizers, scheduler, patience, replay and history restore | pending |
+| P4.5 | Run unit/integration tests and project guard | all required gates pass | pending |
+| P4.6 | Run clean CUDA smoke | current/history/current, clean=1, true noisy/enhanced PESQ, local replay observed | pending |
+| P4.7 | Run monitored teacher-only pilot | E0/E1/E2, immutable run, no cache/S1 | pending |
+| P4.8 | Audit teacher gate | true metrics and calibration reconcile independently | pending |
+| P4.9 | Record gate decision | pass selects T1; fail stops downstream work | pending |
 
 Unblock condition: P3.7 passes.
 
@@ -200,3 +200,4 @@ calibration, evaluation protocol, provenance and claim set.
 | 2026-07-27 | Resume smoke A4 passed exact state equivalence | real CUDA forward/backward; injected stop after epoch 2; resumed/control LR, patience, best state, selected hash and history identical; optimizer effect isolated because the CUDA reflection-pad backward is nondeterministic | P2.7 commit/push |
 | 2026-07-27 | Closed P2 on pushed commit `5c48415` | 52/52 tests, plan/config validation and project guard passed; resume smoke A4 audit has zero issues | P3.1 promotion inventory |
 | 2026-07-27 | Built and audited the portable S0 package | `20260727-converged-s0-baseline-v1`; 3 models, 23 inventoried artifacts, zero package/privacy issues; 56/56 tests, contract/plan/guard pass | P3.7 commit/push |
+| 2026-07-27 | Published the converged S0 baseline | Git commit `e6388d4`; 24 package files in Git normal, push confirmed and worktree clean | P4.1 freeze E0 |
