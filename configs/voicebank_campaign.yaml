@@ -51,6 +51,7 @@ training:
   student_lr: 0.0005
   proxy_lr: 0.001
   metric_discriminator_lr: 0.0005
+  teacher_calibration_refreshes: 2
   metric_discriminator_rows: 100
   metric_discriminator_calibration_rows: 100
   metric_discriminator_history_portion: 0.2
@@ -86,6 +87,7 @@ pilot:
   proxy_train_rows: 64
   proxy_validation_rows: 16
   proxy_batch_size: 4
+  teacher_calibration_refreshes: 2
   metric_discriminator_rows: 100
   metric_discriminator_calibration_rows: 100
   metric_discriminator_min_calibration_records: 100

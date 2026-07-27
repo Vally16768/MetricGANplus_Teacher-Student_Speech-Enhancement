@@ -121,7 +121,10 @@ The initial predeclared calibration gate is:
 - no near-constant output or current-score extrapolation beyond the calibrated
   range.
 
-If the gate fails, refresh D again or stop the trial. Do not update G.
+The calibration diagnostic predeclares at most two refreshes. If the first
+gate fails, perform exactly one additional current/history/current refresh
+with the frozen generator and apply the same gate to a new disjoint held-out
+partition. If the second gate fails, stop the trial. Do not update G.
 
 ## Stage 2 — Teacher-only pilot
 

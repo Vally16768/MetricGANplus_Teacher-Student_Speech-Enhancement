@@ -2218,7 +2218,12 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
             rank_results: dict[str, dict[str, Any]] = {}
             select_results: dict[str, dict[str, Any]] = {}
 
-            should_rank_eval = bool(rank_eval_manifests) and rank_eval_every > 0 and epoch % rank_eval_every == 0
+            should_rank_eval = (
+                not config.metric_discriminator_calibration_only
+                and bool(rank_eval_manifests)
+                and rank_eval_every > 0
+                and epoch % rank_eval_every == 0
+            )
             if should_rank_eval:
                 _write_progress("rank_eval_start", epoch=epoch, global_step=global_step)
                 rank_results, rank_flat = _evaluate_group(
@@ -2237,7 +2242,12 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                 for key, value in rank_flat.items():
                     history_row[key] = float(value)
 
-            should_select_eval = bool(select_eval_manifests) and select_eval_every > 0 and epoch % select_eval_every == 0
+            should_select_eval = (
+                not config.metric_discriminator_calibration_only
+                and bool(select_eval_manifests)
+                and select_eval_every > 0
+                and epoch % select_eval_every == 0
+            )
             if should_select_eval:
                 _write_progress("select_eval_start", epoch=epoch, global_step=global_step)
                 select_results, select_flat = _evaluate_group(
@@ -2448,7 +2458,10 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
         select_metrics_by_split: dict[str, dict[str, Any]] = {}
         test_metrics_by_split: dict[str, dict[str, Any]] = {}
         reuse_init_evaluation = bool(
-            config.epochs == 0
+            (
+                config.epochs == 0
+                or config.metric_discriminator_calibration_only
+            )
             and config.evaluate_init_checkpoint
             and best_select_metrics_by_split
         )

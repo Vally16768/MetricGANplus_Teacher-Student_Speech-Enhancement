@@ -1311,9 +1311,17 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
         refreshes = list(
             calibration_cell.get("metric_discriminator_refresh_history") or []
         )
-        if len(refreshes) != 1:
-            issues.append("calibration package must contain exactly one refresh")
-        elif dict(refreshes[0].get("calibration_gate") or {}) != calibration_gate:
+        declared_refreshes = summary.get(
+            "teacher_calibration_refresh_count"
+        )
+        if not refreshes:
+            issues.append("calibration package contains no discriminator refresh")
+        elif (
+            declared_refreshes is not None
+            and int(declared_refreshes) != len(refreshes)
+        ):
+            issues.append("teacher calibration refresh-count mismatch")
+        elif dict(refreshes[-1].get("calibration_gate") or {}) != calibration_gate:
             issues.append("teacher calibration gate binding mismatch")
         if int(
             calibration_cell.get("metric_discriminator_accepted_update_count")
@@ -1614,11 +1622,16 @@ def run_teacher_calibration(
         candidate_teacher_checkpoint=str(cells["E0-T0"]["checkpoint_out"]),
         mode=mode,
     )
+    calibration_refreshes = int(
+        effective.get("teacher_calibration_refreshes", 2)
+    )
+    if calibration_refreshes < 1 or calibration_refreshes > 2:
+        raise ValueError("teacher_calibration_refreshes must be 1 or 2.")
     cells["E0-D-CAL"] = _run_cell(
         **teacher_common,
         cell="E0-D-CAL",
         loss_recipe="T0_PESQ",
-        epochs=1,
+        epochs=calibration_refreshes,
         init_checkpoint=str(cells["E0-T0"]["checkpoint_out"]),
         evaluate_init_checkpoint=True,
         proxy_checkpoint=str(proxy["checkpoint"]),
@@ -1629,9 +1642,12 @@ def run_teacher_calibration(
     refreshes = list(
         cells["E0-D-CAL"].get("metric_discriminator_refresh_history") or []
     )
-    if len(refreshes) != 1:
-        raise RuntimeError("Calibration-only diagnostic did not record one refresh.")
-    calibration_gate = dict(refreshes[0]["calibration_gate"])
+    if len(refreshes) != calibration_refreshes:
+        raise RuntimeError(
+            "Calibration-only diagnostic refresh count does not match "
+            "the predeclared schedule."
+        )
+    calibration_gate = dict(refreshes[-1]["calibration_gate"])
     plot = _write_teacher_calibration_plot(run_root, refreshes)
     report = _write_report(
         run_root=run_root,
@@ -1646,6 +1662,7 @@ def run_teacher_calibration(
         comparison_pairs={},
     )
     report["teacher_calibration_gate"] = calibration_gate
+    report["teacher_calibration_refresh_count"] = len(refreshes)
     report["e0_contract"] = e0_contract
     report["calibration_plot"] = plot.as_posix()
     _atomic_json(run_root / "metrics" / "campaign_summary.json", report)

@@ -266,3 +266,19 @@ Constraint: the plan does not alter completed S0 evidence. T1 still requires
 at least `+0.01` PESQ-WB with STOI/SI-SDR guardrails before C1 or S1 work.
 The synthesis hypothesis remains a separate TTS campaign with its own
 generator outputs, targets, calibration, data, evaluation and claims.
+
+## D-023 — Permit one fixed-generator discriminator recalibration retry
+
+Decision: the calibration-only diagnostic may execute exactly two
+current/history/current refreshes. The same strict held-out gate applies after
+the second refresh, and failure stops T1 before E1/E2. Generator evaluation is
+reused while G is frozen; no epoch or final reevaluation is repeated between
+calibration refreshes.
+
+Cause: strict A2 used 100 update plus 100 disjoint held-out current outputs
+and failed safely with normalized MAE 0.1968, Pearson 0.5379 and Spearman
+0.5504. The predeclared plan allowed one refresh retry, while the observed
+three identical full E0 evaluations added cost without scientific evidence.
+
+Constraint: the retry does not relax thresholds, change the dataset, use test
+results, update G or authorize a broader hyperparameter search.

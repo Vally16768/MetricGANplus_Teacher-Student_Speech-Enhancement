@@ -479,6 +479,22 @@ class CampaignAuditTests(unittest.TestCase):
         )
         self.assertFalse(failed["passed"])
 
+    def test_teacher_calibration_predeclares_one_retry(self) -> None:
+        import yaml
+
+        config_path = (
+            Path(__file__).resolve().parents[1]
+            / "configs"
+            / "voicebank_campaign.yaml"
+        )
+        config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            _effective_training(config, "pilot")[
+                "teacher_calibration_refreshes"
+            ],
+            2,
+        )
+
     def test_failed_verification_gate_keeps_official_teacher_downstream(self) -> None:
         metrics = {
             "pesq_mean": 3.0,

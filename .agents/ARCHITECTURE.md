@@ -257,7 +257,8 @@ smoke-resume
 smoke-teacher-calibration / calibrate-teacher
   -> frozen promoted E0 teacher from canonical true-length S0 v2
   -> disjoint current D-update and held-out calibration supports
-  -> one current/history/current refresh; no generator update
+  -> at most two predeclared current/history/current refreshes
+  -> reuse frozen E0 metrics between refreshes; no generator update
   -> explicit calibration gate + predicted-versus-true plot
 smoke-teacher / pilot-teacher
   -> require an audited, passed calibration-only source

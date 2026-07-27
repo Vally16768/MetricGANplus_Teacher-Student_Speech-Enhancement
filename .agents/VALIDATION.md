@@ -67,6 +67,13 @@ metric/reference profile matches the run profile
 - unit/integration suite: 56/56 passed after portable promotion and manifest
   tamper-detection coverage;
 - canonical research plan and project guard: passed with zero issues.
+- strict teacher-calibration A2: audited with zero package issues and zero
+  generator updates; its 100-record held-out gate failed and remains negative
+  evidence.
+- two-refresh calibration smoke A1: 2/2 refreshes, zero generator updates,
+  epoch rows contain no redundant evaluation, independent audit zero issues.
+- unit/integration suite: 62/62 passed after the predeclared calibration-retry
+  and frozen-evaluation reuse change.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.
