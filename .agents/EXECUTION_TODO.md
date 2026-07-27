@@ -1,9 +1,9 @@
 # Iterative execution TODO
 
-Status: **active**
+Status: **complete — conditional stop after failed T1 calibration gate**
 Last evidence update: **2026-07-27**
-Current phase: **P6 — final negative result package**
-Next action: **P6.6 — commit and push the final evidence**
+Current phase: **P1–P6 complete**
+Next action: **none; a future T1 successor or TTS study requires a new plan**
 
 This is the detailed execution board for the active research sequence. The
 campaign-wide summary remains `.agents/TODO.md`; this file owns the subtask
@@ -178,7 +178,7 @@ Unblock condition: accepted T1 teacher.
 | P6.3 | Compare S1-NB−S0-NB | PESQ-NB and NB guard metrics | not-applicable |
 | P6.4 | Generate final tables/figures/report | claim-to-artifact traceability | passed |
 | P6.5 | Run independent promotion audit | zero unresolved issues or explicit failed result | passed |
-| P6.6 | Commit and push final accepted evidence | sanitized canonical package only | in-progress |
+| P6.6 | Commit and push final accepted evidence | sanitized canonical package only | passed |
 
 ## Parked — TTS metric-critic study
 
@@ -210,3 +210,4 @@ calibration, evaluation protocol, provenance and claim set.
 | 2026-07-27 | Validated the fixed-generator two-refresh retry flow | 62/62 tests; plan/config/guard pass; CUDA smoke has two refreshes, zero G updates, no redundant epoch/final evaluation and zero audit issues | commit/push, then strict A3 |
 | 2026-07-27 | Final strict calibration retry failed and stopped downstream work | A3 on clean `21af6b5`; two 100+100 refreshes; final normalized MAE 0.2133, Pearson 0.5545, Spearman 0.5435, range failed; zero G updates; audit zero issues | P6 final negative report |
 | 2026-07-27 | Built and audited the final conditional outcome | canonical S0 table, claim map, negative T1 report and sanitized JSON; 62/62 tests; v2/A3 audits, contract, guard, source-hash reconciliation and privacy checks pass | P6.6 commit/push |
+| 2026-07-27 | Closed P1–P6 on the pushed final evidence | commit `a485306` pushed; canonical S0 v2 retained, failed T1 recorded, P5 and S1 comparisons correctly not applicable | no active action |

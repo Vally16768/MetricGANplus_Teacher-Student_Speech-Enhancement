@@ -50,6 +50,7 @@ Update this register whenever a gate changes state.
 | C43 | Track the ordered post-NB program iteratively | `.agents/EXECUTION_TODO.md` owns P1–P6 dependencies, evidence, one active item and next action; project skill enforces updates | passed |
 | C44 | Repair post-evaluation resume robustness | commit `5c48415`; 52/52 tests; real CUDA fault-injection A4 reconciled LR, patience, best state, selected hash and history | passed |
 | C45 | Make evaluation invariant to variable-length batch padding | per-utterance protocol regression-tested; corrected S0 v2 audited and pushed at `65b9a9c` | passed |
+| C46 | Close the ordered P1–P6 program | final S0 table and negative T1 evidence audited and pushed at `a485306`; conditional P5 work marked not applicable | passed |
 
 ## Execution rule
 
