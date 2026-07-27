@@ -64,6 +64,7 @@ experiments/runs/<run_id>/
 | `20260727-postcleanup-smoke-wbnb-s0-a5` | smoke-passed/audited | stable post-cleanup source; six cells, six models, 36/36 reported samples, matched WB/NB protocols, zero audit issues | no |
 | `20260727-pilot-wbnb-s0-a1` | pilot-passed/audited | clean commit `76729f3`; six cells, six models, 72/72 samples, frozen manifests unchanged, zero audit issues; verification-only | no |
 | `20260727-full-wbnb-s0-a1` | stopped-by-user/invalid | clean commit `4fee1e3`; teacher/proxies/cache completed; stopped during epoch 14 validation of inadequate 96x1 `S-WB-BASE`; all 9.4 GiB preserved locally | no |
+| official MetricGAN+ checkpoint diagnostic | observed/non-promotable | pinned revision and checkpoint hash; exact full test PESQ-WB 3.1225 on 824 pairs with the SpeechBrain adapter; exact local generator reconstruction passed four-row CUDA diagnostic | no |
 
 There is currently no promoted end-to-end run from the current repository
 snapshot.
@@ -128,31 +129,39 @@ Graphs must include:
 
 ## Canonical ablation matrix
 
-The first campaign is a controlled six-cell comparison. Architecture, split,
-seed set and optimizer schedule stay fixed within each paired comparison.
+The replacement campaign is a controlled seven-cell, two-stage comparison.
+Student architecture, split, seed and optimizer schedule stay fixed between S0
+and S1; the teacher cache identity is the intended changed variable.
 
 | Cell | Model | Band | Loss | Comparison |
 |---|---|---|---|---|
-| T-WB-BASE | WB teacher | WB | `T0` | teacher baseline |
-| T-WB-METRIC | WB teacher | WB | `T0_PESQ` | metric-discriminator effect |
-| S-WB-BASE | WB student | WB | `D1` | WB distillation baseline |
-| S-WB-METRIC | WB student | WB | `D1_PESQ` | WB student metric effect |
-| S-NB-BASE | NB student | NB | `D1` | NB distillation baseline |
-| S-NB-METRIC | NB student | NB | `D1_PESQ` | NB student metric effect |
+| T0-WB-OFFICIAL | pinned official WB teacher | WB | epoch-0 checkpoint | credible teacher baseline |
+| S0-WB | fresh causal-max WB student | WB | `D1` | distilled from T0 cache |
+| S0-NB | fresh causal-max NB student | NB | `D1` | distilled from T0 cache |
+| T1-WB-BASE | official teacher fine-tune control | WB | `T0` | training-control effect |
+| T1-WB-METRIC | official teacher metric fine-tune | WB | `T0_PESQ` | PESQ-proxy effect |
+| S1-WB | fresh causal-max WB student | WB | `D1` | distilled from gated T1 cache |
+| S1-NB | fresh causal-max NB student | NB | `D1` | distilled from gated T1 cache |
 
-Primary effect sizes are paired deltas within profile:
-`METRIC - BASE` for PESQ, STOI, SI-SDR and delta-SNR. Teacher improvement is
-established first. Student comparisons use the promoted WB teacher and their
-own bandwidth-calibrated proxy.
+Primary effect sizes are `T1 - T0`, `S1-WB - S0-WB` and
+`S1-NB - S0-NB` for PESQ, STOI, SI-SDR and delta-SNR. The T1 teacher must gain
+at least 0.01 PESQ-WB on `val_select`, lose no more than 0.002 STOI and lose no
+more than 0.25 SI-SDR. Test metrics are reported only after that selection and
+never choose the branch.
 
-Required metric-proxy evidence per bandwidth:
+Required WB metric-proxy evidence:
 
 - label-generation manifest and PESQ protocol;
 - train/validation split by utterance identity;
 - proxy MSE/MAE and rank correlation on held-out candidates;
 - calibration plot and score-range coverage;
 - frozen proxy checkpoint hash;
-- generator ablation showing true-metric change, not only predicted change.
+- generator ablation showing true-metric change, not only predicted change;
+- explicit proxy-exploitation analysis when predicted and true PESQ disagree.
+
+The direct student-metric experiment is deferred. If reintroduced, it requires
+separate WB/NB proxies and a separately named matrix; it must not alter the
+S1–S0 teacher-effect comparison.
 
 The TTS extension is a separate future campaign. It may reuse the objective
 adapter but requires a selected TTS generator, its own outputs, a recalibrated

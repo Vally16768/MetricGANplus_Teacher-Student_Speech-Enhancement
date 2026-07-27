@@ -25,7 +25,7 @@ class CampaignAuditTests(unittest.TestCase):
         cells = {}
         inventory = {}
         for cell in CELL_ORDER:
-            bandwidth = "nb" if "-NB-" in cell else "wb"
+            bandwidth = "nb" if "-NB" in cell else "wb"
             sample_rate = 8000 if bandwidth == "nb" else 16000
             sample = root / "samples" / f"{cell}.wav"
             sample.parent.mkdir(exist_ok=True)
@@ -80,6 +80,10 @@ class CampaignAuditTests(unittest.TestCase):
         plot.write_bytes(b"PNG-fixture")
         summary = {
             "verification_only": True,
+            "teacher_promotion_gate": {
+                "passed": False,
+                "verification_override": True,
+            },
             "cells": cells,
             "model_inventory": inventory,
             "canonical_metrics_csv": metrics_csv.as_posix(),
@@ -105,18 +109,18 @@ class CampaignAuditTests(unittest.TestCase):
             self.make_run(root)
             result = audit_campaign_run(root)
         self.assertTrue(result["valid"], result["issues"])
-        self.assertEqual(result["cell_count"], 6)
-        self.assertEqual(result["model_count"], 6)
+        self.assertEqual(result["cell_count"], 7)
+        self.assertEqual(result["model_count"], 7)
 
     def test_model_tampering_is_detected(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
             self.make_run(root)
-            (root / "models" / "T-WB-BASE.pt").write_bytes(b"tampered")
+            (root / "models" / "T1-WB-BASE.pt").write_bytes(b"tampered")
             result = audit_campaign_run(root)
         self.assertFalse(result["valid"])
-        self.assertIn("model size mismatch: T-WB-BASE", result["issues"])
-        self.assertIn("model hash mismatch: T-WB-BASE", result["issues"])
+        self.assertIn("model size mismatch: T1-WB-BASE", result["issues"])
+        self.assertIn("model hash mismatch: T1-WB-BASE", result["issues"])
 
     def test_pilot_overrides_full_training_without_changing_full(self) -> None:
         config = {

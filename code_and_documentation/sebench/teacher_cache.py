@@ -135,14 +135,18 @@ def _load_existing_cache_payload(
     dirs: dict[str, Path],
     guidance_required: bool,
     validate_existing: bool,
+    cache_inputs: bool,
+    cache_dtype: torch.dtype,
 ) -> dict[str, str] | None:
     payload = _cache_entry_paths(row=row, row_key=row_key, dirs=dirs, guidance_required=guidance_required)
     required_paths = [
         payload["teacher_wav"],
         payload["teacher_mask_erb"],
-        payload["noisy_cache"],
-        payload["clean_cache"],
     ]
+    if cache_inputs:
+        required_paths.extend(
+            [payload["noisy_cache"], payload["clean_cache"]]
+        )
     if guidance_required:
         required_paths.append(payload["guidance_sg"])
     for path in required_paths:
@@ -155,6 +159,15 @@ def _load_existing_cache_payload(
                 loaded = torch.load(path, map_location="cpu", weights_only=True)
                 if not isinstance(loaded, torch.Tensor):
                     raise TypeError(f"Expected tensor payload in {path}")
+                if path in {
+                    payload["teacher_wav"],
+                    payload["teacher_mask_erb"],
+                    payload["guidance_sg"],
+                } and loaded.dtype != cache_dtype:
+                    raise TypeError(
+                        f"Expected {cache_dtype} payload in {path}, got "
+                        f"{loaded.dtype}."
+                    )
                 del loaded
         except Exception:
             _unlink_cache_paths(payload)
@@ -165,8 +178,12 @@ def _load_existing_cache_payload(
         "teacher_wav": payload["teacher_wav"].as_posix(),
         "teacher_mask_erb": payload["teacher_mask_erb"].as_posix(),
         "guidance_sg": payload["guidance_sg"].as_posix() if payload["guidance_sg"] is not None else "",
-        "noisy_cache": payload["noisy_cache"].as_posix(),
-        "clean_cache": payload["clean_cache"].as_posix(),
+        "noisy_cache": (
+            payload["noisy_cache"].as_posix() if cache_inputs else ""
+        ),
+        "clean_cache": (
+            payload["clean_cache"].as_posix() if cache_inputs else ""
+        ),
     }
 
 
@@ -297,10 +314,21 @@ def build_multi_target_teacher_cache(
     write_workers: int = 0,
     resume: bool = False,
     validate_existing: bool = True,
+    cache_inputs: bool = True,
+    storage_dtype: str = "float32",
     progress_callback: Callable[[str], None] | None = None,
 ) -> dict[str, str]:
     if not targets:
         raise ValueError("targets must not be empty")
+    storage_dtypes = {
+        "float32": torch.float32,
+        "float16": torch.float16,
+    }
+    if storage_dtype not in storage_dtypes:
+        raise ValueError(
+            "Teacher cache storage_dtype must be 'float32' or 'float16'."
+        )
+    cache_dtype = storage_dtypes[storage_dtype]
 
     rows = read_pair_manifest(manifest_path)
     out_root = Path(out_dir)
@@ -344,6 +372,8 @@ def build_multi_target_teacher_cache(
                     dirs=target_dirs[target.name],
                     guidance_required=(target.guidance_classic == "spectral_gating"),
                     validate_existing=validate_existing,
+                    cache_inputs=bool(cache_inputs),
+                    cache_dtype=cache_dtype,
                 )
                 checked_entries += 1
                 if payload is None:
@@ -427,8 +457,16 @@ def build_multi_target_teacher_cache(
                             clean_target_batch = clean_teacher_batch
                             teacher_wav_target = teacher_wav_batch
 
-                        noisy_target_cpu = noisy_target_batch.cpu()
-                        clean_target_cpu = clean_target_batch.cpu()
+                        noisy_target_cpu = (
+                            noisy_target_batch.cpu()
+                            if cache_inputs
+                            else None
+                        )
+                        clean_target_cpu = (
+                            clean_target_batch.cpu()
+                            if cache_inputs
+                            else None
+                        )
                         target_length = int(noisy_target_batch.shape[-1])
                         if int(teacher_wav_target.shape[-1]) > target_length:
                             teacher_wav_target = teacher_wav_target[..., :target_length]
@@ -445,7 +483,7 @@ def build_multi_target_teacher_cache(
                             n_fft=n_fft,
                             hop_length=hop_length,
                             win_length=win_length,
-                        ).cpu()
+                        ).to(device="cpu", dtype=cache_dtype)
                         guidance_batch: torch.Tensor | None = None
                         if target.guidance_classic == "spectral_gating":
                             guidance_batch = compute_spectral_gating_guidance(
@@ -455,15 +493,26 @@ def build_multi_target_teacher_cache(
                                 n_fft=n_fft,
                                 hop_length=hop_length,
                                 win_length=win_length,
-                            ).cpu()
-                        teacher_wav_cpu = teacher_wav_target.cpu()
+                            ).to(device="cpu", dtype=cache_dtype)
+                        teacher_wav_cpu = teacher_wav_target.to(
+                            device="cpu",
+                            dtype=cache_dtype,
+                        )
                         for offset, item in enumerate(group):
                             batch_outputs[(target.name, int(item["index"]))] = {
                                 "teacher_wav": teacher_wav_cpu[offset].clone(),
                                 "teacher_mask": teacher_mask_batch[offset].clone(),
                                 "guidance": None if guidance_batch is None else guidance_batch[offset].clone(),
-                                "noisy_cache": noisy_target_cpu[offset].clone(),
-                                "clean_cache": clean_target_cpu[offset].clone(),
+                                "noisy_cache": (
+                                    None
+                                    if noisy_target_cpu is None
+                                    else noisy_target_cpu[offset].clone()
+                                ),
+                                "clean_cache": (
+                                    None
+                                    if clean_target_cpu is None
+                                    else clean_target_cpu[offset].clone()
+                                ),
                             }
 
                 for item in batch_items:
@@ -551,6 +600,8 @@ def build_teacher_cache(
     write_workers: int = 0,
     resume: bool = False,
     validate_existing: bool = True,
+    cache_inputs: bool = True,
+    storage_dtype: str = "float32",
     progress_callback: Callable[[str], None] | None = None,
 ) -> str:
     manifests = build_multi_target_teacher_cache(
@@ -575,6 +626,8 @@ def build_teacher_cache(
         write_workers=write_workers,
         resume=resume,
         validate_existing=validate_existing,
+        cache_inputs=cache_inputs,
+        storage_dtype=storage_dtype,
         progress_callback=progress_callback,
     )
     return manifests["default"]

@@ -22,6 +22,7 @@ status. Historical experiment directories are evidence, not canonical docs.
 | `docs/audits/2026-07-26-legacy-surface-removal.md` | authorized legacy removal and recovery anchors | active observed |
 | `docs/audits/2026-07-27-pilot-a1.md` | clean-snapshot pilot execution and scientific gate audit | active observed |
 | `docs/audits/2026-07-27-full-a1-stopped.md` | controlled-stop audit and causal-max recovery evidence | active observed |
+| `docs/audits/2026-07-27-official-teacher-baseline.md` | official checkpoint reconciliation and two-stage corrective design | active observed |
 | `experiments/README.md` | experiment directory explanation | active, consolidate later |
 | `code_and_documentation/configs/research_plan_voicebank_wb_nb.yaml` | machine-independent canonical WB/NB campaign contract | canonical configuration, non-Markdown |
 

@@ -16,15 +16,16 @@ This directory is the canonical control plane for the research project.
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
 
-Current release state: **legacy surface removed; clean-snapshot pilot audited;
-full campaign pending**.
+Current release state: **official teacher and two-stage causal-max campaign
+implemented; seven-cell GPU smoke pending**.
 
 Open blockers:
 
 - Historical experiment validity and checkpoint ancestry are not yet fully
   reconstructed.
-- The six-cell VoiceBank-only flow is pilot-verified, but the one-seed,
-  256-pair pilot is explicitly non-promotable.
-- The pilot teacher metric branch has a test PESQ warning (-0.0107 versus its
-  paired baseline), while both students gained PESQ; test is not used to tune.
+- The old six-cell pilot remains non-promotable and does not validate the new
+  official-teacher/two-stage graph.
+- The pinned official teacher and local reconstruction pass structure,
+  checkpoint and bounded CUDA metric diagnostics; the full seven-cell graph
+  still requires a clean-snapshot smoke and audit.
 - There is no promoted end-to-end run produced from the current clean snapshot.

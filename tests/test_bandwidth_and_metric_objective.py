@@ -65,6 +65,8 @@ class BandwidthContractTests(unittest.TestCase):
         result = validate_research_plan(plan)
         self.assertTrue(result["valid"])
         self.assertEqual(result["teacher"]["name"], "wb")
+        self.assertEqual(result["teacher"]["hop_length"], 256)
+        self.assertEqual(result["teacher"]["win_length"], 512)
         self.assertEqual(set(result["students"]), {"wb", "nb"})
 
     def test_pesq_receives_the_declared_mode(self) -> None:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import inspect
 from pathlib import Path
 
@@ -16,6 +17,7 @@ from sebench.bandwidth import resolve_bandwidth
 MODEL_FAMILIES = (
     "metricgan_plus",
     "metricgan_plus_teacher_wb",
+    "metricgan_plus_teacher_official_wb",
     "metricgan_plus_student_wb",
     "metricgan_plus_student_nb",
     "metricgan_plus_student_wb_causal_max",
@@ -30,6 +32,7 @@ MODEL_VARIANTS = ("small", "base")
 DEFAULT_MICROBATCH = {
     "metricgan_plus": 8,
     "metricgan_plus_teacher_wb": 8,
+    "metricgan_plus_teacher_official_wb": 8,
     "metricgan_plus_student_wb": 12,
     "metricgan_plus_student_nb": 12,
     "metricgan_plus_student_wb_causal_max": 8,
@@ -42,6 +45,10 @@ DEFAULT_MICROBATCH = {
 }
 METRICGAN_PLUS_SOURCE = "speechbrain/metricgan-plus-voicebank"
 METRICGAN_PLUS_CACHE_DIR = Path.home() / ".cache" / "sebench" / "metricgan_plus_voicebank"
+METRICGAN_PLUS_HF_REVISION = "a196ce26b3bdace6fa1d819017584bdbcce462a8"
+METRICGAN_PLUS_CHECKPOINT_SHA256 = (
+    "147bfb866bac8264603546e035bf283370e716ed2f4b7412d308d2bcee88304f"
+)
 
 
 class WaveformEnhancer(nn.Module):
@@ -121,6 +128,7 @@ class MetricGANPlusAdapter(WaveformEnhancer):
                 huggingface_hub.hf_hub_download = _hf_hub_download_compat
             try:
                 from speechbrain.inference.enhancement import SpectralMaskEnhancement
+                from speechbrain.utils.fetching import FetchConfig
             except Exception as exc:  # pragma: no cover - optional dependency
                 raise ImportError(
                     "MetricGAN+ support requires SpeechBrain. Install `speechbrain>=1.0.0`."
@@ -133,6 +141,9 @@ class MetricGANPlusAdapter(WaveformEnhancer):
                     source=METRICGAN_PLUS_SOURCE,
                     savedir=str(METRICGAN_PLUS_CACHE_DIR),
                     run_opts={"device": device_str},
+                    fetch_config=FetchConfig(
+                        revision=METRICGAN_PLUS_HF_REVISION,
+                    ),
                 )
             bundle.eval()
             cls._bundle_cache[device_str] = bundle
@@ -149,6 +160,13 @@ class MetricGANPlusAdapter(WaveformEnhancer):
     @classmethod
     def pretrained_generator_state_dict(cls, device: str | torch.device = "cpu") -> dict[str, torch.Tensor]:
         bundle = cls._bundle_for_device(torch.device(device))
+        checkpoint_path = METRICGAN_PLUS_CACHE_DIR / "enhance_model.ckpt"
+        digest = hashlib.sha256(checkpoint_path.read_bytes()).hexdigest()
+        if digest != METRICGAN_PLUS_CHECKPOINT_SHA256:
+            raise RuntimeError(
+                "Official MetricGAN+ checkpoint hash mismatch: expected "
+                f"{METRICGAN_PLUS_CHECKPOINT_SHA256}, got {digest}."
+            )
         enhance_model = bundle.mods["enhance_model"]
         return {key: value.detach().cpu().clone() for key, value in enhance_model.state_dict().items()}
 
@@ -310,6 +328,9 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         linear_dim: int,
         arch_name: str,
         init_from_pretrained: bool,
+        feature_domain: str = "sqrt_magnitude",
+        window_type: str = "hann",
+        official_checkpoint_sha256: str | None = None,
     ) -> None:
         super().__init__()
         feature_bins = n_fft // 2 + 1
@@ -321,7 +342,20 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.linear_dim = linear_dim
-        self.register_buffer("window", torch.hann_window(win_length), persistent=False)
+        self.feature_domain = str(feature_domain)
+        if self.feature_domain not in {
+            "sqrt_magnitude",
+            "official_log_magnitude",
+        }:
+            raise ValueError(f"Unsupported MetricGAN feature domain: {feature_domain}")
+        self.window_type = str(window_type)
+        if self.window_type == "hann":
+            window = torch.hann_window(win_length)
+        elif self.window_type == "hamming":
+            window = torch.hamming_window(win_length)
+        else:
+            raise ValueError(f"Unsupported MetricGAN window type: {window_type}")
+        self.register_buffer("window", window, persistent=False)
         self.mask_generator = MetricGANLikeMaskGenerator(
             input_size=feature_bins,
             hidden_size=hidden_size,
@@ -344,7 +378,17 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
             "non_causal": True,
             "lookahead_ms": 500.0,
             "init_from_metricgan_pretrained": init_from_pretrained,
+            "feature_domain": self.feature_domain,
+            "window_type": self.window_type,
+            # Reconstruct saved packages without requiring a network/cache hit.
+            "initialize_from_official": False,
         }
+        if official_checkpoint_sha256:
+            self.model_config["official_checkpoint_sha256"] = str(
+                official_checkpoint_sha256
+            )
+            self.model_config["official_source"] = METRICGAN_PLUS_SOURCE
+            self.model_config["official_revision"] = METRICGAN_PLUS_HF_REVISION
         self.pretrained_init_summary = {
             "loaded_keys": [],
             "skipped_keys": [],
@@ -412,10 +456,18 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
             raise ValueError("Expected input tensor shaped (batch, 1, length).")
         original_length = input.shape[-1]
         spec = self._stft(input)
-        magnitude = spec.abs().clamp_min(1e-8).pow(0.5)
-        features = magnitude.transpose(1, 2)
+        magnitude = spec.abs().clamp_min(1e-8)
+        if self.feature_domain == "official_log_magnitude":
+            features = torch.log1p(magnitude)
+        else:
+            features = magnitude.pow(0.5)
+        features = features.transpose(1, 2)
         mask = self.mask_generator(features).transpose(1, 2).clamp_min(0.0)
-        enhanced_magnitude = (mask * magnitude).pow(2.0)
+        masked = mask * features.transpose(1, 2)
+        if self.feature_domain == "official_log_magnitude":
+            enhanced_magnitude = torch.expm1(masked).clamp_min(0.0)
+        else:
+            enhanced_magnitude = masked.pow(2.0)
         enhanced_spec = torch.polar(enhanced_magnitude, torch.angle(spec))
         enhanced = self._istft(enhanced_spec, original_length)
         return enhanced[..., :original_length]
@@ -534,6 +586,9 @@ def build_metricgan_standalone(
     native8k: bool = False,
     init_from_pretrained: bool = True,
     arch_name: str | None = None,
+    feature_domain: str = "sqrt_magnitude",
+    window_type: str = "hann",
+    official_checkpoint_sha256: str | None = None,
 ) -> MetricGANLikeEnhancer:
     if variant == "small":
         hidden_size = 200
@@ -555,6 +610,9 @@ def build_metricgan_standalone(
         linear_dim=linear_dim,
         arch_name=resolved_arch_name,
         init_from_pretrained=init_from_pretrained,
+        feature_domain=feature_domain,
+        window_type=window_type,
+        official_checkpoint_sha256=official_checkpoint_sha256,
     )
 
 
@@ -627,6 +685,8 @@ def build_model(
     n_fft: int = 512,
     hop_length: int = 160,
     win_length: int = 320,
+    initialize_from_official: bool = True,
+    official_checkpoint_sha256: str | None = None,
 ) -> nn.Module:
     if variant not in MODEL_VARIANTS:
         raise ValueError(f"Unsupported model variant: {variant}")
@@ -649,6 +709,39 @@ def build_model(
             native8k=True,
             init_from_pretrained=False,
             arch_name=model_family,
+        )
+    if model_family == "metricgan_plus_teacher_official_wb":
+        if spectral_native_gate:
+            raise ValueError(
+                "Official MetricGAN+ WB teacher does not support spectral-native gating."
+            )
+        resolve_bandwidth("wb", sample_rate=sample_rate)
+        if variant != "small":
+            raise ValueError(
+                "The official MetricGAN+ checkpoint requires variant='small'."
+            )
+        expected_frontend = (512, 256, 512)
+        observed_frontend = (int(n_fft), int(hop_length), int(win_length))
+        if observed_frontend != expected_frontend:
+            raise ValueError(
+                "Official MetricGAN+ frontend mismatch: expected "
+                f"n_fft/hop/win={expected_frontend}, got {observed_frontend}."
+            )
+        return build_metricgan_standalone(
+            sample_rate=sample_rate,
+            n_fft=n_fft,
+            hop_length=hop_length,
+            win_length=win_length,
+            variant=variant,
+            native8k=False,
+            init_from_pretrained=bool(initialize_from_official),
+            arch_name=model_family,
+            feature_domain="official_log_magnitude",
+            window_type="hamming",
+            official_checkpoint_sha256=(
+                official_checkpoint_sha256
+                or METRICGAN_PLUS_CHECKPOINT_SHA256
+            ),
         )
     if model_family == "metricgan_plus_native8k":
         if spectral_native_gate:
@@ -711,6 +804,8 @@ def build_enhancer(
     n_fft: int = 512,
     hop_length: int = 160,
     win_length: int = 320,
+    initialize_from_official: bool = True,
+    official_checkpoint_sha256: str | None = None,
 ) -> nn.Module:
     base_model = build_model(
         model_family,
@@ -724,6 +819,8 @@ def build_enhancer(
         n_fft=n_fft,
         hop_length=hop_length,
         win_length=win_length,
+        initialize_from_official=initialize_from_official,
+        official_checkpoint_sha256=official_checkpoint_sha256,
     )
     postfilter_config = resolve_postfilter_config(postfilter_mode, postfilter_preset)
     if not postfilter_config.enabled:

@@ -7,13 +7,15 @@ dataset:
 
 teacher:
   role: "teacher"
-  family: "metricgan_plus_teacher_wb"
+  family: "metricgan_plus_teacher_official_wb"
   bandwidth: "wb"
   sample_rate: 16000
   n_fft: 512
-  hop_length: 160
-  win_length: 320
+  hop_length: 256
+  win_length: 512
   evaluation_reference_bandwidth: "wb"
+  initialization: "speechbrain/metricgan-plus-voicebank"
+  checkpoint_sha256: "147bfb866bac8264603546e035bf283370e716ed2f4b7412d308d2bcee88304f"
 
 students:
   wb:
@@ -37,29 +39,45 @@ students:
 
 metric_discriminator:
   target_metric: "PESQ"
-  separate_proxy_profiles: ["wb", "nb"]
+  proxy_profiles: ["wb"]
+  scope: "teacher_finetune_only"
   generator_weight: 0.25
   frozen_during_generator_update: true
 
-ablations:
-  - name: "teacher_baseline"
+stages:
+  - name: "official_teacher_baseline"
+    role: "teacher"
+    loss: "frozen_checkpoint"
+  - name: "student_wb_from_official"
+    role: "student_wb"
+    loss: "D1"
+  - name: "student_nb_from_official"
+    role: "student_nb"
+    loss: "D1"
+  - name: "teacher_finetune_control"
     role: "teacher"
     loss: "T0"
-  - name: "teacher_metric"
+  - name: "teacher_finetune_metric"
     role: "teacher"
     loss: "T0_PESQ"
-  - name: "student_wb_baseline"
+  - name: "student_wb_from_improved"
     role: "student_wb"
     loss: "D1"
-  - name: "student_wb_metric"
-    role: "student_wb"
-    loss: "D1_PESQ"
-  - name: "student_nb_baseline"
+  - name: "student_nb_from_improved"
     role: "student_nb"
     loss: "D1"
-  - name: "student_nb_metric"
-    role: "student_nb"
-    loss: "D1_PESQ"
+
+teacher_promotion_gate:
+  selection_split: "val_select"
+  minimum_pesq_gain: 0.01
+  maximum_stoi_drop: 0.002
+  maximum_sisdr_drop: 0.25
+
+teacher_cache:
+  location: "desktop_local_only"
+  key: "teacher_checkpoint_sha256 + train_manifest_sha256"
+  cache_inputs: false
+  storage_dtype: "float16"
 
 tts_extension:
   status: "planned_separate_domain_calibration"

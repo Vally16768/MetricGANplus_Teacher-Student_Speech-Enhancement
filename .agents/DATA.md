@@ -39,7 +39,10 @@ Audio is loaded read-only and resampled in memory:
 - student NB: noisy and the matching clean reference at 8 kHz.
 
 No resampled audio is written back to the dataset. Regenerable teacher caches
-and run outputs belong under ignored/project artifact roots.
+and run outputs belong under ignored/project artifact roots. Canonical teacher
+caches are Desktop-local, content-addressed, store teacher targets in FP16 and
+leave noisy/clean cache fields empty; the student loader falls back to the
+external read-only pair paths.
 
 For each manifest record:
 

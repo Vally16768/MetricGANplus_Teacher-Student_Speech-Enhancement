@@ -38,6 +38,13 @@ Antrenarea nouă folosește exclusiv datasetul extern, read-only,
 - evaluare WB cu referință WB și PESQ-WB;
 - evaluare NB cu referință NB și PESQ-NB.
 
+Prima etapă folosește checkpoint-ul oficial
+`speechbrain/metricgan-plus-voicebank`, fixat prin revizie și SHA-256, pentru a
+antrena studenții S0-WB și S0-NB. A doua etapă îmbunătățește teacher-ul pornind
+din același checkpoint, îl promovează numai după un câștig PESQ-WB real pe
+`val_select` și guardrails STOI/SI-SDR, apoi antrenează de la zero studenții
+S1-WB și S1-NB. Comparațiile S1–S0 izolează astfel schimbarea teacher-ului.
+
 Planul verificabil este în
 [`research_plan_voicebank_wb_nb.yaml`](code_and_documentation/configs/research_plan_voicebank_wb_nb.yaml).
 Poate fi auditat fără dataset:
@@ -57,6 +64,11 @@ Git.
 manifestele aparțin exclusiv VoiceBank+DEMAND. Comenzile de antrenare/cache
 refuză CPU și un mediu diferit de venv-ul shared; validarea read-only, testele
 și auditurile pot rula pe CPU.
+
+Output-urile teacher-ului sunt memorate într-un cache persistent, ignorat de
+Git și aflat local pe Desktop. Cache-ul este identificat prin hash-urile
+checkpoint-ului și manifestului, păstrează în FP16 numai waveform-ul teacher și
+masca ERB și nu copiază fișierele noisy/clean din dataset.
 
 Controlerul canonic este `campaign.py`:
 
@@ -79,9 +91,11 @@ nu produc rezultate promovabile.
 ## Discriminatorul metric și extensia TTS
 
 PESQ nu este folosit direct ca o funcție diferențiabilă. Un predictor PESQ
-înghețat furnizează gradientul pentru generator. Studiul compară baseline versus
-obiectiv metric pentru teacher, student WB și student NB, cu proxy-uri WB/NB
-separate.
+înghețat furnizează gradientul pentru generator. În campania canonică actuală,
+ablation-ul metric este aplicat teacher-ului WB. Studenții S0 și S1 folosesc
+același obiectiv de distilare `D1`, aceeași arhitectură și același schedule;
+singura variabilă intenționată este teacher-ul. Un viitor ablation metric direct
+pe studenți trebuie declarat separat și ar necesita proxy-uri WB/NB distincte.
 
 Interfața `MetricGANGeneratorObjective` poate fi conectată ulterior la un
 generator TTS. Aceasta este momentan o direcție planificată: proxy-ul trebuie

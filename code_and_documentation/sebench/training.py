@@ -1300,6 +1300,7 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
         n_fft=config.n_fft,
         hop_length=config.hop_length,
         win_length=config.win_length,
+        initialize_from_official=not bool(config.init_checkpoint),
     ).to(config.device)
     if config.init_checkpoint:
         init_package = load_checkpoint_package(config.init_checkpoint, map_location="cpu")

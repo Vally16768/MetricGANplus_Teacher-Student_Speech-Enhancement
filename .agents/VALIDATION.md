@@ -12,6 +12,8 @@
 | Evaluation/metrics | fixture metric test + sample-count reconciliation |
 | Bandwidth/profile | explicit WB/NB contract + reference/mode metadata test |
 | Metric discriminator | proxy calibration + frozen weights + generator gradient smoke + true-metric ablation |
+| Official checkpoint | pinned revision + SHA-256 + exact tensor mapping + offline package round-trip + true PESQ diagnostic |
+| Teacher cache | outside dataset + no input duplication + dtype/error bound + resume + manifest fallback |
 | Architecture | all relevant tests + architecture register/hash update |
 | Experiment promotion | run contract + independent metric recomputation |
 
@@ -62,8 +64,8 @@ metric/reference profile matches the run profile
 - metric-objective teacher/student backward smoke: passed.
 - local shared environment prefix and CUDA resolution: passed on 2026-07-26.
 - safe checkpoint/proxy restricted-load round trips: passed.
-- unit/integration suite: 30/30 passed on 2026-07-27 after cleanup, monitoring
-  and WB/NB ERB extraction changes.
+- unit/integration suite: 37/37 passed on 2026-07-27 after the official-teacher,
+  two-stage campaign and local FP16 cache changes.
 - stable post-cleanup VoiceBank-only six-cell GPU smoke: passed as
   `20260727-postcleanup-smoke-wbnb-s0-a5` on one NVIDIA GTX 1660 Ti.
 - reported sample reconciliation: 36 unique paths, 36 files present.
@@ -81,9 +83,19 @@ metric/reference profile matches the run profile
 - causal-max structural audit passed: WB `604386` parameters, NB `514018`,
   GRU hidden size `160`, three layers, linear size `224`, fixed 16 ms
   lookahead.
-- 32/32 unit/integration tests and the research-plan validator passed after the
-  architecture change.
+- official teacher structure passed: exact 512/256/512 Hamming/log-magnitude
+  frontend, 1,895,514 parameters, 21/21 mapped generator tensors and zero
+  skipped tensors.
+- official checkpoint package round-trip passed without accessing the remote
+  model/cache loader.
+- pinned official checkpoint loaded on CUDA and produced PESQ-WB 3.340675,
+  STOI 0.933437 and SI-SDR 9.192374 on the frozen four-row smoke test support.
+- local teacher-cache tests passed: FP16 teacher waveform/mask payloads,
+  no noisy/clean copies, float32 loader output, maximum waveform quantization
+  error below 0.0005 and successful resume validation.
+- 37/37 unit/integration tests and the research-plan validator passed after the
+  architecture and campaign change.
 - direct two-second WB and NB forward/backward passes completed on the shared
   venv's NVIDIA GTX 1660 Ti with finite gradients.
-- a new end-to-end six-cell smoke and independent audit remain required before
-  the next pilot/full gate.
+- a new end-to-end seven-cell two-stage smoke and independent audit remain
+  required before the next pilot/full gate.

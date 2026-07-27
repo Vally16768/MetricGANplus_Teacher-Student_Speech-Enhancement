@@ -42,12 +42,13 @@ from sebench.training import ExperimentConfig, run_experiment  # noqa: E402
 
 
 CELL_ORDER = (
-    "T-WB-BASE",
-    "T-WB-METRIC",
-    "S-WB-BASE",
-    "S-WB-METRIC",
-    "S-NB-BASE",
-    "S-NB-METRIC",
+    "T0-WB-OFFICIAL",
+    "S0-WB",
+    "S0-NB",
+    "T1-WB-BASE",
+    "T1-WB-METRIC",
+    "S1-WB",
+    "S1-NB",
 )
 
 
@@ -118,6 +119,23 @@ def validate_campaign_config(config: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("runtime.run_root must be outside the manifest input root.")
     if str(config["runtime"].get("device", "")).lower() == "cpu":
         raise ValueError("Canonical campaign training is GPU-only.")
+    cache_root = Path(
+        str(config.get("teacher_cache", {}).get("root") or "")
+    ).expanduser().resolve()
+    if not str(config.get("teacher_cache", {}).get("root") or "").strip():
+        raise ValueError("teacher_cache.root is required.")
+    if _is_within(cache_root, manifest_root):
+        raise ValueError("teacher_cache.root must be outside the manifest input root.")
+    if not _is_within(cache_root, run_root.parent):
+        raise ValueError(
+            "teacher_cache.root must remain inside the Desktop-local runtime area."
+        )
+    if bool(config["teacher_cache"].get("cache_inputs", True)):
+        raise ValueError(
+            "Canonical cache must not duplicate noisy/clean dataset inputs."
+        )
+    if str(config["teacher_cache"].get("storage_dtype")) != "float16":
+        raise ValueError("Canonical cache storage_dtype must be float16.")
 
     sets: dict[str, dict[str, set[str]]] = {}
     for name, path in manifests.items():
@@ -148,6 +166,7 @@ def validate_campaign_config(config: dict[str, Any]) -> dict[str, Any]:
             for name, path in manifests.items()
         },
         "overlaps": overlaps,
+        "teacher_cache_root": cache_root.as_posix(),
         "valid": True,
     }
 
@@ -352,9 +371,12 @@ def _experiment_config(
     proxy_checkpoint: str | None = None,
     teacher_cache_manifest: str | None = None,
     include_test: bool = True,
+    evaluate_init_checkpoint: bool = False,
+    frontend: dict[str, int] | None = None,
     mode: str,
 ) -> ExperimentConfig:
     profile = resolve_bandwidth(bandwidth)
+    model_frontend = dict(frontend or profile.as_dict())
     effective = _effective_training(config, mode)
     evaluation = dict(config["evaluation"])
     if mode != "full":
@@ -409,7 +431,7 @@ def _experiment_config(
         mlflow_artifact_root=(run_root / "tracking" / "artifacts").as_posix(),
         experiment_name=f"voicebank_{run_root.name}",
         selection_metric="val_select/pesq_mean",
-        evaluate_init_checkpoint=False,
+        evaluate_init_checkpoint=bool(evaluate_init_checkpoint),
         pesq_proxy_checkpoint=proxy_checkpoint,
         metric_proxy_weight=float(effective["metric_proxy_weight"]),
         eval_dnsmos=False,
@@ -425,11 +447,11 @@ def _experiment_config(
         erb_bands=int(config["model"]["erb_bands"]),
         context_frames=5,
         init_checkpoint=init_checkpoint,
-        sample_rate=profile.sample_rate,
+        sample_rate=int(model_frontend["sample_rate"]),
         bandwidth=profile.name,
-        n_fft=profile.n_fft,
-        hop_length=profile.hop_length,
-        win_length=profile.win_length,
+        n_fft=int(model_frontend["n_fft"]),
+        hop_length=int(model_frontend["hop_length"]),
+        win_length=int(model_frontend["win_length"]),
         log_torch_model=False,
         log_system_metrics=False,
     )
@@ -465,9 +487,10 @@ def _build_cache(
     *,
     run_root: Path,
     teacher_checkpoint: str,
+    cache_label: str,
     mode: str,
 ) -> dict[str, str]:
-    stage = "TEACHER-CACHE-WB-NB"
+    stage = f"TEACHER-CACHE-{cache_label.upper()}-WB-NB"
     _mark_stage(run_root, stage=stage, status="running")
     try:
         teacher, _ = load_model_from_checkpoint(
@@ -475,7 +498,14 @@ def _build_cache(
             device=str(config["runtime"]["device"]),
         )
         effective = _effective_training(config, mode)
-        cache_root = run_root / "teacher_cache"
+        checkpoint_hash = sha256(teacher_checkpoint)
+        manifest_hash = sha256(str(config["dataset"]["train_fit"]))
+        cache_key = f"{checkpoint_hash[:16]}-{manifest_hash[:16]}"
+        cache_config = dict(config["teacher_cache"])
+        cache_root = (
+            Path(str(cache_config["root"])).expanduser().resolve()
+            / f"{cache_label}-{cache_key}"
+        )
         result = build_multi_target_teacher_cache(
             str(config["dataset"]["train_fit"]),
             teacher,
@@ -492,14 +522,33 @@ def _build_cache(
             persistent_workers=int(effective["num_workers"]) > 0,
             prefetch_factor=2,
             write_workers=0,
-            resume=False,
+            resume=True,
             validate_existing=True,
+            cache_inputs=bool(cache_config["cache_inputs"]),
+            storage_dtype=str(cache_config["storage_dtype"]),
         )
+        metadata = {
+            "schema_version": 1,
+            "cache_label": cache_label,
+            "cache_key": cache_key,
+            "teacher_checkpoint_sha256": checkpoint_hash,
+            "train_manifest_sha256": manifest_hash,
+            "teacher_sample_rate": 16_000,
+            "targets": {
+                "wb": {"sample_rate": 16_000, "erb_bands": 32},
+                "nb": {"sample_rate": 8_000, "erb_bands": 32},
+            },
+            "cache_inputs": bool(cache_config["cache_inputs"]),
+            "storage_dtype": str(cache_config["storage_dtype"]),
+            "manifests": result,
+            "status": "complete",
+        }
+        _atomic_json(cache_root / "cache_metadata.json", metadata)
         _mark_stage(
             run_root,
             stage=stage,
             status="completed",
-            details={"manifests": result},
+            details=metadata,
         )
         return result
     except BaseException as exc:
@@ -563,10 +612,14 @@ def _proxy(
 
 
 def _best_teacher(
+    official: dict[str, Any],
     baseline: dict[str, Any],
     metric: dict[str, Any],
-) -> tuple[str, dict[str, Any]]:
-    candidates = {"T-WB-BASE": baseline, "T-WB-METRIC": metric}
+    *,
+    config: dict[str, Any],
+    verification_only: bool,
+) -> tuple[str, dict[str, Any], dict[str, Any]]:
+    candidates = {"T1-WB-BASE": baseline, "T1-WB-METRIC": metric}
     name = max(
         candidates,
         key=lambda key: float(
@@ -574,14 +627,50 @@ def _best_teacher(
             or float("-inf")
         ),
     )
-    return name, candidates[name]
+    selected = candidates[name]
+    official_metrics = dict(official.get("val_select_metrics") or {})
+    selected_metrics = dict(selected.get("val_select_metrics") or {})
+    training = dict(config["training"])
+    deltas = {
+        metric_name: float(selected_metrics.get(metric_name, float("nan")))
+        - float(official_metrics.get(metric_name, float("nan")))
+        for metric_name in (
+            "pesq_mean",
+            "stoi_mean",
+            "sisdr_mean",
+            "delta_snr_mean",
+        )
+    }
+    checks = {
+        "pesq_gain": deltas["pesq_mean"]
+        >= float(training["teacher_min_pesq_gain"]),
+        "stoi_guardrail": deltas["stoi_mean"]
+        >= -float(training["teacher_max_stoi_drop"]),
+        "sisdr_guardrail": deltas["sisdr_mean"]
+        >= -float(training["teacher_max_sisdr_drop"]),
+    }
+    gate_passed = all(checks.values())
+    gate = {
+        "selected_candidate": name,
+        "official_teacher": "T0-WB-OFFICIAL",
+        "val_select_deltas": deltas,
+        "checks": checks,
+        "passed": gate_passed,
+        "verification_override": bool(verification_only and not gate_passed),
+    }
+    if not gate_passed and not verification_only:
+        raise RuntimeError(
+            "No fine-tuned teacher passed the predeclared improvement gate: "
+            f"{gate}"
+        )
+    return name, selected, gate
 
 
 def _metric_rows(cells: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for cell in CELL_ORDER:
         summary = cells[cell]
-        bandwidth = "nb" if "-NB-" in cell else "wb"
+        bandwidth = "nb" if "-NB" in cell else "wb"
         for split_key, split_label in (
             ("val_rank_metrics", "val_rank"),
             ("val_select_metrics", "val_select"),
@@ -607,6 +696,7 @@ def _write_report(
     cells: dict[str, dict[str, Any]],
     proxies: dict[str, dict[str, Any]],
     selected_teacher: str,
+    teacher_gate: dict[str, Any],
     mode: str,
     verification_only: bool,
 ) -> dict[str, Any]:
@@ -628,9 +718,10 @@ def _write_report(
 
     deltas: dict[str, dict[str, float]] = {}
     pairs = {
-        "teacher_wb": ("T-WB-BASE", "T-WB-METRIC"),
-        "student_wb": ("S-WB-BASE", "S-WB-METRIC"),
-        "student_nb": ("S-NB-BASE", "S-NB-METRIC"),
+        "teacher_control_vs_official": ("T0-WB-OFFICIAL", "T1-WB-BASE"),
+        "teacher_metric_vs_official": ("T0-WB-OFFICIAL", "T1-WB-METRIC"),
+        "student_wb_after_teacher_upgrade": ("S0-WB", "S1-WB"),
+        "student_nb_after_teacher_upgrade": ("S0-NB", "S1-NB"),
     }
     for label, (baseline, metric) in pairs.items():
         baseline_metrics = dict(cells[baseline].get("test_metrics") or {})
@@ -671,9 +762,10 @@ def _write_report(
         "dataset": "VoiceBank+DEMAND",
         "verification_only": verification_only,
         "selected_teacher": selected_teacher,
+        "teacher_promotion_gate": teacher_gate,
         "cells": cells,
         "metric_proxies": proxies,
-        "deltas_metric_minus_baseline": deltas,
+        "paired_deltas": deltas,
         "model_inventory": model_inventory,
         "canonical_metrics_csv": csv_path.as_posix(),
         "test_pesq_plot": figure_path.as_posix(),
@@ -686,7 +778,7 @@ def _write_report(
         "",
         f"Selected teacher by val_select PESQ: `{selected_teacher}`.",
         "",
-        "## Metric-aware deltas",
+        "## Paired stage deltas",
         "",
     ]
     for label, values in deltas.items():
@@ -746,7 +838,7 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
     reported_samples: set[Path] = set()
     for cell in CELL_ORDER:
         payload = dict(cells.get(cell) or {})
-        bandwidth = "nb" if "-NB-" in cell else "wb"
+        bandwidth = "nb" if "-NB" in cell else "wb"
         profile = PROFILES[bandwidth]
         for split_key, split_label in (
             ("val_rank_metrics", "val_rank"),
@@ -816,6 +908,11 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
         issues.append("verification_only mismatch between summary and provenance")
     if verification_only and bool(status.get("valid_for_promotion")):
         issues.append("verification-only run incorrectly marked promotable")
+    teacher_gate = dict(summary.get("teacher_promotion_gate") or {})
+    if not teacher_gate:
+        issues.append("missing teacher promotion gate")
+    elif not verification_only and not bool(teacher_gate.get("passed")):
+        issues.append("full run teacher promotion gate did not pass")
 
     result = {
         "schema_version": 1,
@@ -918,63 +1015,84 @@ def run_all(
         )
         return result
 
-    anchor = execute(
-        "T-WB-ANCHOR",
-        lambda: _run_cell(
+    teacher_frontend = dict(config["model"]["teacher_frontend"])
+    common_official_teacher = {
+        "config": config,
+        "run_root": run_root,
+        "family": str(config["model"]["teacher_family"]),
+        "bandwidth": "wb",
+        "lr": float(effective["teacher_branch_lr"]),
+        "seed": int(effective["seed"]),
+        "frontend": teacher_frontend,
+        "include_test": True,
+        "mode": mode,
+    }
+    cells["T0-WB-OFFICIAL"] = _run_cell(
+        **common_official_teacher,
+        cell="T0-WB-OFFICIAL",
+        loss_recipe="T0",
+        epochs=0,
+        evaluate_init_checkpoint=True,
+    )
+    official_cache_manifests = _build_cache(
+        config,
+        run_root=run_root,
+        teacher_checkpoint=str(cells["T0-WB-OFFICIAL"]["checkpoint_out"]),
+        cache_label="official",
+        mode=mode,
+    )
+
+    for bandwidth in ("wb", "nb"):
+        cell = f"S0-{bandwidth.upper()}"
+        cells[cell] = _run_cell(
             config=config,
             run_root=run_root,
-            cell="T-WB-ANCHOR",
-            family=str(config["model"]["teacher_family"]),
-            bandwidth="wb",
-            loss_recipe="T0",
-            epochs=int(effective["teacher_anchor_epochs"]),
-            lr=float(effective["teacher_lr"]),
+            cell=cell,
+            family=str(config["model"][f"student_{bandwidth}_family"]),
+            bandwidth=bandwidth,
+            loss_recipe="D1",
+            epochs=int(effective["student_epochs"]),
+            lr=float(effective["student_lr"]),
             seed=int(effective["seed"]),
-            include_test=False,
+            teacher_cache_manifest=official_cache_manifests[bandwidth],
             mode=mode,
-        ),
-    )
+        )
+
     proxies["wb"] = execute(
         "PROXY-WB",
         lambda: _proxy(
             config,
             run_root=run_root,
             bandwidth="wb",
-            candidate_teacher_checkpoint=str(anchor["checkpoint_out"]),
+            candidate_teacher_checkpoint=str(
+                cells["T0-WB-OFFICIAL"]["checkpoint_out"]
+            ),
             mode=mode,
         ),
     )
-    common_teacher = {
-        "config": config,
-        "run_root": run_root,
-        "family": str(config["model"]["teacher_family"]),
-        "bandwidth": "wb",
+    common_finetuned_teacher = {
+        **common_official_teacher,
         "epochs": int(effective["teacher_branch_epochs"]),
-        "lr": float(effective["teacher_branch_lr"]),
-        "seed": int(effective["seed"]),
-        "init_checkpoint": str(anchor["checkpoint_out"]),
-        "mode": mode,
+        "init_checkpoint": str(cells["T0-WB-OFFICIAL"]["checkpoint_out"]),
+        "evaluate_init_checkpoint": True,
     }
-    cells["T-WB-BASE"] = execute(
-        "T-WB-BASE",
-        lambda: _run_cell(
-            **common_teacher,
-            cell="T-WB-BASE",
-            loss_recipe="T0",
-        ),
+    cells["T1-WB-BASE"] = _run_cell(
+        **common_finetuned_teacher,
+        cell="T1-WB-BASE",
+        loss_recipe="T0",
     )
-    cells["T-WB-METRIC"] = execute(
-        "T-WB-METRIC",
-        lambda: _run_cell(
-            **common_teacher,
-            cell="T-WB-METRIC",
-            loss_recipe="T0_PESQ",
-            proxy_checkpoint=str(proxies["wb"]["checkpoint"]),
-        ),
+    cells["T1-WB-METRIC"] = _run_cell(
+        **common_finetuned_teacher,
+        cell="T1-WB-METRIC",
+        loss_recipe="T0_PESQ",
+        proxy_checkpoint=str(proxies["wb"]["checkpoint"]),
     )
-    selected_teacher, selected_summary = _best_teacher(
-        cells["T-WB-BASE"],
-        cells["T-WB-METRIC"],
+    selected_teacher, selected_summary, teacher_gate = _best_teacher(
+        cells["T0-WB-OFFICIAL"],
+        cells["T1-WB-BASE"],
+        cells["T1-WB-METRIC"],
+        config=config,
+        verification_only=verification_only,
     )
     _mark_stage(
         run_root,
@@ -983,58 +1101,31 @@ def run_all(
         details={
             "selected_teacher": selected_teacher,
             "val_select_pesq": selected_summary.get("best_val_select_pesq"),
+            "promotion_gate": teacher_gate,
         },
     )
-    cache_manifests = execute(
-        "TEACHER-CACHE-WB-NB",
-        lambda: _build_cache(
-            config,
-            run_root=run_root,
-            teacher_checkpoint=str(selected_summary["checkpoint_out"]),
-            mode=mode,
-        ),
-    )
-    proxies["nb"] = execute(
-        "PROXY-NB",
-        lambda: _proxy(
-            config,
-            run_root=run_root,
-            bandwidth="nb",
-            candidate_teacher_checkpoint=str(selected_summary["checkpoint_out"]),
-            mode=mode,
-        ),
+    improved_cache_manifests = _build_cache(
+        config,
+        run_root=run_root,
+        teacher_checkpoint=str(selected_summary["checkpoint_out"]),
+        cache_label="improved",
+        mode=mode,
     )
 
     for bandwidth in ("wb", "nb"):
-        prefix = f"S-{bandwidth.upper()}"
-        family = str(config["model"][f"student_{bandwidth}_family"])
-        common_student = {
-            "config": config,
-            "run_root": run_root,
-            "family": family,
-            "bandwidth": bandwidth,
-            "epochs": int(effective["student_epochs"]),
-            "lr": float(effective["student_lr"]),
-            "seed": int(effective["seed"]),
-            "teacher_cache_manifest": cache_manifests[bandwidth],
-            "mode": mode,
-        }
-        cells[f"{prefix}-BASE"] = execute(
-            f"{prefix}-BASE",
-            lambda prefix=prefix, common_student=common_student: _run_cell(
-                **common_student,
-                cell=f"{prefix}-BASE",
-                loss_recipe="D1",
-            ),
-        )
-        cells[f"{prefix}-METRIC"] = execute(
-            f"{prefix}-METRIC",
-            lambda prefix=prefix, bandwidth=bandwidth, common_student=common_student: _run_cell(
-                **common_student,
-                cell=f"{prefix}-METRIC",
-                loss_recipe="D1_PESQ",
-                proxy_checkpoint=str(proxies[bandwidth]["checkpoint"]),
-            ),
+        cell = f"S1-{bandwidth.upper()}"
+        cells[cell] = _run_cell(
+            config=config,
+            run_root=run_root,
+            cell=cell,
+            family=str(config["model"][f"student_{bandwidth}_family"]),
+            bandwidth=bandwidth,
+            loss_recipe="D1",
+            epochs=int(effective["student_epochs"]),
+            lr=float(effective["student_lr"]),
+            seed=int(effective["seed"]),
+            teacher_cache_manifest=improved_cache_manifests[bandwidth],
+            mode=mode,
         )
 
     report = execute(
@@ -1044,12 +1135,14 @@ def run_all(
             cells=cells,
             proxies=proxies,
             selected_teacher=selected_teacher,
+            teacher_gate=teacher_gate,
             mode=mode,
             verification_only=verification_only,
         ),
     )
     provenance["status"] = "evaluated"
     provenance["selected_teacher"] = selected_teacher
+    provenance["teacher_promotion_gate"] = teacher_gate
     provenance["report"] = report["report"]
     _atomic_json(run_root / "provenance" / "provenance.json", provenance)
     _atomic_json(
@@ -1080,7 +1173,9 @@ def run_all(
             "status": final_status,
             "campaign_mode": mode,
             "current_stage": None,
-            "valid_for_promotion": bool(mode == "full" and not git["dirty"]),
+            "valid_for_promotion": bool(
+                mode == "full" and not git["dirty"] and teacher_gate["passed"]
+            ),
         },
     )
     progress_path = run_root / "tracking" / "campaign_progress.json"

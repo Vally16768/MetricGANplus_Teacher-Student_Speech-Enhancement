@@ -14,28 +14,39 @@ runtime:
   device: "cuda"
 
 model:
-  teacher_family: "metricgan_plus_teacher_wb"
+  teacher_family: "metricgan_plus_teacher_official_wb"
+  teacher_frontend:
+    sample_rate: 16000
+    n_fft: 512
+    hop_length: 256
+    win_length: 512
   student_wb_family: "metricgan_plus_student_wb_causal_max"
   student_nb_family: "metricgan_plus_student_nb_causal_max"
   variant: "small"
   erb_bands: 32
 
+teacher_cache:
+  root: "${METRICGAN_RUN_ROOT}/../teacher_cache_store"
+  cache_inputs: false
+  storage_dtype: "float16"
+
 training:
   seed: 0
   batch_size: 8
   num_workers: 4
-  teacher_anchor_epochs: 10
   teacher_branch_epochs: 10
   student_epochs: 20
   proxy_epochs: 8
   proxy_train_rows: 256
   proxy_validation_rows: 64
   proxy_batch_size: 8
-  teacher_lr: 0.0005
   teacher_branch_lr: 0.0001
   student_lr: 0.0005
   proxy_lr: 0.001
   metric_proxy_weight: 0.25
+  teacher_min_pesq_gain: 0.01
+  teacher_max_stoi_drop: 0.002
+  teacher_max_sisdr_drop: 0.25
   grad_clip: 5.0
   amp: true
 
@@ -49,7 +60,6 @@ evaluation:
 pilot:
   batch_size: 4
   num_workers: 2
-  teacher_anchor_epochs: 2
   teacher_branch_epochs: 2
   student_epochs: 3
   proxy_epochs: 4
@@ -65,7 +75,6 @@ pilot:
 smoke:
   batch_size: 2
   num_workers: 0
-  teacher_anchor_epochs: 1
   teacher_branch_epochs: 1
   student_epochs: 1
   proxy_epochs: 1

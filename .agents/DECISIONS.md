@@ -109,3 +109,30 @@ for WB/NB in the earlier MP-SENet teacher–student campaign.
 
 Constraint: transfer architecture only. Do not warm-start from the historical
 weights because their provenance includes non-VoiceBank training data.
+
+## D-014 — Anchor the campaign to the official MetricGAN+ teacher
+
+Decision: stage T0 uses the pinned official
+`speechbrain/metricgan-plus-voicebank` WB generator without retraining. Two
+fresh causal-max students, WB and NB, are trained from its content-addressed
+cache. Stage T1 fine-tunes control and PESQ-proxy teacher branches from the
+same official checkpoint, promotes a branch only after a true-PESQ
+`val_select` gain with STOI/SI-SDR guardrails, regenerates a separate cache and
+trains two fresh S1 students with the same seeds and schedules as S0.
+
+Cause: the former teacher was a simplified reimplementation trained for only
+10 epochs with a mismatched frontend and objective; its test PESQ-WB of 2.529
+was not comparable to the official MetricGAN+ result above 3. The two-stage
+design establishes a credible baseline first and then attributes S1–S0 changes
+only to the teacher upgrade.
+
+## D-015 — Persist only regenerable teacher targets in local FP16 caches
+
+Decision: teacher caches live only in the ignored Desktop-local runtime area,
+are keyed by teacher-checkpoint and training-manifest hashes, store teacher
+waveforms and ERB masks in FP16, and leave noisy/clean cache fields empty so
+the loader reads the external VoiceBank+DEMAND inputs.
+
+Cause: caching avoids repeated teacher inference while preventing duplicated
+dataset audio, Kingston writes and avoidable disk use. Cache precision is
+validated on load; caches remain regenerable and are never Git artifacts.

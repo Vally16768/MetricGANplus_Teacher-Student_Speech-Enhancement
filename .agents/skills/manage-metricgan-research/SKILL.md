@@ -32,8 +32,10 @@ the workflow matching the task.
 - Bind every objective metric to the model profile: WB reference and PESQ-WB
   for WB; NB reference and PESQ-NB for NB. Never compare scores produced under
   different bandwidth protocols as if they were one metric.
-- Use separate WB and NB metric-discriminator checkpoints. A WB PESQ proxy is
-  not a valid NB proxy, and an enhancement proxy is not TTS evidence.
+- Use a WB metric-discriminator checkpoint for canonical T1 teacher
+  fine-tuning. If a direct student-metric ablation is separately declared, use
+  distinct WB and NB proxies; a WB proxy is not valid for NB, and an
+  enhancement proxy is not TTS evidence.
 - Reject MP-SENet, FullSubNet, CMGAN and unrelated project artifacts from the
   canonical pipeline.
 - Keep datasets, audio, generated caches and machine-local configs out of Git.
@@ -83,14 +85,25 @@ Require:
 Execute in order:
 
 ```text
-prepare_data -> split audit -> WB teacher baseline/metric ablation -> teacher gate
--> WB+NB teacher caches -> WB student baseline/metric ablation
--> NB student baseline/metric ablation -> student gates -> QAT
--> bandwidth-matched evaluation -> report -> audit
+prepare_data -> split audit -> pinned official WB teacher T0
+-> content-addressed local WB+NB cache C0 -> fresh S0-WB + S0-NB
+-> T1 control/metric teacher fine-tuning -> true-metric teacher gate
+-> content-addressed local WB+NB cache C1 -> fresh S1-WB + S1-NB
+-> paired bandwidth-matched evaluation -> report -> audit
 ```
 
 Stop downstream work when a gate fails. Do not reinterpret a partial run as
 end-to-end evidence.
+
+The canonical teacher gate requires a predeclared positive true PESQ-WB delta
+on `val_select` plus STOI/SI-SDR guardrails. Test is never a selection input.
+Smoke/pilot may continue after a failed gate only as explicitly
+`verification_only`; such runs can never be promoted.
+
+Teacher caches must stay in the ignored Desktop-local runtime area, outside
+the dataset and Git. Key them by teacher checkpoint and frozen training
+manifest, store regenerable teacher targets in validated FP16, and do not copy
+noisy/clean dataset audio into the cache.
 
 Use `campaign.py monitor-run --run-dir <run-dir>` throughout pilot/full
 execution. Reconcile the active campaign stage with the current cell epoch,
@@ -118,8 +131,8 @@ speech-enhancement campaign.
 
 Use `scripts/run_contract.py validate --stage canonical`.
 Use `campaign.py audit-run --run-dir <run-dir>` first to reconcile the
-six-cell campaign CSV, profile metadata, reported samples, model sizes/hashes
-and report artifacts.
+seven-cell campaign CSV, profile metadata, teacher promotion gate, reported
+samples, model sizes/hashes and report artifacts.
 
 Promote only when:
 

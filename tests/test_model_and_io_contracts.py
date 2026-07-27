@@ -4,6 +4,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import torch
 
@@ -19,7 +20,12 @@ from sebench.losses import (  # noqa: E402
     load_pesq_proxy_checkpoint,
     save_pesq_proxy_checkpoint,
 )
-from sebench.models import build_enhancer, build_metricgan_causal_lite  # noqa: E402
+from sebench.models import (  # noqa: E402
+    METRICGAN_PLUS_CHECKPOINT_SHA256,
+    MetricGANPlusAdapter,
+    build_enhancer,
+    build_metricgan_causal_lite,
+)
 
 
 class IOContractTests(unittest.TestCase):
@@ -202,6 +208,103 @@ class StudentArchitectureTests(unittest.TestCase):
             restored = load_pesq_proxy_checkpoint(checkpoint)
         self.assertEqual(restored.bandwidth, "nb")
         self.assertEqual(restored.sample_rate, 8000)
+
+
+class OfficialTeacherTests(unittest.TestCase):
+    @staticmethod
+    def _official_shaped_state() -> dict[str, torch.Tensor]:
+        template = build_enhancer(
+            "metricgan_plus_teacher_official_wb",
+            "small",
+            sample_rate=16000,
+            n_fft=512,
+            hop_length=256,
+            win_length=512,
+            initialize_from_official=False,
+        )
+        reverse_prefixes = (
+            ("mask_generator.blstm.", "blstm.rnn."),
+            ("mask_generator.linear1.", "linear1."),
+            ("mask_generator.linear2.", "linear2."),
+            ("mask_generator.learnable_sigmoid.", "Learnable_sigmoid."),
+        )
+        result = {}
+        for index, (key, value) in enumerate(template.state_dict().items(), start=1):
+            source_key = key
+            for target_prefix, official_prefix in reverse_prefixes:
+                source_key = source_key.replace(target_prefix, official_prefix)
+            result[source_key] = torch.full_like(value, float(index) / 100.0)
+        return result
+
+    def test_official_teacher_frontend_and_architecture_are_exact(self) -> None:
+        fake_state = self._official_shaped_state()
+        with mock.patch.object(
+            MetricGANPlusAdapter,
+            "pretrained_generator_state_dict",
+            return_value=fake_state,
+        ):
+            model = build_enhancer(
+                "metricgan_plus_teacher_official_wb",
+                "small",
+                sample_rate=16000,
+                n_fft=512,
+                hop_length=256,
+                win_length=512,
+            )
+        self.assertEqual(model.model_config["feature_domain"], "official_log_magnitude")
+        self.assertEqual(model.model_config["window_type"], "hamming")
+        self.assertEqual(model.model_config["official_checkpoint_sha256"], METRICGAN_PLUS_CHECKPOINT_SHA256)
+        self.assertEqual(
+            model.model_config["official_revision"],
+            "a196ce26b3bdace6fa1d819017584bdbcce462a8",
+        )
+        self.assertEqual(model.pretrained_init_summary["loaded_key_count"], 21)
+        self.assertEqual(model.pretrained_init_summary["skipped_key_count"], 0)
+        self.assertEqual(sum(parameter.numel() for parameter in model.parameters()), 1_895_514)
+        waveform = torch.randn(1, 1, 2048)
+        enhanced = model(waveform)
+        self.assertEqual(tuple(enhanced.shape), tuple(waveform.shape))
+        self.assertTrue(torch.isfinite(enhanced).all())
+
+    def test_official_teacher_rejects_wrong_frontend(self) -> None:
+        with self.assertRaisesRegex(ValueError, "frontend mismatch"):
+            build_enhancer(
+                "metricgan_plus_teacher_official_wb",
+                "small",
+                sample_rate=16000,
+                n_fft=512,
+                hop_length=160,
+                win_length=320,
+                initialize_from_official=False,
+            )
+
+    def test_official_teacher_checkpoint_round_trip_is_offline(self) -> None:
+        model = build_enhancer(
+            "metricgan_plus_teacher_official_wb",
+            "small",
+            sample_rate=16000,
+            n_fft=512,
+            hop_length=256,
+            win_length=512,
+            initialize_from_official=False,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            checkpoint = Path(tmp) / "official_teacher.pt"
+            save_checkpoint_package(
+                checkpoint,
+                model,
+                "metricgan_plus_teacher_official_wb",
+                "small",
+            )
+            with mock.patch.object(
+                MetricGANPlusAdapter,
+                "pretrained_generator_state_dict",
+                side_effect=AssertionError("round-trip attempted a network/cache load"),
+            ):
+                restored, package = load_model_from_checkpoint(checkpoint)
+        self.assertEqual(package["model_family"], "metricgan_plus_teacher_official_wb")
+        self.assertFalse(restored.model_config["initialize_from_official"])
+        self.assertEqual(restored.model_config["hop_length"], 256)
 
 
 if __name__ == "__main__":

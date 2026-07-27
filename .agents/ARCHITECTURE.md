@@ -1,6 +1,6 @@
 # Architecture register
 
-Status: `causal-max-student-change-in-validation`; no full run is promoted.
+Status: `official-teacher-two-stage-flow-in-validation`; no full run is promoted.
 
 ## A0 — End-to-end research pipeline
 
@@ -11,23 +11,25 @@ Status: `causal-max-student-change-in-validation`; no full run is promoted.
 [Frozen manifests + split audit]
               |
               v
-[MetricGAN+ WB FP32 teacher, 16 kHz]
-      |                         |
-      +--> [T0 vs T0_PESQ] --> [WB evaluation gate]
+[Official MetricGAN+ WB checkpoint T0]
               |
-              v
-[Regenerable teacher cache]
-      |                    |
-      v                    v
-[WB target, 16 kHz]   [NB target, 8 kHz]
-      |                    |
-      v                    v
-[WB causal student]   [NB causal student]
-      |                    |
-      +---- D1 vs D1_PESQ -+
+              +--> [local cache C0: WB + NB targets]
+              |             |
+              |             +--> [fresh WB student S0]
+              |             +--> [fresh NB student S0]
               |
-              v
-[profile gate -> optional QAT -> one final profile-matched test]
+              +--> [T1 control + T1 PESQ-proxy fine-tuning]
+                            |
+                            v
+                  [true WB val_select gate]
+                            |
+                            +--> [local cache C1: WB + NB targets]
+                                          |
+                                          +--> [fresh WB student S1]
+                                          +--> [fresh NB student S1]
+                                                        |
+                                                        v
+                                      [profile-matched test + paired deltas]
               |
               v
 [Metrics + curves + model + provenance + report]
@@ -55,16 +57,29 @@ Evidence:
 ## A1 — Teacher
 
 ```text
-waveform
-  -> STFT magnitude
-  -> non-causal MetricGAN-like mask generator
-     [2-layer bidirectional LSTM -> Linear -> Linear -> learnable sigmoid]
-  -> magnitude mask + noisy phase
+waveform at 16 kHz
+  -> STFT [FFT 512, hop 256, window 512, Hamming]
+  -> log1p(magnitude)
+  -> official non-causal mask generator
+     [2-layer BLSTM, hidden 200/direction
+      -> Linear 400x300 + LeakyReLU
+      -> Linear 300x257
+      -> 257-bin learnable sigmoid]
+  -> expm1(mask * log-magnitude) + noisy phase
   -> iSTFT enhanced waveform
 ```
 
-Canonical family alias: `metricgan_plus_teacher_wb`, variant `small`;
-bandwidth `wb`; sample rate 16 kHz; frontend 512/160/320.
+Canonical family alias: `metricgan_plus_teacher_official_wb`, variant `small`;
+bandwidth `wb`; sample rate 16 kHz; frontend 512/256/512; 1,895,514 trainable
+parameters. Initialization is the pinned official
+`speechbrain/metricgan-plus-voicebank` generator at revision
+`a196ce26b3bdace6fa1d819017584bdbcce462a8`, checkpoint SHA-256
+`147bfb866bac8264603546e035bf283370e716ed2f4b7412d308d2bcee88304f`.
+All 21 generator tensors must load and none may be skipped.
+
+Saved repository checkpoint packages contain the complete generator state and
+set `initialize_from_official=false`, so evaluation, caching and fine-tuning
+resume offline without an implicit model download.
 
 Historical MetricGAN checkpoint family names remain loadable for compatibility,
 but are not canonical public experiment names. FullSubNet, MP-SENet, CMGAN,
@@ -135,9 +150,12 @@ separate columns/figures and are not pooled.
 ```
 
 The non-differentiable PESQ implementation creates labels for a learned proxy;
-PESQ itself is not differentiated through. `T0_PESQ` is the teacher metric
-condition and `D1_PESQ`/`D2_PESQ` are student metric conditions. WB and NB
-proxies have separate checkpoints and validation records.
+PESQ itself is not differentiated through. `T0_PESQ` is the stage-T1 teacher
+metric condition. The canonical S0/S1 student comparison uses `D1` in both
+stages, with identical architecture, seed and schedule, so the changed teacher
+is the only intended experimental variable. A future direct student-metric
+ablation must restore distinct WB/NB proxies and cannot be mixed into this
+teacher-effect experiment.
 
 `MetricGANGeneratorObjective` exposes the same optimization interface for a
 future TTS generator. That extension is only `planned`: the enhancement proxy
@@ -150,14 +168,14 @@ publication.
 validate
   -> immutable manifest/profile checks
 smoke-all
-  -> T-WB anchor
+  -> T0-WB-OFFICIAL at epoch 0
+  -> persistent dual-profile cache C0
+  -> S0-WB + S0-NB from fresh identical schedules
   -> WB proxy labels/train/calibration
-  -> T-WB-BASE + T-WB-METRIC
-  -> val_select teacher choice
-  -> one dual-profile teacher cache
-  -> NB proxy labels/train/calibration
-  -> S-WB-BASE + S-WB-METRIC
-  -> S-NB-BASE + S-NB-METRIC
+  -> T1-WB-BASE + T1-WB-METRIC from the official checkpoint
+  -> true-metric val_select gate against T0
+  -> persistent dual-profile cache C1
+  -> S1-WB + S1-NB from fresh identical schedules
   -> true-metric aggregation + plots + model hashes + report
 pilot-all
   -> same graph on a larger frozen subset; clean source required
@@ -172,7 +190,9 @@ monitor-run / audit-run
 snapshot. Smoke and pilot are marked `verification_only` and cannot be
 promoted. All training nodes enforce the shared venv and CUDA contract.
 Generated files live below the configured run root, never below the dataset
-root.
+root. Teacher caches are content-addressed by teacher checkpoint and training
+manifest, remain in the Desktop-local ignored runtime area, store teacher
+waveforms/masks as FP16 and do not duplicate noisy/clean dataset audio.
 
 Evidence:
 
@@ -188,6 +208,8 @@ Evidence:
 - first full attempt:
   `20260727-full-wbnb-s0-a1` (user-stopped during the inadequate 96x1 WB
   student; preserved and non-promotable).
+- official-checkpoint diagnostic: 21/21 tensors loaded, 1,895,514 parameters,
+  PESQ-WB 3.3407 on the four-row frozen smoke test support.
 
 ## A6 — Selection boundaries
 
