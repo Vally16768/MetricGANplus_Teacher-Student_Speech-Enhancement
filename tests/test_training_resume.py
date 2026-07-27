@@ -13,7 +13,9 @@ CODE_ROOT = REPO_ROOT / "code_and_documentation"
 sys.path.insert(0, CODE_ROOT.as_posix())
 
 from sebench.training import (  # noqa: E402
+    _capture_rng_state,
     _resume_epoch_position,
+    _restore_rng_state,
     _training_control_state_fields,
 )
 
@@ -156,6 +158,17 @@ class ResumeControlStateTests(unittest.TestCase):
             _resume_epoch_position({"epoch": 7, "reason": "evaluation"}),
             (8, 7),
         )
+
+    def test_rng_state_is_weights_only_serializable(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "rng.pt"
+            torch.save({"rng_state": _capture_rng_state()}, path)
+            payload = torch.load(
+                path,
+                map_location="cpu",
+                weights_only=True,
+            )
+        _restore_rng_state(payload["rng_state"])
 
 
 if __name__ == "__main__":

@@ -194,3 +194,4 @@ calibration, evaluation protocol, provenance and claim set.
 | 2026-07-27 | Closed the converged S0 baseline | `20260727-converged-s0-baseline-a1`; 3 cells/models, 54 samples, zero audit issues | P2 resume robustness |
 | 2026-07-27 | Localized and repaired post-evaluation resume state ordering | focused interrupted/resumed control test matches LR, patience, best state and history | P2.4 full suite |
 | 2026-07-27 | Passed static resume-repair validation | 51/51 tests; canonical config/plan valid; project guard zero issues | P2.6 clean CUDA smoke |
+| 2026-07-27 | Resume smoke A1 stopped before its injected interruption | PyTorch rejected NumPy RNG state encoded as `torch.uint32`; failed run preserved | encode RNG as serializable `int64`, test, rerun A2 |

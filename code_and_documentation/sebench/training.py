@@ -768,7 +768,9 @@ def _capture_rng_state() -> dict[str, Any]:
         "python": random.getstate(),
         "numpy": {
             "bit_generator": numpy_state[0],
-            "state": torch.from_numpy(numpy_state[1].copy()),
+            "state": torch.from_numpy(
+                numpy_state[1].astype(np.int64, copy=True)
+            ),
             "position": int(numpy_state[2]),
             "has_gauss": int(numpy_state[3]),
             "cached_gaussian": float(numpy_state[4]),
