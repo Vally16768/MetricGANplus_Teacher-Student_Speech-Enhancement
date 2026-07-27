@@ -8,6 +8,7 @@ from pathlib import Path
 
 from campaign import (
     CELL_ORDER,
+    _best_teacher,
     _effective_training,
     audit_campaign_run,
     monitor_campaign_run,
@@ -129,6 +130,41 @@ class CampaignAuditTests(unittest.TestCase):
         }
         self.assertEqual(_effective_training(config, "pilot")["student_epochs"], 3)
         self.assertEqual(_effective_training(config, "full")["student_epochs"], 20)
+
+    def test_failed_verification_gate_keeps_official_teacher_downstream(self) -> None:
+        metrics = {
+            "pesq_mean": 3.0,
+            "stoi_mean": 0.93,
+            "sisdr_mean": 9.0,
+            "delta_snr_mean": 0.0,
+        }
+        official = {
+            "checkpoint_out": "official.pt",
+            "val_select_metrics": metrics,
+        }
+        candidate = {
+            "checkpoint_out": "candidate.pt",
+            "val_select_metrics": dict(metrics),
+        }
+        config = {
+            "training": {
+                "teacher_min_pesq_gain": 0.01,
+                "teacher_max_stoi_drop": 0.002,
+                "teacher_max_sisdr_drop": 0.25,
+            }
+        }
+        name, summary, gate = _best_teacher(
+            official,
+            candidate,
+            candidate,
+            config=config,
+            verification_only=True,
+        )
+        self.assertEqual(name, "T0-WB-OFFICIAL")
+        self.assertIs(summary, official)
+        self.assertFalse(gate["passed"])
+        self.assertEqual(gate["selected_candidate"], "T1-WB-BASE")
+        self.assertEqual(gate["downstream_teacher"], "T0-WB-OFFICIAL")
 
     def test_monitor_reads_campaign_and_cell_progress(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

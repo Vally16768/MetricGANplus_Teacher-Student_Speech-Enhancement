@@ -663,6 +663,10 @@ def _best_teacher(
             "No fine-tuned teacher passed the predeclared improvement gate: "
             f"{gate}"
         )
+    if not gate_passed:
+        gate["downstream_teacher"] = "T0-WB-OFFICIAL"
+        return "T0-WB-OFFICIAL", official, gate
+    gate["downstream_teacher"] = name
     return name, selected, gate
 
 

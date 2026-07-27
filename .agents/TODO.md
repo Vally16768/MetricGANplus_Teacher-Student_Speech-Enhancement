@@ -15,7 +15,7 @@ Update this register whenever a gate changes state.
 | C08 | Implement NB student baseline/metric pair | NB profile/proxy; GPU smoke | passed |
 | C09 | Implement true-metric evaluation and aggregation | profile metadata/support in canonical CSV/JSON | passed |
 | C10 | Implement plots and academic report | curves, calibration, deltas, hashes, report and independent auditor | passed |
-| C11 | Run unit/integration suite | 37/37 tests passed, including official-teacher and FP16 cache contracts | passed |
+| C11 | Run unit/integration suite | 38/38 tests passed, including official-teacher, failed-gate fallback and FP16 cache contracts | passed |
 | C12 | Run GPU end-to-end smoke | stable post-cleanup `...-a5`: six cells, six models, 36/36 samples, zero audit issues | passed |
 | C13 | Run canonical full/pilot experiments | pilot passed; first full `...-a1` stopped during inadequate legacy WB student and is invalid; replacement rerun pending | failed |
 | C14 | Audit and promote only valid outputs | pilot reconciles 0 issues but is non-promotable; stopped full documented and excluded; no full result | blocked |
@@ -23,7 +23,7 @@ Update this register whenever a gate changes state.
 | C16 | Final docs/privacy/scope audit | project guard passed with zero issues after authorized cleanup | passed |
 | C17 | Recover stronger MP-SENet-campaign student architecture | exact causal-max architecture traced; external sources read-only; mixed-dataset weights explicitly excluded | passed |
 | C18 | Implement causal-max aliases for WB/NB | new names preserve 96x1 checkpoint semantics; configs and research plan updated | passed |
-| C19 | Validate causal-max architecture | 37/37 tests and direct WB/NB CUDA backward passed; end-to-end two-stage smoke/audit pending | in-progress |
+| C19 | Validate causal-max architecture | 38/38 tests and direct WB/NB CUDA backward passed; end-to-end two-stage smoke/audit pending | in-progress |
 | C20 | Rerun pilot/full with causal-max students | only after clean committed two-stage smoke passes; compare S1 versus S0 within profile | blocked |
 | C21 | Explain low teacher PESQ against the original implementation | simplified 10-epoch teacher/frontend/loss mismatch isolated; official primary sources and checkpoint inspected | passed |
 | C22 | Import the official MetricGAN+ WB teacher reproducibly | pinned revision/SHA-256; exact 512/256/512 Hamming log-magnitude frontend; 21/21 tensors; offline checkpoint round-trip | passed |
