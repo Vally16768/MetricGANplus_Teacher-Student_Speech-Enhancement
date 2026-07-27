@@ -176,9 +176,11 @@ experimental variable. A future direct student-metric ablation must restore
 distinct WB/NB proxies and cannot be mixed into this teacher-effect experiment.
 
 The earlier bounded frozen-proxy branch remains historical negative evidence,
-not the canonical T1 implementation. The alternating branch still requires a
-clean real-GPU smoke and pilot; code presence alone does not establish teacher
-improvement.
+not the canonical T1 implementation. The alternating branch passed structural
+smoke but failed its clean pilot promotion gate: current-output D calibration
+degraded and the true `val_select` PESQ gain was only +0.00221. The next
+experiment must remain teacher-only until calibration and the true-metric gate
+pass; code presence and structural execution do not establish improvement.
 
 `MetricGANGeneratorObjective` exposes the same optimization interface for a
 future TTS generator. That extension is only `planned`: the enhancement proxy
@@ -255,6 +257,10 @@ Evidence:
   `20260727-alternating-teacher-smoke-s0-a2` on commit `f5003ef` (seven
   cells/models, current/history/current refresh and generated-only local
   replay, 42 samples, T0 fallback, audit zero issues).
+- alternating-D pilot:
+  `20260727-alternating-teacher-pilot-s0-a1` on commit `9ad2b85` (seven
+  cells/models, 84 samples, +0.00221 `val_select` PESQ below gate,
+  current-output D calibration degradation, T0 fallback, audit zero issues).
 
 ## A6 — Selection boundaries
 

@@ -192,6 +192,23 @@ SpeechBrain recipe missing from both failed frozen-proxy pilots. It directly
 addresses generator-induced distribution shift while preserving the external
 read-only dataset and reproducible resume state.
 
-Constraint: implementation status is not evidence of improvement. C30 remains
-open until a clean GPU smoke passes; pilot/full remain gated by true
-`val_select` PESQ and STOI/SI-SDR.
+Constraint: implementation status is not evidence of improvement. C30 passed
+its structural smoke, but the following pilot failed; full remains gated by
+true `val_select` PESQ and STOI/SI-SDR.
+
+## D-019 — Stop downstream work after a failed teacher gate
+
+Decision: the next fidelity experiment is teacher-only. It must use at least
+100 current outputs per discriminator refresh, record a current-output
+calibration guard, and stop before regenerating teacher caches or training S1
+students unless T1 gains at least 0.01 true PESQ-WB on `val_select` while
+passing the STOI/SI-SDR guardrails.
+
+Cause: alternating pilot `20260727-alternating-teacher-pilot-s0-a1` produced
+only +0.00221 `val_select` PESQ and -0.02029 test PESQ. Current-output D MAE
+degraded from 1.5002 to 1.7555 and predicted PESQ exceeded the warm-start
+calibration range. The T0 anchor prevented collapse, but repeated S1 training
+after the failed gate only reproduced S0 and consumed GPU time.
+
+Constraint: test remains reporting-only. Do not tune discriminator epochs,
+learning rates or stopping from the observed test delta.

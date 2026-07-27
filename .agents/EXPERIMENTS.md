@@ -73,6 +73,7 @@ experiments/runs/<run_id>/
 | `20260727-bounded-teacher-pilot-s0-a1` | pilot-passed/audited; T1 gate failed | clean commit `33ef895`; stable bounded branches but best true PESQ remained epoch-0 T0; 7 cells/models, 84/84 samples, zero issues | no |
 | `20260727-alternating-teacher-smoke-s0-a1` | smoke-passed/audited; superseded | clean commit `8df612f`; structural three-pass D/G execution exposed warm-start clean-label mismatch; preserved, no pilot use | no |
 | `20260727-alternating-teacher-smoke-s0-a2` | smoke-passed/audited | clean commit `f5003ef`; corrected clean=1 target, current/history/current D refresh, local generated-only replay; 7 cells/models, 42/42 samples, zero issues; T0 fallback | no |
+| `20260727-alternating-teacher-pilot-s0-a1` | execution-passed/audited; T1 gate failed | clean commit `9ad2b85`; 7 cells/models, 84/84 samples, zero issues; T1 val PESQ +0.00221 was below gate and test PESQ was -0.02029; T0 fallback | no |
 
 There is currently no promoted end-to-end run from the current repository
 snapshot.
@@ -212,3 +213,17 @@ and labels; noisy/clean inputs remained external.
 The two-example D calibration was deliberately too small for inference
 (Pearson -0.817). Both T1 branches restored T0 and the teacher gate failed.
 This is a structural pass only; the monitored pilot is the next evidence gate.
+
+### Alternating pilot `20260727-alternating-teacher-pilot-s0-a1`
+
+The official T0 checkpoint produced test PESQ-WB 3.2626 and STOI 0.9266 on 64
+pairs. The alternating branch moved true `val_select` PESQ from 2.8238 to
+2.8226 and 2.8261. Its +0.00221 best gain missed the +0.01 gate; test PESQ was
+0.02029 lower. T0 therefore remained downstream.
+
+Current-output D calibration was inadequate despite a correlated warm start:
+MAE degraded from 1.5002 to 1.7555 while generator-facing predicted PESQ moved
+outside the warm-start prediction range. S1 reproduced S0 from the identical
+T0 cache. Full remains blocked; the next trial is teacher-only and must repair
+calibration before any S1 training. See
+`docs/audits/2026-07-27-alternating-teacher-pilot-a1.md`.

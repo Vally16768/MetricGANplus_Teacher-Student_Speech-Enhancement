@@ -33,9 +33,10 @@ Update this register whenever a gate changes state.
 | C26 | Run monitored two-stage pilot | clean commit `0756a68`; 7 cells/models, 84/84 samples, zero audit issues; T1 PESQ gate failed and T0 fallback passed | failed |
 | C27 | Replace unsafe teacher proxy optimization | bounded target-score loss, T0 trust anchor, official log-spectral features, 41/41 tests and clean 7-cell CUDA smoke | passed |
 | C28 | Rerun clean smoke and monitored pilot | smoke/pilot executed and audited; bounded proxy stable but true PESQ gate failed | failed |
-| C29 | Run and promote full multi-seed campaign | only after C28 passes; independent audit and article-ready report | blocked |
+| C29 | Run and promote full multi-seed campaign | only after a teacher-only successor to C31 passes; independent audit and article-ready report | blocked |
 | C30 | Implement alternating MetricGAN+ discriminator refresh | SpeechBrain 4-conv D, clean=1 and true normalized noisy/enhanced labels, current/history/current updates, local FP16 replay, resumable D state; 45/45 tests and corrected clean A2 smoke/audit pass | passed |
-| C31 | Validate alternating T1 in clean smoke/pilot | smoke structural gate passed; monitored pilot must calibrate D and show T1 gain >= 0.01 PESQ-WB with STOI/SI-SDR guardrails before full | in-progress |
+| C31 | Validate alternating T1 in clean smoke/pilot | clean pilot `...-a1` audited 7/7 cells/models and 84/84 samples, but T1 gained only +0.00221 PESQ-WB and D current-output MAE degraded 1.50→1.76; full blocked | failed |
+| C32 | Isolate the next teacher-only fidelity trial | require 100 current examples/epoch, current-output calibration guard and immediate stop before cache/S1 work when the teacher gate fails | pending |
 
 ## Execution rule
 

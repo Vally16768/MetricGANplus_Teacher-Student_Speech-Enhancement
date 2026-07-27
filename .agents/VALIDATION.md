@@ -139,3 +139,10 @@ metric/reference profile matches the run profile
   42/42 samples and zero independent-audit issues. The clean=1 target, all
   three D passes, D freeze for G, resumable D checkpoint and local
   generated-only FP16 replay were observed.
+- alternating pilot A1 on clean commit `9ad2b85` completed and independently
+  audited 7/7 cells/models, 84/84 samples and zero issues.
+- the pilot kept WB/NB references and PESQ modes aligned, and its local 6.9 MiB
+  replay contained 64 generated FP16 outputs with no noisy/clean input copies.
+- T1 gained only +0.00221 PESQ-WB on `val_select`, below the +0.01 gate, while
+  current-output D MAE degraded from 1.5002 to 1.7555; T0 fallback passed and
+  full training remains blocked.

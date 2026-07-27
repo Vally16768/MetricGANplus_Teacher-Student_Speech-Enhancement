@@ -28,6 +28,7 @@ status. Historical experiment directories are evidence, not canonical docs.
 | `docs/audits/2026-07-27-bounded-teacher-smoke-a1.md` | bounded target-score/T0-anchor clean GPU smoke and independent audit | active observed |
 | `docs/audits/2026-07-27-bounded-teacher-pilot-a1.md` | bounded frozen-proxy pilot, negative teacher gate and alternating-discriminator decision | active observed |
 | `docs/audits/2026-07-27-alternating-teacher-smoke-a2.md` | corrected clean-target alternating D/G GPU smoke, local replay and failed verification gate | active observed |
+| `docs/audits/2026-07-27-alternating-teacher-pilot-a1.md` | monitored alternating D/G pilot, current-output calibration failure and rejected T1 teacher | active observed |
 | `experiments/README.md` | experiment directory explanation | active, consolidate later |
 | `code_and_documentation/configs/research_plan_voicebank_wb_nb.yaml` | machine-independent canonical WB/NB campaign contract | canonical configuration, non-Markdown |
 

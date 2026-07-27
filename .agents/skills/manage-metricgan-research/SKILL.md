@@ -104,6 +104,13 @@ on `val_select` plus STOI/SI-SDR guardrails. Test is never a selection input.
 Smoke/pilot may continue after a failed gate only as explicitly
 `verification_only`; such runs can never be promoted.
 
+After one verification run has demonstrated failed-gate fallback and cache
+identity, isolate later T1 iterations as teacher-only trials. Use at least the
+original recipe's 100 current examples per discriminator refresh, audit
+calibration on current generator outputs and stop before cache generation or
+S1 training unless the teacher passes its true-metric gate. Do not repeat
+students merely to reconfirm an unchanged T0 fallback.
+
 Teacher caches must stay in the ignored Desktop-local runtime area, outside
 the dataset and Git. Key them by teacher checkpoint, frozen training manifest
 and cache contract; stage labels must not duplicate identical content. Store
