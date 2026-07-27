@@ -1467,7 +1467,11 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
                 resume_state_path = candidate
 
     if resume_state_path is not None:
-        state_payload = torch.load(resume_state_path, map_location="cpu")
+        state_payload = torch.load(
+            resume_state_path,
+            map_location="cpu",
+            weights_only=True,
+        )
         base_model = _unwrap_runtime_model(model)
         base_model.load_state_dict(state_payload["model_state"], strict=False)
         if "optimizer_state" in state_payload and state_payload["optimizer_state"]:

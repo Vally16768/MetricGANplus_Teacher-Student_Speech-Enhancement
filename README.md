@@ -80,6 +80,8 @@ export METRICGAN_SHARED_VENV=/path/to/shared-venv
 
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py validate
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py run-baseline --run-id <baseline-id>
+"$METRICGAN_SHARED_VENV/bin/python" campaign.py continue-students \
+  --source-run-dir <audited-baseline-run> --run-id <continuation-id>
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py pilot-all --run-id <pilot-id>
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py run-all --run-id <immutable-id>
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py monitor-run --run-dir <run-dir>
@@ -92,6 +94,12 @@ T1/S1. `pilot-all`, `run-all`, `pilot-baseline` și `run-baseline` refuză un
 worktree murdar. `smoke-all` și `smoke-baseline` pot fi folosite numai pentru
 verificare tehnică, cu `--allow-dirty-smoke`. Smoke-ul și pilotul nu produc
 rezultate promovabile.
+
+Rulările full ale studenților au un plafon de 50 de epoci, reduc LR la platou
+și aplică early stopping după opt evaluări fără progres. `continue-students`
+este folosit numai pentru un baseline full auditat care s-a oprit la un plafon
+mai mic; creează un director nou și restaurează starea completă fără să
+suprascrie rularea sursă.
 
 ## Discriminatorul metric și extensia TTS
 

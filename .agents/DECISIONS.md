@@ -230,3 +230,18 @@ Constraint: the TTS idea is a separate domain experiment. It may reuse the
 metric-generator interface, but a TTS generator requires its own data,
 calibration and evaluation; its output cannot directly supervise the
 VoiceBank enhancement students.
+
+## D-021 — Use validation-governed 50-epoch student training
+
+Decision: full WB and NB student runs use a maximum of 50 epochs,
+`ReduceLROnPlateau` with factor 0.5/patience 2/minimum LR `1e-6`, and early
+stopping after eight non-improving bandwidth-matched `val_select` evaluations.
+Ceiling-limited historical students are continued only into a new immutable run
+with complete optimizer/scheduler/scaler/history restoration.
+
+Cause: full S0-WB reached its highest PESQ-WB at the predeclared epoch-20
+ceiling after the LR had only recently fallen to `2.5e-4`. The run therefore
+established a valid executed checkpoint but did not establish convergence.
+
+Constraint: test remains reporting-only. Continuations must retain the source
+manifest/cache hashes and cannot overwrite or relabel the epoch-20 package.

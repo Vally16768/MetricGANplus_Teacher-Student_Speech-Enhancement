@@ -35,7 +35,11 @@ training:
   batch_size: 8
   num_workers: 4
   teacher_branch_epochs: 10
-  student_epochs: 20
+  student_epochs: 50
+  student_lr_factor: 0.5
+  student_lr_patience: 2
+  student_min_lr: 0.000001
+  student_early_stop_patience: 8
   proxy_epochs: 8
   proxy_train_rows: 256
   proxy_validation_rows: 64

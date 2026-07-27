@@ -157,3 +157,10 @@ metric/reference profile matches the run profile
 - the smoke package contains no proxy/T1/S1 cells; its WB/NB metric/reference
   metadata match and its reused FP16 cache contains zero noisy/clean input
   files.
+- the 50-epoch student policy and immutable two-cell continuation package pass
+  48/48 unit/integration tests; coverage includes the exact plateau/early-stop
+  contract, dynamic continuation audit, source state/model hashes and the
+  historical baseline audit contracts.
+- canonical configuration validation, research-plan validation and the project
+  guard pass after the student schedule/resume change. A clean real-entry-point
+  CUDA smoke and the full continuation remain required before C40/C41 pass.

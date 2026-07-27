@@ -125,6 +125,15 @@ QAT uses fake quantization in the causal mask generator. The final deployment
 claim requires a validated exported model and measured latency/model size, not
 only the presence of QAT code.
 
+Canonical full student training has a 50-epoch ceiling, selects checkpoints
+only by bandwidth-matched `val_select/PESQ`, and uses
+`ReduceLROnPlateau(mode=max, factor=0.5, patience=2, min_lr=1e-6)`. Early
+stopping waits eight non-improving validation epochs, leaving a recovery window
+after an LR reduction. If an earlier immutable run ended at its epoch ceiling,
+`continue-students` restores its model, optimizer, scheduler, AMP scaler,
+history and selection state into a new run directory; it never overwrites the
+source package.
+
 ## A3 — Bandwidth and metric protocol
 
 | Model profile | Model input | Clean reference | PESQ mode | STOI/SI-SDR/delta-SNR |

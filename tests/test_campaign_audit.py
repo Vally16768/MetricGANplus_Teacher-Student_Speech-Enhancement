@@ -10,8 +10,11 @@ from campaign import (
     BASELINE_CELL_ORDER,
     BASELINE_SCOPE,
     CELL_ORDER,
+    STUDENT_CONTINUATION_CELL_ORDER,
+    STUDENT_CONTINUATION_SCOPE,
     _best_teacher,
     _effective_training,
+    _student_schedule,
     _teacher_cache_identity,
     audit_campaign_run,
     monitor_campaign_run,
@@ -20,7 +23,13 @@ from campaign import (
 
 
 class CampaignAuditTests(unittest.TestCase):
-    def make_run(self, root: Path, *, baseline: bool = False) -> None:
+    def make_run(
+        self,
+        root: Path,
+        *,
+        baseline: bool = False,
+        continuation: bool = False,
+    ) -> None:
         (root / "metrics").mkdir(parents=True)
         (root / "models").mkdir()
         (root / "provenance").mkdir()
@@ -28,7 +37,11 @@ class CampaignAuditTests(unittest.TestCase):
         rows: list[dict[str, object]] = []
         cells = {}
         inventory = {}
-        cell_order = BASELINE_CELL_ORDER if baseline else CELL_ORDER
+        cell_order = (
+            STUDENT_CONTINUATION_CELL_ORDER
+            if continuation
+            else (BASELINE_CELL_ORDER if baseline else CELL_ORDER)
+        )
         for cell in cell_order:
             bandwidth = "nb" if "-NB" in cell else "wb"
             sample_rate = 8000 if bandwidth == "nb" else 16000
@@ -63,6 +76,8 @@ class CampaignAuditTests(unittest.TestCase):
                             }
                         )
             cells[cell] = split_payloads
+            if continuation:
+                cells[cell]["stop_epoch"] = 30
             model = root / "models" / f"{cell}.pt"
             model.write_bytes(cell.encode("utf-8"))
             inventory[cell] = {
@@ -84,7 +99,15 @@ class CampaignAuditTests(unittest.TestCase):
         plot = root / "reports" / "plot.png"
         plot.write_bytes(b"PNG-fixture")
         summary = {
-            "campaign_scope": BASELINE_SCOPE if baseline else "teacher_improvement_two_stage",
+            "campaign_scope": (
+                STUDENT_CONTINUATION_SCOPE
+                if continuation
+                else (
+                    BASELINE_SCOPE
+                    if baseline
+                    else "teacher_improvement_two_stage"
+                )
+            ),
             "expected_cells": list(cell_order),
             "verification_only": True,
             "selected_teacher": "T0-WB-OFFICIAL",
@@ -94,7 +117,35 @@ class CampaignAuditTests(unittest.TestCase):
             "test_pesq_plot": plot.as_posix(),
             "report": report.as_posix(),
         }
-        if baseline:
+        if continuation:
+            sources = {}
+            for cell in STUDENT_CONTINUATION_CELL_ORDER:
+                state = root / "sources" / f"{cell}.state.pt"
+                source_model = root / "sources" / f"{cell}.model.pt"
+                state.parent.mkdir(exist_ok=True)
+                state.write_bytes(f"{cell}-state".encode("utf-8"))
+                source_model.write_bytes(f"{cell}-model".encode("utf-8"))
+                sources[cell] = {
+                    "epoch": 20,
+                    "training_state": state.as_posix(),
+                    "training_state_sha256": sha256(state),
+                    "model": source_model.as_posix(),
+                    "model_sha256": sha256(source_model),
+                }
+            summary["student_continuation_contract"] = {
+                "passed": True,
+                "students": list(STUDENT_CONTINUATION_CELL_ORDER),
+                "max_epochs": 50,
+                "schedule": {
+                    "scheduler": "plateau",
+                    "early_stop_patience": 8,
+                    "lr_factor": 0.5,
+                    "lr_patience": 2,
+                    "min_lr": 1e-6,
+                },
+                "sources": sources,
+            }
+        elif baseline:
             summary["baseline_contract"] = {
                 "passed": True,
                 "teacher": "T0-WB-OFFICIAL",
@@ -140,6 +191,16 @@ class CampaignAuditTests(unittest.TestCase):
         self.assertEqual(result["cell_count"], 3)
         self.assertEqual(result["model_count"], 3)
 
+    def test_student_continuation_reconciles_two_cells(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            self.make_run(root, continuation=True)
+            result = audit_campaign_run(root)
+        self.assertTrue(result["valid"], result["issues"])
+        self.assertEqual(result["campaign_scope"], STUDENT_CONTINUATION_SCOPE)
+        self.assertEqual(result["cell_count"], 2)
+        self.assertEqual(result["model_count"], 2)
+
     def test_model_tampering_is_detected(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)
@@ -152,11 +213,28 @@ class CampaignAuditTests(unittest.TestCase):
 
     def test_pilot_overrides_full_training_without_changing_full(self) -> None:
         config = {
-            "training": {"batch_size": 8, "student_epochs": 20},
+            "training": {"batch_size": 8, "student_epochs": 50},
             "pilot": {"batch_size": 4, "student_epochs": 3},
         }
         self.assertEqual(_effective_training(config, "pilot")["student_epochs"], 3)
-        self.assertEqual(_effective_training(config, "full")["student_epochs"], 20)
+        self.assertEqual(_effective_training(config, "full")["student_epochs"], 50)
+
+    def test_student_full_schedule_allows_lr_recovery_before_early_stop(self) -> None:
+        effective = {
+            "student_lr_factor": 0.5,
+            "student_lr_patience": 2,
+            "student_min_lr": 1e-6,
+            "student_early_stop_patience": 8,
+        }
+        self.assertEqual(
+            _student_schedule(effective, mode="full"),
+            {
+                "early_stop_patience": 8,
+                "lr_factor": 0.5,
+                "lr_patience": 2,
+                "min_lr": 1e-6,
+            },
+        )
 
     def test_failed_verification_gate_keeps_official_teacher_downstream(self) -> None:
         metrics = {

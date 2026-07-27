@@ -173,6 +173,19 @@ The direct student-metric experiment is deferred. If reintroduced, it requires
 separate WB/NB proxies and a separately named matrix; it must not alter the
 S1–S0 teacher-effect comparison.
 
+## Student convergence policy
+
+Canonical full S0 and S1 students use a 50-epoch ceiling with
+validation-selected checkpoints, plateau LR reduction and eight-evaluation
+early stopping. A run whose best checkpoint is its maximum epoch is
+`ceiling-limited`: it may be structurally audited, but its student is not
+treated as converged or promoted as the final student baseline.
+
+`continue-students` creates a separate two-cell continuation package from an
+audited official baseline. It preserves source state/model hashes and restores
+the complete optimizer, scheduler, AMP scaler, history and best-score state.
+WB and NB remain separate metric protocols throughout the continuation.
+
 The TTS extension is a separate future campaign. It may reuse the objective
 adapter but requires a selected TTS generator, its own outputs, a recalibrated
 proxy and separate dataset/provenance. It cannot be promoted from the

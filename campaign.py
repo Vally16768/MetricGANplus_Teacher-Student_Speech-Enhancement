@@ -54,6 +54,8 @@ CELL_ORDER = (
 BASELINE_CELL_ORDER = CELL_ORDER[:3]
 BASELINE_SCOPE = "official_teacher_students_baseline"
 TWO_STAGE_SCOPE = "teacher_improvement_two_stage"
+STUDENT_CONTINUATION_CELL_ORDER = ("S0-WB", "S0-NB")
+STUDENT_CONTINUATION_SCOPE = "official_student_training_continuation"
 
 
 def sha256(path: str | Path) -> str:
@@ -140,6 +142,24 @@ def validate_campaign_config(config: dict[str, Any]) -> dict[str, Any]:
         )
     if str(config["teacher_cache"].get("storage_dtype")) != "float16":
         raise ValueError("Canonical cache storage_dtype must be float16.")
+    training = dict(config["training"])
+    if int(training.get("student_epochs", 0)) != 50:
+        raise ValueError("Canonical student training must use a 50-epoch ceiling.")
+    student_lr_patience = int(training.get("student_lr_patience", 0))
+    student_early_stop_patience = int(
+        training.get("student_early_stop_patience", 0)
+    )
+    if student_lr_patience < 1:
+        raise ValueError("training.student_lr_patience must be positive.")
+    if student_early_stop_patience <= student_lr_patience:
+        raise ValueError(
+            "Student early-stop patience must exceed LR-reduction patience."
+        )
+    student_lr_factor = float(training.get("student_lr_factor", 0.0))
+    if not 0.0 < student_lr_factor < 1.0:
+        raise ValueError("training.student_lr_factor must be between 0 and 1.")
+    if float(training.get("student_min_lr", 0.0)) <= 0.0:
+        raise ValueError("training.student_min_lr must be positive.")
 
     sets: dict[str, dict[str, set[str]]] = {}
     for name, path in manifests.items():
@@ -360,6 +380,29 @@ def _effective_training(config: dict[str, Any], mode: str) -> dict[str, Any]:
     return values
 
 
+def _student_schedule(
+    effective: dict[str, Any],
+    *,
+    mode: str,
+) -> dict[str, Any]:
+    early_stop_patience = (
+        int(effective["student_early_stop_patience"])
+        if mode == "full"
+        else int(
+            effective.get(
+                "early_stop_patience",
+                0 if mode == "smoke" else 2,
+            )
+        )
+    )
+    return {
+        "early_stop_patience": early_stop_patience,
+        "lr_factor": float(effective["student_lr_factor"]),
+        "lr_patience": int(effective["student_lr_patience"]),
+        "min_lr": float(effective["student_min_lr"]),
+    }
+
+
 def _experiment_config(
     config: dict[str, Any],
     *,
@@ -378,6 +421,11 @@ def _experiment_config(
     evaluate_init_checkpoint: bool = False,
     frontend: dict[str, int] | None = None,
     alternating_metric_discriminator: bool = False,
+    resume_training_state: str | None = None,
+    early_stop_patience: int | None = None,
+    lr_factor: float | None = None,
+    lr_patience: int | None = None,
+    min_lr: float | None = None,
     mode: str,
 ) -> ExperimentConfig:
     profile = resolve_bandwidth(bandwidth)
@@ -417,11 +465,18 @@ def _experiment_config(
         history_plot_every_epochs=1,
         history_plot_final_only=False,
         record_step_history=False,
-        lr_factor=0.5,
-        lr_patience=2,
-        min_lr=1e-6,
+        lr_factor=float(0.5 if lr_factor is None else lr_factor),
+        lr_patience=int(2 if lr_patience is None else lr_patience),
+        min_lr=float(1e-6 if min_lr is None else min_lr),
         early_stop_patience=int(
-            effective.get("early_stop_patience", 0 if mode == "smoke" else 5)
+            (
+                effective.get(
+                    "early_stop_patience",
+                    0 if mode == "smoke" else 5,
+                )
+                if early_stop_patience is None
+                else early_stop_patience
+            )
         ),
         min_epochs=1,
         eval_every=1,
@@ -466,6 +521,7 @@ def _experiment_config(
         erb_bands=int(config["model"]["erb_bands"]),
         context_frames=5,
         init_checkpoint=init_checkpoint,
+        resume_training_state=resume_training_state,
         sample_rate=int(model_frontend["sample_rate"]),
         bandwidth=profile.name,
         n_fft=int(model_frontend["n_fft"]),
@@ -763,6 +819,7 @@ def _write_report(
     cell_order: tuple[str, ...] = CELL_ORDER,
     comparison_pairs: dict[str, tuple[str, str]] | None = None,
     baseline_contract: dict[str, Any] | None = None,
+    student_continuation_contract: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     metrics_dir = run_root / "metrics"
     reports_dir = run_root / "reports"
@@ -847,6 +904,8 @@ def _write_report(
         summary["teacher_promotion_gate"] = teacher_gate
     if baseline_contract is not None:
         summary["baseline_contract"] = baseline_contract
+    if student_continuation_contract is not None:
+        summary["student_continuation_contract"] = student_continuation_contract
 
     lines = [
         "# VoiceBank MetricGAN+ campaign report",
@@ -856,7 +915,11 @@ def _write_report(
         (
             "Official T0 checkpoint distilled into fresh WB and NB students."
             if campaign_scope == BASELINE_SCOPE
-            else f"Selected teacher by val_select PESQ: `{selected_teacher}`."
+            else (
+                "WB and NB students continued from immutable optimizer states."
+                if campaign_scope == STUDENT_CONTINUATION_SCOPE
+                else f"Selected teacher by val_select PESQ: `{selected_teacher}`."
+            )
         ),
         "",
     ]
@@ -906,9 +969,12 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
     campaign_scope = str(
         summary.get("campaign_scope") or TWO_STAGE_SCOPE
     )
-    canonical_cells = (
-        BASELINE_CELL_ORDER if campaign_scope == BASELINE_SCOPE else CELL_ORDER
-    )
+    if campaign_scope == BASELINE_SCOPE:
+        canonical_cells = BASELINE_CELL_ORDER
+    elif campaign_scope == STUDENT_CONTINUATION_SCOPE:
+        canonical_cells = STUDENT_CONTINUATION_CELL_ORDER
+    else:
+        canonical_cells = CELL_ORDER
     declared_cells = tuple(summary.get("expected_cells") or canonical_cells)
     if declared_cells != canonical_cells:
         issues.append(
@@ -1024,6 +1090,40 @@ def audit_campaign_run(run_dir: str | Path) -> dict[str, Any]:
             != teacher_model.get("sha256")
         ):
             issues.append("baseline teacher checkpoint hash mismatch")
+    elif campaign_scope == STUDENT_CONTINUATION_SCOPE:
+        continuation = dict(summary.get("student_continuation_contract") or {})
+        if continuation.get("students") != list(STUDENT_CONTINUATION_CELL_ORDER):
+            issues.append("student continuation cell contract mismatch")
+        if int(continuation.get("max_epochs") or 0) != 50:
+            issues.append("student continuation ceiling is not 50 epochs")
+        schedule = dict(continuation.get("schedule") or {})
+        if schedule != {
+            "early_stop_patience": 8,
+            "lr_factor": 0.5,
+            "lr_patience": 2,
+            "min_lr": 1e-6,
+            "scheduler": "plateau",
+        }:
+            issues.append("student continuation schedule contract mismatch")
+        sources = dict(continuation.get("sources") or {})
+        for cell in STUDENT_CONTINUATION_CELL_ORDER:
+            source = dict(sources.get(cell) or {})
+            state_path = Path(str(source.get("training_state") or ""))
+            model_path = Path(str(source.get("model") or ""))
+            if not state_path.is_file():
+                issues.append(f"missing continuation source state: {cell}")
+            elif source.get("training_state_sha256") != sha256(state_path):
+                issues.append(f"continuation source state hash mismatch: {cell}")
+            if not model_path.is_file():
+                issues.append(f"missing continuation source model: {cell}")
+            elif source.get("model_sha256") != sha256(model_path):
+                issues.append(f"continuation source model hash mismatch: {cell}")
+            cell_summary = dict(cells.get(cell) or {})
+            source_epoch = int(source.get("epoch") or 0)
+            if int(cell_summary.get("stop_epoch") or 0) <= source_epoch:
+                issues.append(f"continuation did not advance beyond source: {cell}")
+            if int(cell_summary.get("stop_epoch") or 0) > 50:
+                issues.append(f"continuation exceeded epoch ceiling: {cell}")
     else:
         if not teacher_gate:
             issues.append("missing teacher promotion gate")
@@ -1062,6 +1162,10 @@ def _finish_run(
         provenance["teacher_promotion_gate"] = report["teacher_promotion_gate"]
     if "baseline_contract" in report:
         provenance["baseline_contract"] = report["baseline_contract"]
+    if "student_continuation_contract" in report:
+        provenance["student_continuation_contract"] = report[
+            "student_continuation_contract"
+        ]
     provenance["report"] = report["report"]
     _atomic_json(run_root / "provenance" / "provenance.json", provenance)
     _atomic_json(
@@ -1180,6 +1284,7 @@ def run_all(
         details={"dataset": audit, "git": git, "device": device},
     )
     effective = _effective_training(config, mode)
+    student_schedule = _student_schedule(effective, mode=mode)
     cells: dict[str, dict[str, Any]] = {}
     proxies: dict[str, dict[str, Any]] = {}
 
@@ -1243,6 +1348,7 @@ def run_all(
             lr=float(effective["student_lr"]),
             seed=int(effective["seed"]),
             teacher_cache_manifest=official_cache_manifests[bandwidth],
+            **student_schedule,
             mode=mode,
         )
 
@@ -1356,6 +1462,7 @@ def run_all(
             lr=float(effective["student_lr"]),
             seed=int(effective["seed"]),
             teacher_cache_manifest=improved_cache_manifests[bandwidth],
+            **student_schedule,
             mode=mode,
         )
 
@@ -1381,6 +1488,242 @@ def run_all(
     )
 
 
+def continue_official_students(
+    config: dict[str, Any],
+    *,
+    source_run_dir: str | Path,
+    run_id: str,
+) -> dict[str, Any]:
+    """Continue both official-cache students from immutable epoch states."""
+    dataset_audit = validate_campaign_config(config)
+    git = _git_state()
+    if git["dirty"]:
+        raise RuntimeError("Refusing student continuation from a dirty worktree.")
+    shared_venv = Path(str(config["runtime"]["shared_venv"]))
+    require_shared_venv(shared_venv)
+    device = require_training_cuda(str(config["runtime"]["device"]))
+    config["runtime"]["device"] = device
+
+    source_root = Path(source_run_dir).expanduser().resolve()
+    if not source_root.is_dir():
+        raise FileNotFoundError(f"Source run does not exist: {source_root}")
+    source_status_path = source_root / "status.json"
+    source_provenance_path = source_root / "provenance" / "provenance.json"
+    if not source_status_path.is_file() or not source_provenance_path.is_file():
+        raise FileNotFoundError("Source run is missing status/provenance.")
+    source_status = json.loads(source_status_path.read_text(encoding="utf-8"))
+    source_provenance = json.loads(
+        source_provenance_path.read_text(encoding="utf-8")
+    )
+    if source_status.get("status") != "audited":
+        raise ValueError("Student continuation requires an audited full source run.")
+    if source_provenance.get("campaign_scope") != BASELINE_SCOPE:
+        raise ValueError("Student continuation requires an official baseline source.")
+
+    run_root = (
+        Path(str(config["runtime"]["run_root"])).expanduser().resolve() / run_id
+    )
+    run_root.mkdir(parents=True, exist_ok=False)
+    effective = _effective_training(config, "full")
+    schedule = _student_schedule(effective, mode="full")
+    max_epochs = int(effective["student_epochs"])
+    source_contract: dict[str, dict[str, Any]] = {}
+    source_payloads: dict[str, dict[str, Any]] = {}
+
+    for cell in STUDENT_CONTINUATION_CELL_ORDER:
+        cell_root = source_root / "cells" / cell
+        summary_path = cell_root / "summary.json"
+        state_path = cell_root / "training_state.pt"
+        model_path = cell_root / "model.pt"
+        if (
+            not summary_path.is_file()
+            or not state_path.is_file()
+            or not model_path.is_file()
+        ):
+            raise FileNotFoundError(f"Source artifacts are incomplete for {cell}.")
+        summary = json.loads(summary_path.read_text(encoding="utf-8"))
+        state = torch.load(state_path, map_location="cpu", weights_only=True)
+        source_epoch = int(state.get("epoch") or 0)
+        if source_epoch >= max_epochs:
+            raise ValueError(
+                f"{cell} source epoch {source_epoch} is not below {max_epochs}."
+            )
+        source_config = dict(state.get("config") or {})
+        expected_bandwidth = "nb" if cell.endswith("-NB") else "wb"
+        if source_config.get("bandwidth") != expected_bandwidth:
+            raise ValueError(f"{cell} source state bandwidth mismatch.")
+        expected_family = str(
+            config["model"][f"student_{expected_bandwidth}_family"]
+        )
+        if source_config.get("model_family") != expected_family:
+            raise ValueError(f"{cell} source state model-family mismatch.")
+        if source_config.get("loss_recipe") != "D1":
+            raise ValueError(f"{cell} source state loss-recipe mismatch.")
+        for key, dataset_key in (
+            ("train_csv", "train_fit"),
+            ("val_rank_csv", "val_rank"),
+            ("val_select_csv", "val_select"),
+            ("test_csv", "test"),
+        ):
+            source_manifest = Path(str(source_config.get(key) or ""))
+            current_manifest = Path(str(config["dataset"][dataset_key]))
+            if (
+                not source_manifest.is_file()
+                or sha256(source_manifest) != sha256(current_manifest)
+            ):
+                raise ValueError(f"{cell} source manifest mismatch: {key}.")
+        teacher_cache_manifest = Path(
+            str(source_config.get("teacher_cache_manifest") or "")
+        )
+        if not teacher_cache_manifest.is_file():
+            raise FileNotFoundError(
+                f"{cell} source teacher-cache manifest is missing."
+            )
+        source_payloads[cell] = {
+            "state_path": state_path,
+            "model_path": model_path,
+            "teacher_cache_manifest": teacher_cache_manifest,
+        }
+        source_contract[cell] = {
+            "epoch": source_epoch,
+            "best_epoch": int(summary.get("best_epoch") or 0),
+            "best_score": float(summary.get("best_score") or float("nan")),
+            "training_state": state_path.as_posix(),
+            "training_state_sha256": sha256(state_path),
+            "model": model_path.as_posix(),
+            "model_sha256": sha256(model_path),
+        }
+
+    provenance = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "status": "running",
+        "mode": "full",
+        "campaign_scope": STUDENT_CONTINUATION_SCOPE,
+        "verification_only": False,
+        "git_commit": git["commit"],
+        "git_dirty": git["dirty"],
+        "dataset_audit": dataset_audit,
+        "source_run": {
+            "run_id": source_root.name,
+            "git_commit": source_provenance.get("git_commit"),
+            "path": source_root.as_posix(),
+        },
+        "environment": {
+            "python": sys.version,
+            "platform": platform.platform(),
+            "torch": torch.__version__,
+            "cuda_available": torch.cuda.is_available(),
+            "cuda_device": torch.cuda.get_device_name(0),
+        },
+    }
+    _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+    (run_root / "provenance" / "config_resolved.yaml").write_text(
+        yaml.safe_dump(config, sort_keys=False),
+        encoding="utf-8",
+    )
+    _atomic_json(
+        run_root / "status.json",
+        {
+            "status": "running",
+            "campaign_mode": "full",
+            "campaign_scope": STUDENT_CONTINUATION_SCOPE,
+            "current_stage": "preflight",
+            "valid_for_promotion": False,
+        },
+    )
+    _mark_stage(
+        run_root,
+        stage="preflight",
+        status="completed",
+        details={
+            "dataset": dataset_audit,
+            "git": git,
+            "device": device,
+            "source_run_id": source_root.name,
+        },
+    )
+
+    cells: dict[str, dict[str, Any]] = {}
+    for cell in STUDENT_CONTINUATION_CELL_ORDER:
+        bandwidth = "nb" if cell.endswith("-NB") else "wb"
+        source = source_payloads[cell]
+        _mark_stage(run_root, stage=cell, status="running")
+        try:
+            experiment = _experiment_config(
+                config,
+                run_root=run_root,
+                cell=cell,
+                family=str(config["model"][f"student_{bandwidth}_family"]),
+                bandwidth=bandwidth,
+                loss_recipe="D1",
+                epochs=max_epochs,
+                lr=float(effective["student_lr"]),
+                seed=int(effective["seed"]),
+                teacher_cache_manifest=source[
+                    "teacher_cache_manifest"
+                ].as_posix(),
+                resume_training_state=source["state_path"].as_posix(),
+                **schedule,
+                mode="full",
+            )
+            shutil.copy2(source["model_path"], experiment.checkpoint_out)
+            summary = run_experiment(experiment)
+            summary["continued_from"] = source_contract[cell]
+            _atomic_json(
+                Path(experiment.checkpoint_out).parent / "summary.json",
+                summary,
+            )
+            cells[cell] = summary
+            _mark_stage(
+                run_root,
+                stage=cell,
+                status="completed",
+                details=_stage_details(summary),
+            )
+        except BaseException as exc:
+            _mark_stage(
+                run_root,
+                stage=cell,
+                status="failed",
+                error=f"{exc.__class__.__name__}: {exc}",
+            )
+            raise
+
+    continuation_contract = {
+        "passed": True,
+        "source_run_id": source_root.name,
+        "students": list(STUDENT_CONTINUATION_CELL_ORDER),
+        "max_epochs": max_epochs,
+        "schedule": {
+            "scheduler": "plateau",
+            **schedule,
+        },
+        "sources": source_contract,
+    }
+    report = _write_report(
+        run_root=run_root,
+        cells=cells,
+        proxies={},
+        selected_teacher="T0-WB-OFFICIAL",
+        teacher_gate=None,
+        mode="full",
+        verification_only=False,
+        campaign_scope=STUDENT_CONTINUATION_SCOPE,
+        cell_order=STUDENT_CONTINUATION_CELL_ORDER,
+        comparison_pairs={},
+        student_continuation_contract=continuation_contract,
+    )
+    return _finish_run(
+        run_root=run_root,
+        provenance=provenance,
+        report=report,
+        mode="full",
+        git=git,
+        promotion_gate_passed=True,
+    )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -1403,6 +1746,9 @@ def parse_args() -> argparse.Namespace:
     baseline_pilot.add_argument("--run-id", required=True)
     baseline_full = subparsers.add_parser("run-baseline")
     baseline_full.add_argument("--run-id", required=True)
+    continuation = subparsers.add_parser("continue-students")
+    continuation.add_argument("--source-run-dir", required=True)
+    continuation.add_argument("--run-id", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -1470,7 +1816,42 @@ def main() -> None:
                     {"status": "failed", "valid_for_promotion": False},
                 )
             raise
-    elif args.command not in {"audit-run", "monitor-run"}:
+    elif args.command == "continue-students":
+        try:
+            result = continue_official_students(
+                config,
+                source_run_dir=args.source_run_dir,
+                run_id=args.run_id,
+            )
+        except BaseException as exc:
+            run_root = (
+                Path(str(config["runtime"]["run_root"])).expanduser().resolve()
+                / args.run_id
+            )
+            if run_root.exists():
+                provenance_path = run_root / "provenance" / "provenance.json"
+                provenance = (
+                    json.loads(provenance_path.read_text(encoding="utf-8"))
+                    if provenance_path.exists()
+                    else {"run_id": args.run_id}
+                )
+                provenance["status"] = "failed"
+                provenance["failure"] = {
+                    "type": exc.__class__.__name__,
+                    "message": str(exc),
+                    "traceback": traceback.format_exc(),
+                }
+                _atomic_json(provenance_path, provenance)
+                _atomic_json(
+                    run_root / "status.json",
+                    {"status": "failed", "valid_for_promotion": False},
+                )
+            raise
+    elif args.command not in {
+        "audit-run",
+        "monitor-run",
+        "continue-students",
+    }:
         raise ValueError(args.command)
     print(json.dumps(result, indent=2, sort_keys=True))
     if args.command == "audit-run" and not result["valid"]:
