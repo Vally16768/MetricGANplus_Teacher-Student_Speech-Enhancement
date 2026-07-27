@@ -68,6 +68,7 @@ experiments/runs/<run_id>/
 | `20260727-official-two-stage-smoke-s0-a1` | superseded smoke | seven-cell graph passed, but failed gate used an ambiguous T1 downstream label | no |
 | `20260727-official-two-stage-smoke-s0-a2` | superseded smoke | corrected T0 fallback and audited 7/7 cells, but identical stage-labeled caches were duplicated | no |
 | `20260727-official-two-stage-smoke-s0-a3` | smoke-passed/audited | clean commit `8d36d62`; 7 cells/models, 42/42 samples, T0 fallback, one deduplicated FP16 cache, zero issues | no |
+| `20260727-official-two-stage-pilot-s0-a1` | pilot-passed/audited; T1 gate failed | clean commit `0756a68`; 7 cells/models, 84/84 samples, strong fixed-proxy calibration but true-PESQ degradation; T0 fallback and cache reuse passed; zero audit issues | no |
 
 There is currently no promoted end-to-end run from the current repository
 snapshot.
@@ -170,3 +171,17 @@ The TTS extension is a separate future campaign. It may reuse the objective
 adapter but requires a selected TTS generator, its own outputs, a recalibrated
 proxy and separate dataset/provenance. It cannot be promoted from the
 VoiceBank enhancement results.
+
+### Two-stage pilot `20260727-official-two-stage-pilot-s0-a1`
+
+The official teacher achieved PESQ-WB 3.2626 and STOI 0.9266 on the 64-pair
+pilot test support. The WB proxy had held-out Pearson 0.9539 and Spearman
+0.9325, but the generator escaped that fixed calibration distribution:
+`val_select` PESQ fell from 2.8238 to 2.4457 after one metric-aware epoch and
+to 2.4285 after two. The control branch fell further. Both best checkpoints
+therefore remained the epoch-0 official teacher.
+
+The failed gate correctly reused the same content-addressed T0 cache for S0 and
+S1. WB/NB student PESQ deltas were -0.00007/-0.00085, so no teacher-improvement
+claim exists. The full campaign is blocked. See
+`docs/audits/2026-07-27-two-stage-pilot-a1.md`.

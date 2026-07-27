@@ -106,4 +106,12 @@ metric/reference profile matches the run profile
   `T0-WB-OFFICIAL` downstream and remained non-promotable.
 - S0/S1 reused one physical 2.9 MiB cache when the teacher checkpoint was
   unchanged; the cache recorded both stage labels and no dataset audio copies.
-- the next required gate is the monitored clean-snapshot pilot.
+- clean-snapshot two-stage pilot A1 passed execution/audit on commit `0756a68`:
+  seven cells/models, 84/84 sample files, zero audit issues, unchanged
+  manifests and zero split overlap.
+- pilot T0 test PESQ-WB/STOI were 3.2626/0.9266 on 64 pairs; the WB proxy
+  calibrated to Pearson 0.9539 and Spearman 0.9325 on 96 held-out candidates.
+- both T1 branches reduced true `val_select` PESQ despite optimization; the
+  gate retained T0 and the full campaign remains blocked.
+- the next required gate is a tested bounded/refreshable teacher metric
+  objective followed by a new clean smoke and monitored pilot.

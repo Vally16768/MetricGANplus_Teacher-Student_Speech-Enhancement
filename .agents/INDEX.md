@@ -17,7 +17,8 @@ Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
 
 Current release state: **official teacher and two-stage causal-max campaign
-passed its clean-snapshot seven-cell smoke; monitored pilot pending**.
+passed its clean-snapshot seven-cell pilot; the teacher-improvement gate failed
+and full training is blocked**.
 
 Open blockers:
 
@@ -27,6 +28,8 @@ Open blockers:
   official-teacher/two-stage graph.
 - The pinned official teacher, local reconstruction and full seven-cell graph
   pass structure, checkpoint, CUDA smoke and independent package audit gates.
-- The clean smoke intentionally rejected one-epoch T1 changes; larger pilot
-  proxy calibration and teacher validation remain required.
+- The clean pilot calibrated the frozen WB proxy well, but both T1 branches
+  reduced true `val_select` PESQ and were restored to the official checkpoint.
+- A bounded official-style target-score objective plus protection against
+  proxy distribution shift must pass smoke and pilot gates before full.
 - There is no promoted end-to-end run produced from the current clean snapshot.

@@ -1,6 +1,7 @@
 # Architecture register
 
-Status: `official-teacher-two-stage-smoke-passed`; no full run is promoted.
+Status: `official-teacher-two-stage-pilot-gate-failed`; no full run is
+promoted.
 
 ## A0 — End-to-end research pipeline
 
@@ -214,6 +215,11 @@ Evidence:
 - final two-stage smoke:
   `20260727-official-two-stage-smoke-s0-a3` (seven cells/models, 42 samples,
   failed-gate T0 fallback, one deduplicated cache, audit zero issues).
+- monitored two-stage pilot:
+  `20260727-official-two-stage-pilot-s0-a1` (seven cells/models, 84 samples,
+  strong fixed-proxy calibration but true-PESQ degradation, T0 fallback, audit
+  zero issues). This blocks full training until the teacher objective is made
+  bounded and robust to current-output distribution shift.
 
 ## A6 — Selection boundaries
 

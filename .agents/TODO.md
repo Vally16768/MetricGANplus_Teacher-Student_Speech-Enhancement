@@ -30,7 +30,10 @@ Update this register whenever a gate changes state.
 | C23 | Implement the two-stage teacher-effect campaign | T0 official → C0 → S0 WB/NB → T1 control/metric gate → C1 → fresh S1 WB/NB; seven-cell report/audit | passed |
 | C24 | Validate local persistent teacher caches | Desktop-local, content-addressed, FP16 teacher outputs, no noisy/clean duplication, resume and quantization tests | passed |
 | C25 | Run two-stage GPU smoke and independent audit | A3: clean commit; 7 cells/models, 42/42 samples, cache dedup, zero audit issues; verification-only | passed |
-| C26 | Run monitored pilot then full campaign | pilot is next on a clean committed source; full requires positive teacher PESQ gate and guardrails | in-progress |
+| C26 | Run monitored two-stage pilot | clean commit `0756a68`; 7 cells/models, 84/84 samples, zero audit issues; T1 PESQ gate failed and T0 fallback passed | failed |
+| C27 | Replace unsafe teacher proxy optimization | official-style bounded target-score loss; trust-region or refreshed current-output labels; unit/CUDA smoke | in-progress |
+| C28 | Rerun clean smoke and monitored pilot | true `val_select` PESQ gain >= 0.01 with STOI/SI-SDR guardrails | blocked |
+| C29 | Run and promote full multi-seed campaign | only after C28 passes; independent audit and article-ready report | blocked |
 
 ## Execution rule
 
