@@ -135,3 +135,7 @@ metric/reference profile matches the run profile
   samples and zero issues, but exposed a warm-start-only clean-label mismatch:
   library PESQ could exceed 4.5 while official D_clean is exactly 1. The run is
   preserved as structural evidence and superseded before pilot.
+- corrected alternating smoke A2 on clean commit `f5003ef` passed 7/7 cells,
+  42/42 samples and zero independent-audit issues. The clean=1 target, all
+  three D passes, D freeze for G, resumable D checkpoint and local
+  generated-only FP16 replay were observed.

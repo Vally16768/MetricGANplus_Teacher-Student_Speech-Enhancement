@@ -251,6 +251,10 @@ Evidence:
   `20260727-bounded-teacher-pilot-s0-a1` on commit `33ef895` (seven
   cells/models, 84 samples, stable but negative T1 teacher changes, T0
   fallback, audit zero issues).
+- corrected alternating-D smoke:
+  `20260727-alternating-teacher-smoke-s0-a2` on commit `f5003ef` (seven
+  cells/models, current/history/current refresh and generated-only local
+  replay, 42 samples, T0 fallback, audit zero issues).
 
 ## A6 — Selection boundaries
 

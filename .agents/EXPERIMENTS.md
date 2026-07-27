@@ -71,6 +71,8 @@ experiments/runs/<run_id>/
 | `20260727-official-two-stage-pilot-s0-a1` | pilot-passed/audited; T1 gate failed | clean commit `0756a68`; 7 cells/models, 84/84 samples, strong fixed-proxy calibration but true-PESQ degradation; T0 fallback and cache reuse passed; zero audit issues | no |
 | `20260727-bounded-teacher-smoke-s0-a1` | smoke-passed/audited | clean commit `27838d9`; bounded T1 stayed within 0.0007 PESQ of T0, failed the positive-gain gate, restored T0; 7 cells/models, 42/42 samples, zero issues | no |
 | `20260727-bounded-teacher-pilot-s0-a1` | pilot-passed/audited; T1 gate failed | clean commit `33ef895`; stable bounded branches but best true PESQ remained epoch-0 T0; 7 cells/models, 84/84 samples, zero issues | no |
+| `20260727-alternating-teacher-smoke-s0-a1` | smoke-passed/audited; superseded | clean commit `8df612f`; structural three-pass D/G execution exposed warm-start clean-label mismatch; preserved, no pilot use | no |
+| `20260727-alternating-teacher-smoke-s0-a2` | smoke-passed/audited | clean commit `f5003ef`; corrected clean=1 target, current/history/current D refresh, local generated-only replay; 7 cells/models, 42/42 samples, zero issues; T0 fallback | no |
 
 There is currently no promoted end-to-end run from the current repository
 snapshot.
@@ -199,3 +201,14 @@ The frozen proxy remained strongly calibrated on fixed candidates (Pearson
 0.9539), so repeating this full run would only scale a negative formulation.
 The next experiment must implement current/noisy/historical discriminator
 refresh as in MetricGAN+, then pass a new pilot gate.
+
+### Alternating smoke `20260727-alternating-teacher-smoke-s0-a2`
+
+The corrected implementation completed all seven cells and the independent
+package audit with zero issues. D ran current/history/current updates and was
+frozen for G. Its 344 KiB local replay stored only two FP16 enhanced outputs
+and labels; noisy/clean inputs remained external.
+
+The two-example D calibration was deliberately too small for inference
+(Pearson -0.817). Both T1 branches restored T0 and the teacher gate failed.
+This is a structural pass only; the monitored pilot is the next evidence gate.
