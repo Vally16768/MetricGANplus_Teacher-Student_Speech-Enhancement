@@ -3,7 +3,7 @@
 Status: **active**
 Last evidence update: **2026-07-27**
 Current phase: **P4 — teacher-only T1 improvement**
-Next action: **P4.6 — run clean CUDA calibration and teacher-only smoke**
+Next action: **P4.7 — run strict calibration, then the monitored teacher pilot**
 
 This is the detailed execution board for the active research sequence. The
 campaign-wide summary remains `.agents/TODO.md`; this file owns the subtask
@@ -147,8 +147,8 @@ reporting-only.
 | P4.3 | Implement calibration guard | held-out current-output MAE/correlation/range; failed guard skips G | passed |
 | P4.4 | Complete resume-state tests for G/D loop | G, D, optimizers, scheduler, patience, replay and history restore | passed |
 | P4.5 | Run unit/integration tests and project guard | all required gates pass | passed |
-| P4.6 | Run clean CUDA smoke | current/history/current, clean=1, true noisy/enhanced PESQ, local replay observed | in-progress |
-| P4.7 | Run monitored teacher-only pilot | E0/E1/E2, immutable run, no cache/S1 | pending |
+| P4.6 | Run clean CUDA smoke | current/history/current, clean=1, true noisy/enhanced PESQ, local replay observed | passed |
+| P4.7 | Run monitored teacher-only pilot | E0/E1/E2, immutable run, no cache/S1 | in-progress |
 | P4.8 | Audit teacher gate | true metrics and calibration reconcile independently | pending |
 | P4.9 | Record gate decision | pass selects T1; fail stops downstream work | pending |
 
@@ -202,3 +202,4 @@ calibration, evaluation protocol, provenance and claim set.
 | 2026-07-27 | Built and audited the portable S0 package | `20260727-converged-s0-baseline-v1`; 3 models, 23 inventoried artifacts, zero package/privacy issues; 56/56 tests, contract/plan/guard pass | P3.7 commit/push |
 | 2026-07-27 | Published the converged S0 baseline | Git commit `e6388d4`; 24 package files in Git normal, push confirmed and worktree clean | P4.1 freeze E0 |
 | 2026-07-27 | Implemented teacher-only calibration and trial flows | E0 hash/protocol binding; disjoint D/held-out current outputs; failed-gate G skip; D optimizer/replay resume; 60/60 tests and config/plan validation pass | P4.6 clean CUDA smoke |
+| 2026-07-27 | Passed clean teacher-only CUDA smoke on `8eb21ff` | calibration and E0/E1/E2 packages audit with zero issues; current/history/current, 2+2 disjoint FP16 outputs, no cached inputs, one calibrated G update | P4.7 strict calibration |
