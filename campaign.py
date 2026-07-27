@@ -2270,6 +2270,45 @@ def _artifact_manifest(run_root: Path) -> dict[str, Any]:
     }
 
 
+def _write_portable_history(source: Path, target: Path) -> None:
+    """Copy a training history without machine-bound cache/manifest paths."""
+    private_fields = {"teacher_cache_manifest", "train_manifest"}
+    if source.suffix == ".csv":
+        with source.open(newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            fieldnames = [
+                field
+                for field in (reader.fieldnames or [])
+                if field not in private_fields
+            ]
+            rows = [
+                {key: value for key, value in row.items() if key in fieldnames}
+                for row in reader
+            ]
+        with target.open("w", newline="", encoding="utf-8") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(rows)
+        return
+    if source.suffix == ".json":
+        payload = json.loads(source.read_text(encoding="utf-8"))
+
+        def scrub(value: Any) -> Any:
+            if isinstance(value, dict):
+                return {
+                    key: scrub(item)
+                    for key, item in value.items()
+                    if key not in private_fields
+                }
+            if isinstance(value, list):
+                return [scrub(item) for item in value]
+            return value
+
+        _atomic_json(target, scrub(payload))
+        return
+    shutil.copy2(source, target)
+
+
 def _public_package_issues(run_root: Path) -> list[str]:
     issues: list[str] = []
     forbidden_text = (
@@ -2392,7 +2431,7 @@ def promote_converged_baseline(
             source_path = source_cell / suffix
             if not source_path.is_file():
                 raise FileNotFoundError(f"Missing training evidence: {source_path}")
-            shutil.copy2(source_path, destination / target_relative)
+            _write_portable_history(source_path, destination / target_relative)
 
     cells = {
         cell: _portable_baseline_cell(

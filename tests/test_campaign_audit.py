@@ -18,6 +18,7 @@ from campaign import (
     _portable_baseline_cell,
     _student_schedule,
     _teacher_cache_identity,
+    _write_portable_history,
     audit_campaign_run,
     close_converged_baseline,
     monitor_campaign_run,
@@ -260,6 +261,40 @@ class CampaignAuditTests(unittest.TestCase):
             portable["continued_from"]["training_state_sha256"],
             "def",
         )
+
+    def test_portable_history_removes_machine_bound_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            source_csv = root / "source.csv"
+            target_csv = root / "target.csv"
+            source_csv.write_text(
+                "epoch,loss,teacher_cache_manifest,train_manifest\n"
+                "1,0.5,PRIVATE_CACHE,PRIVATE_MANIFEST\n",
+                encoding="utf-8",
+            )
+            _write_portable_history(source_csv, target_csv)
+            source_json = root / "source.json"
+            target_json = root / "target.json"
+            source_json.write_text(
+                json.dumps(
+                    {
+                        "rows": [
+                            {
+                                "epoch": 1,
+                                "loss": 0.5,
+                                "teacher_cache_manifest": "PRIVATE_CACHE",
+                                "train_manifest": "PRIVATE_MANIFEST",
+                            }
+                        ]
+                    }
+                ),
+                encoding="utf-8",
+            )
+            _write_portable_history(source_json, target_json)
+            csv_text = target_csv.read_text(encoding="utf-8")
+            json_payload = json.loads(target_json.read_text(encoding="utf-8"))
+        self.assertEqual(csv_text, "epoch,loss\n1,0.5\n")
+        self.assertEqual(json_payload, {"rows": [{"epoch": 1, "loss": 0.5}]})
 
     def test_student_continuation_reconciles_two_cells(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
