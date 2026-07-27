@@ -2350,6 +2350,8 @@ def smoke_resume_equivalence(
         **common,
         cell=f"{cell}-INTERRUPTED",
     )
+    control.deterministic = True
+    interrupted.deterministic = True
     shutil.copy2(source_model_path, control.checkpoint_out)
     shutil.copy2(source_model_path, interrupted.checkpoint_out)
     control_summary = run_experiment(control)

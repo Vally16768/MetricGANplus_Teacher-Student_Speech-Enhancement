@@ -148,6 +148,7 @@ class ExperimentConfig:
     log_torch_model: bool = False
     log_system_metrics: bool = False
     quantize_dynamic: bool = False
+    deterministic: bool = False
     bandwidth: str | None = None
     metric_proxy_weight: float = 0.25
     teacher_anchor_weight: float = 0.75
@@ -1364,7 +1365,11 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
 
     if config.device.startswith("cuda"):
         torch.cuda.set_device(torch.device(config.device))
-        torch.backends.cudnn.benchmark = True
+        if config.deterministic:
+            os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+        torch.backends.cudnn.benchmark = not config.deterministic
+        torch.backends.cudnn.deterministic = bool(config.deterministic)
+        torch.use_deterministic_algorithms(bool(config.deterministic))
         if hasattr(torch, "set_float32_matmul_precision"):
             torch.set_float32_matmul_precision("high")
 

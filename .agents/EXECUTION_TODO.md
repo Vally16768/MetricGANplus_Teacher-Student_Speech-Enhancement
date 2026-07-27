@@ -195,3 +195,4 @@ calibration, evaluation protocol, provenance and claim set.
 | 2026-07-27 | Localized and repaired post-evaluation resume state ordering | focused interrupted/resumed control test matches LR, patience, best state and history | P2.4 full suite |
 | 2026-07-27 | Passed static resume-repair validation | 51/51 tests; canonical config/plan valid; project guard zero issues | P2.6 clean CUDA smoke |
 | 2026-07-27 | Resume smoke A1 stopped before its injected interruption | PyTorch rejected NumPy RNG state encoded as `torch.uint32`; failed run preserved | encode RNG as serializable `int64`, test, rerun A2 |
+| 2026-07-27 | Resume smoke A2 reached final reconciliation but exposed CUDA kernel variance | control/resumed PESQ differed by about `6e-6` while LR/patience/best epoch aligned; exact model hashes differed | deterministic CUDA fault-injection smoke A3 |
