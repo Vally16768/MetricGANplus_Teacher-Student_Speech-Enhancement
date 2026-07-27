@@ -2,8 +2,8 @@
 
 Status: **active**
 Last evidence update: **2026-07-27**
-Current phase: **P3 corrective — batch-invariant evaluation**
-Next action: **P3.8 — re-evaluate and publish the corrected S0 package**
+Current phase: **P4 — teacher-only T1 improvement**
+Next action: **P4.7 — strict full-support discriminator calibration**
 
 This is the detailed execution board for the active research sequence. The
 campaign-wide summary remains `.agents/TODO.md`; this file owns the subtask
@@ -129,7 +129,7 @@ Gate: only selected, audited and portable artifacts enter Git.
 | P3.5 | Update `.agents`, README and documentation index | no stale baseline claims or duplicated source of truth | passed |
 | P3.6 | Run tests and project guard | required gates pass from the promotion snapshot | passed |
 | P3.7 | Commit and push baseline release | public commit/hash recorded; Git worktree clean | passed |
-| P3.8 | Correct variable-length evaluation discovered in P4 | per-utterance inference; re-evaluated T0/S0 package; v1 marked superseded; v2 audit/push | in-progress |
+| P3.8 | Correct variable-length evaluation discovered in P4 | per-utterance inference; re-evaluated T0/S0 package; v1 marked superseded; v2 audit/push | passed |
 
 Unblock condition: P1 and P2 pass.
 
@@ -149,7 +149,7 @@ reporting-only.
 | P4.4 | Complete resume-state tests for G/D loop | G, D, optimizers, scheduler, patience, replay and history restore | passed |
 | P4.5 | Run unit/integration tests and project guard | all required gates pass | passed |
 | P4.6 | Run clean CUDA smoke | current/history/current, clean=1, true noisy/enhanced PESQ, local replay observed | passed |
-| P4.7 | Run monitored teacher-only pilot | E0/E1/E2, immutable run, no cache/S1 | blocked |
+| P4.7 | Run strict calibration, then monitored teacher-only pilot | full-support D gate first; E0/E1/E2 only after pass; immutable runs; no cache/S1 | in-progress |
 | P4.8 | Audit teacher gate | true metrics and calibration reconcile independently | pending |
 | P4.9 | Record gate decision | pass selects T1; fail stops downstream work | pending |
 
@@ -205,3 +205,4 @@ calibration, evaluation protocol, provenance and claim set.
 | 2026-07-27 | Implemented teacher-only calibration and trial flows | E0 hash/protocol binding; disjoint D/held-out current outputs; failed-gate G skip; D optimizer/replay resume; 60/60 tests and config/plan validation pass | P4.6 clean CUDA smoke |
 | 2026-07-27 | Passed clean teacher-only CUDA smoke on `8eb21ff` | calibration and E0/E1/E2 packages audit with zero issues; current/history/current, 2+2 disjoint FP16 outputs, no cached inputs, one calibrated G update | P4.7 strict calibration |
 | 2026-07-27 | Stopped strict calibration before D after detecting batch-sensitive E0 | same checkpoint/manifest produced PESQ 2.7126 at batch 4 versus 2.6989 at batch 8 because BLSTM consumed right-padding; stopped run preserved | P3.8 true-length evaluation correction |
+| 2026-07-27 | Published corrected padding-invariant S0 baseline v2 | exact three model hashes retained; true-length run and public package audits zero issues; 61/61 tests, plan, guard, contract and privacy checks passed; commit `65b9a9c` pushed | P4.7 strict discriminator calibration |
