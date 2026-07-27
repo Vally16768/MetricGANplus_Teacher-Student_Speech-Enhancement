@@ -156,11 +156,15 @@ def build_proxy_records(
 
             for source, candidate in candidates:
                 aligned = min(length, candidate.numel())
-                score = pesq_score(
-                    clean[:aligned].numpy(),
-                    candidate[:aligned].numpy(),
-                    profile.sample_rate,
-                    bandwidth=profile.name,
+                score = (
+                    4.5
+                    if source == "clean"
+                    else pesq_score(
+                        clean[:aligned].numpy(),
+                        candidate[:aligned].numpy(),
+                        profile.sample_rate,
+                        bandwidth=profile.name,
+                    )
                 )
                 if not math.isfinite(score):
                     continue

@@ -22,6 +22,7 @@ from sebench.metricgan_alternating import (  # noqa: E402
     normalize_pesq,
     refresh_metricgan_discriminator,
 )
+from sebench.metric_proxy_training import build_proxy_records  # noqa: E402
 
 
 class IdentityTeacher(torch.nn.Module):
@@ -34,6 +35,46 @@ class AlternatingMetricGANTests(unittest.TestCase):
         self.assertAlmostEqual(normalize_pesq(-0.5), 0.0)
         self.assertAlmostEqual(normalize_pesq(4.5), 1.0)
         self.assertAlmostEqual(normalize_pesq(2.0), 0.5)
+
+    def test_clean_discriminator_label_is_exact_official_target(self) -> None:
+        waveform = torch.linspace(-0.5, 0.5, 8192)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = root / "pairs.csv"
+            manifest.write_text(
+                "noisy,clean\n/external/noisy.wav,/external/clean.wav\n",
+                encoding="utf-8",
+            )
+            with (
+                mock.patch(
+                    "sebench.metric_proxy_training.load_mono_audio",
+                    return_value=(waveform, 16_000),
+                ),
+                mock.patch(
+                    "sebench.metric_proxy_training.pesq_score",
+                    return_value=2.0,
+                ) as metric,
+            ):
+                payload = build_proxy_records(
+                    train_manifest=manifest,
+                    validation_manifest=manifest,
+                    output_dir=root / "records",
+                    bandwidth="wb",
+                    candidate_teacher_checkpoint=None,
+                    max_train_rows=1,
+                    max_validation_rows=1,
+                    device="cpu",
+                )
+            clean_records = [
+                record
+                for record in payload["records"]
+                if record["source"] == "clean"
+            ]
+            self.assertEqual(len(clean_records), 2)
+            self.assertTrue(
+                all(record["pesq"] == 4.5 for record in clean_records)
+            )
+            self.assertEqual(metric.call_count, 8)
 
     def test_discriminator_matches_official_layer_contract_and_round_trip(
         self,

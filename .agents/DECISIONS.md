@@ -179,8 +179,9 @@ the frozen `val_select` split and the existing promotion guardrails.
 Decision: canonical T1 uses the SpeechBrain MetricGAN discriminator architecture
 (four 5x5 spectral-normalized convolutions, mean pooling and 50/10/1 linear
 head). Before every generator epoch it executes current clean/enhanced/noisy,
-historical enhanced and current clean/enhanced/noisy D updates with
-`(PESQ + 0.5) / 5` targets, then freezes D for the generator update.
+historical enhanced and current clean/enhanced/noisy D updates. Clean uses the
+exact target `1`; noisy/enhanced use `(PESQ + 0.5) / 5`. D is then frozen for
+the generator update.
 
 Generated current enhanced waveforms are cached as FP16 only inside the ignored
 Desktop run directory. Replay metadata references VoiceBank noisy/clean files

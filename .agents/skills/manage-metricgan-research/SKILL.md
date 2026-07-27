@@ -35,8 +35,9 @@ the workflow matching the task.
 - Use a WB metric-discriminator checkpoint for canonical T1 teacher
   fine-tuning. Before every T1 generator epoch, update the SpeechBrain
   four-convolution discriminator in current clean/enhanced/noisy, historical
-  enhanced, current clean/enhanced/noisy order with true normalized PESQ
-  labels. Freeze D during the generator update. If a direct student-metric
+  enhanced, current clean/enhanced/noisy order with clean target `1` and true
+  normalized PESQ labels for noisy/enhanced. Freeze D during the generator
+  update. If a direct student-metric
   ablation is separately declared, use distinct WB and NB proxies; a WB proxy
   is not valid for NB, and an enhancement proxy is not TTS evidence.
 - Reject MP-SENet, FullSubNet, CMGAN and unrelated project artifacts from the

@@ -142,7 +142,8 @@ separate columns/figures and are not pooled.
 
 ```text
 before each G epoch:
- current clean/enhanced/noisy --true (PESQ+0.5)/5--> D updates
+ current clean ------------target 1-----------------> D updates
+ current enhanced/noisy ---true (PESQ+0.5)/5-------> D updates
  historical enhanced --------stored true score------> D replay
  current clean/enhanced/noisy ----------------------> D updates
                                       |
@@ -165,7 +166,7 @@ accepted official output; the fine-tune learning rate is `1e-5`.
 
 Generated current teacher outputs and historical replay live only inside the
 ignored Desktop run directory as FP16. Their index stores true enhanced/noisy
-PESQ labels and references the external clean/noisy paths without copying
+PESQ labels (clean is fixed to 1) and references the external clean/noisy paths without copying
 dataset audio. Noisy scores are reused from a local JSON cache. D optimizer,
 checkpoint and refresh history are part of the resumable T1 state.
 

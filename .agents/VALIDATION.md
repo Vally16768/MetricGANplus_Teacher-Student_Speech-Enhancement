@@ -128,6 +128,10 @@ metric/reference profile matches the run profile
 - alternating implementation unit tests cover PESQ normalization, SpeechBrain
   spectral-normalized layer/checkpoint contract, three-pass refresh, FP16
   generated-output replay, no noisy/clean copies and D freezing after refresh.
-- 44/44 unit/integration tests, the canonical research-plan validator, the real
+- 45/45 unit/integration tests, the canonical research-plan validator, the real
   `campaign.py validate` entry point and the project guard pass after the
   alternating implementation; clean GPU execution remains the open gate.
+- first clean alternating smoke A1 completed and audited 7/7 cells, 42/42
+  samples and zero issues, but exposed a warm-start-only clean-label mismatch:
+  library PESQ could exceed 4.5 while official D_clean is exactly 1. The run is
+  preserved as structural evidence and superseded before pilot.
