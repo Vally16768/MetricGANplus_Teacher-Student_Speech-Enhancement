@@ -163,8 +163,11 @@ metric/reference profile matches the run profile
   test remained unread.
 - T15 OOF-calibration implementation passed the complete suite (`101/101`)
   and project guard (`0` issues). Nested 5x4 train-only OOF calibration has
-  exact affine-folding and deterministic-repeat coverage; CUDA smoke is the
-  next gate before production.
+  exact affine-folding and deterministic-repeat coverage.
+- T15 clean CUDA smoke `20260728-t15-router-smoke-wb-s3003-a1` completed
+  train/rank labeling, nested OOF fits, all 336 policies and quadratic
+  checkpoint round-trip. Its deliberately small support did not read
+  `val_select` or test.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend
