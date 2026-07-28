@@ -61,7 +61,8 @@ Update this register whenever a gate changes state.
 | C54 | Implement and audit T3 differentiable losses | pinned source, WB contracts, untouched local-direction gate and CUDA tests passed | passed |
 | C55 | Run matched T3 teacher pilots | full E1/E2 produced six rollbacks and no accepted epoch; D3 ineligible after harmful E2 | failed |
 | C56 | Confirm and transfer an accepted T3 | three seeds, C3, fresh S3-WB/S3-NB and final audit | blocked |
-| C57 | Execute T4 bounded true-PESQ trust region | scalar mask-logit calibration, then conditional micro-step/backtracking; same teacher gate | in-progress |
+| C57 | Execute T4 bounded true-PESQ trust region | T4-A safe `+0.002034`; T4-B effectively T0; no promotion | failed |
+| C58 | Execute T5 direct true-PESQ frequency-curve search | separated fit/cal support, smooth 8-knot bias and unchanged teacher gate | in-progress |
 
 ## Execution rule
 

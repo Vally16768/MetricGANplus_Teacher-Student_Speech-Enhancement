@@ -287,8 +287,8 @@ discussion.
 | `20260728-t3-e1-e2-contract-smoke-a2` | corrected CUDA flow passed | clean planned contract adopted; deterministic E1/E2 updates and E2 current-direction recheck passed | no, two-file smoke |
 | `20260728-t3-e1-e2-full-s3003-a2` | complete negative outcome | E1/E2 each rolled back at `1e-6`, `5e-7`, `2.5e-7`; selected checkpoints equal T0 and `val_select` gain is zero | no |
 
-T3 is closed. T4-A is recorded below and T4-B is the active successor. Test,
-teacher cache regeneration and students remain blocked.
+T3 and T4 are closed. T5 is the active teacher successor. Test, teacher cache
+regeneration and students remain blocked.
 
 ### T4 bounded trust region
 
@@ -299,3 +299,11 @@ SI-SDR changed by `-0.000467` and `-0.161412` dB. Both guardrails passed, but
 the PESQ gain was below `+0.01`; the checkpoint is not promoted. This safe,
 below-threshold outcome activates the predeclared T4-B micro-step
 backtracking trial.
+
+`20260728-t4b-microstep-wb-s3003-a1` completed exact-T0 trajectories at
+1/4/16/64/256 steps and all 25 backtracking candidates. PESQ degraded with
+horizon; the full 256-step proposal crossed the rollback boundary. The
+selected H1/alpha-0.125 checkpoint changed `val_select` PESQ by `-0.000001`,
+STOI by `+0.00000009` and SI-SDR by `+0.000074` dB. It is effectively T0 and
+fails the teacher gate. T5 therefore replaces surrogate gradients with direct
+true-PESQ search in a bounded smooth frequency curve.

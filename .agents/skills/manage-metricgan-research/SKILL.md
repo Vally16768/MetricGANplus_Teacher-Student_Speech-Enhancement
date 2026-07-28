@@ -13,7 +13,7 @@ read-only input.
 1. Locate the repository root.
 2. Read `AGENTS.md` and `.agents/INDEX.md`.
 3. Read the active execution board named by `.agents/INDEX.md`
-   (`.agents/TEACHER_T4_TODO.md` for T4), then only the other
+   (`.agents/TEACHER_T5_TODO.md` for T5), then only the other
    task-specific registers linked by the index. Read
    `.agents/EXECUTION_TODO.md` when completed P1–P6/T1 provenance is needed.
 4. Inspect Git state, affected files and existing evidence without cleaning or
@@ -61,8 +61,9 @@ not as a cosmetic warning.
 
 ## Execute the iterative board
 
-- Treat `.agents/TEACHER_T4_TODO.md` as the detailed source of truth for the
-  active T4 sequence. Treat `.agents/TEACHER_T3_TODO.md` and
+- Treat `.agents/TEACHER_T5_TODO.md` as the detailed source of truth for the
+  active T5 sequence. Treat `.agents/TEACHER_T4_TODO.md`,
+  `.agents/TEACHER_T3_TODO.md` and
   `.agents/TEACHER_SUCCESSOR_TODO.md` as completed negative evidence and
   `.agents/EXECUTION_TODO.md` as the completed P1–P6/T1 evidence ledger;
   `.agents/TODO.md` remains the campaign summary.

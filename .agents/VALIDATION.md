@@ -203,6 +203,11 @@ metric/reference profile matches the run profile
   trajectory, alpha `1/.5` interpolation, ordinary checkpoint round trip and
   two-file WB rank/select evaluation. Metrics and gradients remained finite;
   `production_support=false`, `verification_only=true` and `test_read=false`.
+- Full T4-B run `20260728-t4b-microstep-wb-s3003-a1` completed every declared
+  horizon/interpolation with production support. The 256-step full proposal
+  became unsafe; the selected H1/alpha-0.125 candidate had `val_select` PESQ
+  delta `-0.00000119` and correctly failed the unchanged gate. Test, cache and
+  students remained unread/unbuilt.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

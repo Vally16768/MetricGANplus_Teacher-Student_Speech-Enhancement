@@ -1,9 +1,9 @@
 # T4 teacher-improvement TODO
 
-Status: **in progress — T4-B implementation and validation**
+Status: **complete negative outcome — no T4 teacher promoted**
 Last update: **2026-07-28**
-Current phase: **T4.2 conditional micro-step backtracking**
-Next action: **commit smoke evidence and execute the full contracted T4-B pilot**
+Current phase: **T4.3 closed; T5 true-PESQ curve search activated**
+Next action: **preserve T4 evidence and execute `.agents/TEACHER_T5_TODO.md`**
 
 This board executes `TEACHER_T4_PLAN.md`. T0 remains the selected teacher; T1,
 T2 and T3 remain immutable negative evidence.
@@ -40,8 +40,8 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | T4.2.2 | Implement exact micro-step/resume trajectory | horizons `1,4,16,64,256`; each incomplete horizon restarts exact T0 | passed |
 | T4.2.3 | Implement checkpoint interpolation line search | alpha `1,.5,.25,.125,.0625`; true `val_rank` gate | passed |
 | T4.2.4 | Run focused/full tests and CUDA smoke | 85/85; `...t4b...smoke...a1` complete; finite one-step/checkpoints/eval | passed |
-| T4.2.5 | Run contracted T4-B pilot | stop at first unsafe horizon; no full harmful epoch | in-progress |
-| T4.2.6 | Apply one-shot `val_select` gate and audit | gain `>=.01`; STOI/SI-SDR guards; no test | pending |
+| T4.2.5 | Run contracted T4-B pilot | all 5 horizons; 25 rank candidates; horizon 256 unsafe | passed |
+| T4.2.6 | Apply one-shot `val_select` gate and audit | selected H1/a=.125; PESQ `-0.000001`; gate failed; no test | failed |
 
 ## T4.3 — Exit or successor
 
@@ -50,7 +50,7 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | T4.3.1 | Confirm teacher improvement across declared seeds | positive mean and paired PESQ CI excludes zero | blocked |
 | T4.3.2 | Promote accepted teacher evidence | independent package/privacy/hash audit | blocked |
 | T4.3.3 | Stop and shut down after genuine success | immediate power recheck; no active writes | blocked |
-| T4.3.4 | Predeclare T5 if T4-B fails | diagnose gradient conflict; do not relax gate | blocked |
+| T4.3.4 | Predeclare T5 if T4-B fails | true-PESQ low-dimensional curve search; unchanged gate | passed |
 
 ## Progress log
 
@@ -62,3 +62,4 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | 2026-07-28 | Closed T4-A below the promotion threshold | selected `-0.10`; `val_select` PESQ `+0.002034`; both quality guardrails pass; test unread | activate T4-B |
 | 2026-07-28 | Implemented deterministic T4-B micro-step/backtracking | exact T0 per horizon; atomic horizon resume; ordinary checkpoints; 85/85 tests and validators pass | clean commit and CUDA smoke |
 | 2026-07-28 | Passed clean T4-B CUDA smoke | one T0 micro-step; alpha `1/.5`; two-file rank/select path; finite artifacts; explicitly verification-only | full contracted pilot |
+| 2026-07-28 | Closed full T4-B as negative | selected H1/a=.125; `val_select` PESQ `-0.000001`; 256-step proposal unsafe; no test/cache/students | activate T5 true-PESQ curve search |

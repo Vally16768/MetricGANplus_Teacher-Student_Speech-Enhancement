@@ -1,6 +1,6 @@
 # T4 bounded true-PESQ trust-region plan
 
-Status: **active — T4-A scalar calibration implementation**
+Status: **complete negative outcome — T4-A/T4-B below teacher gate**
 
 ## Cause
 
@@ -50,6 +50,14 @@ Run only if T4-A is safe but below the teacher threshold.
 
 If T4-B also fails, diagnose gradient conflict explicitly and predeclare a
 constrained-gradient T5; do not relax the +0.01 promotion gate.
+
+## T4-B observed outcome
+
+Run `20260728-t4b-microstep-wb-s3003-a1` completed all five horizons and 25
+backtracking candidates. PESQ decreased with horizon; the 256-step proposal
+became unsafe. The selected horizon-1/alpha-0.125 checkpoint changed
+`val_select` PESQ by `-0.00000119`, STOI by `+0.00000009` and SI-SDR by
+`+0.000074` dB. No T4 teacher is promoted. T5 is the active successor.
 
 ## T4-A observed outcome
 

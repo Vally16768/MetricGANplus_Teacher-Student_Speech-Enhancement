@@ -22,8 +22,10 @@ status. Historical experiment directories are evidence, not canonical docs.
 | `.agents/TEACHER_SUCCESSOR_TODO.md` | completed iterative T2 board with final negative discriminator outcome | canonical complete |
 | `.agents/TEACHER_T3_PLAN.md` | executed direct-perceptual T3 teacher successor | canonical negative outcome |
 | `.agents/TEACHER_T3_TODO.md` | completed T3 execution board and evidence ledger | canonical complete |
-| `.agents/TEACHER_T4_PLAN.md` | bounded true-PESQ calibration and micro-step trust-region successor | canonical active |
-| `.agents/TEACHER_T4_TODO.md` | active iterative T4 execution board and evidence ledger | canonical active |
+| `.agents/TEACHER_T4_PLAN.md` | executed bounded true-PESQ calibration and micro-step successor | canonical negative outcome |
+| `.agents/TEACHER_T4_TODO.md` | completed T4 execution board and evidence ledger | canonical complete |
+| `.agents/TEACHER_T5_PLAN.md` | true-PESQ low-dimensional frequency-curve successor | canonical active |
+| `.agents/TEACHER_T5_TODO.md` | active iterative T5 execution board and evidence ledger | canonical active |
 | `docs/ARTIFACT_POLICY.md` | artifact policy | active, reconcile with this control plane |
 | `docs/FINAL_RESULTS.md` | canonical article-facing S0 table, negative T1 outcome and claim-to-artifact map | canonical reproduced |
 | `docs/audits/2026-07-26-initial-audit.md` | initial forensic audit | historical observed |
