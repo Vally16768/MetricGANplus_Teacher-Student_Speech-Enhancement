@@ -13,7 +13,7 @@ read-only input.
 1. Locate the repository root.
 2. Read `AGENTS.md` and `.agents/INDEX.md`.
 3. Read the active execution board named by `.agents/INDEX.md`
-   (`.agents/TEACHER_T10_TODO.md` for T10), then only the other
+   (`.agents/TEACHER_T11_TODO.md` for T11), then only the other
    task-specific registers linked by the index. Read
    `.agents/EXECUTION_TODO.md` when completed P1–P6/T1 provenance is needed.
 4. Inspect Git state, affected files and existing evidence without cleaning or
@@ -61,8 +61,9 @@ not as a cosmetic warning.
 
 ## Execute the iterative board
 
-- Treat `.agents/TEACHER_T10_TODO.md` as the detailed source of truth for the
-  active T10 sequence. Treat `.agents/TEACHER_T9_TODO.md`,
+- Treat `.agents/TEACHER_T11_TODO.md` as the detailed source of truth for the
+  active T11 sequence. Treat `.agents/TEACHER_T10_TODO.md`,
+  `.agents/TEACHER_T9_TODO.md`,
   `.agents/TEACHER_T8_TODO.md`,
   `.agents/TEACHER_T7_TODO.md`,
   `.agents/TEACHER_T6_TODO.md`,

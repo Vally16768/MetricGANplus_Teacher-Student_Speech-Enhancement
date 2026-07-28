@@ -339,3 +339,9 @@ both auxiliary guards. Its conservative threshold `0.02` retained `+0.017368`
 PESQ and passed STOI (`-0.001773`), while SI-SDR (`-0.279120` dB) missed the
 unchanged limit by `0.029120` dB. It stopped before validation and test. T10
 is the active fresh-support conservative-margin successor.
+
+`20260728-t10-router-wb-s3003-a1` selected margin `0.025`. It gained
+`+0.008331` on `val_rank` and `+0.008015` PESQ on `val_select`, with STOI
+`-0.001639` and SI-SDR `-0.207664` dB. Both auxiliary guards passed, but the
+unchanged PESQ gate failed; test remained unread. T11 is the active
+risk-penalized action-selection successor.

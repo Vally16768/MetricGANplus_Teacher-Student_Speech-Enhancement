@@ -45,6 +45,7 @@ from sebench.t9_multi_router import (  # noqa: E402
     prepare_t9_support_manifests,
 )
 from sebench.t10_risk_router import prepare_t10_calibration_manifest  # noqa: E402
+from sebench.t11_penalty_router import penalize_ridges  # noqa: E402
 
 
 class T4CalibrationTests(unittest.TestCase):
@@ -474,6 +475,25 @@ class T4CalibrationTests(unittest.TestCase):
         self.assertEqual(support["count"], 4)
         self.assertEqual(support["t9_pair_overlap"], 0)
         self.assertEqual(support["t9_clean_overlap"], 0)
+
+    def test_t11_penalty_favors_milder_actions_without_changing_weights(self) -> None:
+        ridges = [
+            {
+                "bias": 0.02,
+                "weights": [float(index)] * 16,
+                "feature_mean": [0.0] * 16,
+                "feature_scale": [1.0] * 16,
+            }
+            for index in range(4)
+        ]
+        adjusted = penalize_ridges(
+            ridges,
+            (-0.2, -0.4, -0.6, -0.8),
+            0.02,
+        )
+        self.assertGreater(adjusted[0]["bias"], adjusted[3]["bias"])
+        self.assertEqual(adjusted[2]["weights"], ridges[2]["weights"])
+        self.assertEqual(ridges[3]["bias"], 0.02)
 
 
 if __name__ == "__main__":

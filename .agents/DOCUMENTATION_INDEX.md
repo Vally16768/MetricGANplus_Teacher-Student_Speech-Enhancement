@@ -34,8 +34,10 @@ status. Historical experiment directories are evidence, not canonical docs.
 | `.agents/TEACHER_T8_TODO.md` | completed T8 board and evidence ledger | canonical complete |
 | `.agents/TEACHER_T9_PLAN.md` | executed train-only multi-action adaptive-routing successor | canonical negative outcome |
 | `.agents/TEACHER_T9_TODO.md` | completed T9 board and evidence ledger | canonical complete |
-| `.agents/TEACHER_T10_PLAN.md` | conservative-risk margin-calibration successor | canonical active |
-| `.agents/TEACHER_T10_TODO.md` | active T10 board and evidence ledger | canonical active |
+| `.agents/TEACHER_T10_PLAN.md` | executed conservative-risk margin-calibration successor | canonical negative outcome |
+| `.agents/TEACHER_T10_TODO.md` | completed T10 board and evidence ledger | canonical complete |
+| `.agents/TEACHER_T11_PLAN.md` | risk-penalized multi-action successor | canonical active |
+| `.agents/TEACHER_T11_TODO.md` | active T11 board and evidence ledger | canonical active |
 | `docs/ARTIFACT_POLICY.md` | artifact policy | active, reconcile with this control plane |
 | `docs/FINAL_RESULTS.md` | canonical article-facing S0 table, negative T1 outcome and claim-to-artifact map | canonical reproduced |
 | `docs/audits/2026-07-26-initial-audit.md` | initial forensic audit | historical observed |

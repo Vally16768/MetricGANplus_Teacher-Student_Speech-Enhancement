@@ -115,6 +115,13 @@ metric/reference profile matches the run profile
 - T10 clean CUDA smoke `20260728-t10-router-smoke-wb-s3003-a1` completed
   fresh support, conservative-margin selection, rank/select flow and
   checkpoint round-trip. It is verification-only; test remained unread.
+- T10 production `20260728-t10-router-wb-s3003-a1` passed prevalidation,
+  rank and both final auxiliary guards; `val_select` PESQ gain `+0.008015`
+  missed the unchanged gate, and test remained unread. T11 validation is
+  pending.
+- T11 implementation: 96/96 unit/integration tests pass, including immutable
+  strength-penalty folding and inherited router/checkpoint behavior. Campaign
+  validation and project guard pass; clean CUDA smoke remains pending.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

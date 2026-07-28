@@ -30,8 +30,10 @@ This directory is the canonical control plane for the research project.
 | [TEACHER_T8_TODO.md](TEACHER_T8_TODO.md) | Completed T8 board and oracle-ceiling evidence | T8 audit |
 | [TEACHER_T9_PLAN.md](TEACHER_T9_PLAN.md) | Executed train-only multi-action adaptive-routing successor | T9 audit |
 | [TEACHER_T9_TODO.md](TEACHER_T9_TODO.md) | Completed T9 board and auxiliary-risk evidence | T9 audit |
-| [TEACHER_T10_PLAN.md](TEACHER_T10_PLAN.md) | Active conservative-risk margin-calibration successor | all T10 work |
-| [TEACHER_T10_TODO.md](TEACHER_T10_TODO.md) | Active T10 dependency board and exit gates | every T10 iteration |
+| [TEACHER_T10_PLAN.md](TEACHER_T10_PLAN.md) | Executed conservative-risk margin-calibration successor | T10 audit |
+| [TEACHER_T10_TODO.md](TEACHER_T10_TODO.md) | Completed T10 board and below-gate evidence | T10 audit |
+| [TEACHER_T11_PLAN.md](TEACHER_T11_PLAN.md) | Active risk-penalized multi-action successor | all T11 work |
+| [TEACHER_T11_TODO.md](TEACHER_T11_TODO.md) | Active T11 dependency board and exit gates | every T11 iteration |
 
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
@@ -47,11 +49,12 @@ only `+0.004931`. T8 learned a safe `+0.009197` calibration router, but its
 single-action oracle ceiling was only `+0.014197`. T9 raised the oracle to
 `+0.031116`, but its PESQ-only decisions over-consumed SI-SDR; threshold
 `0.02` retained `+0.017368` PESQ and missed SI-SDR by `0.029120` dB. T0
-remains selected; T10 now calibrates conservative risk on fresh support**.
+remains selected. T10 passed auxiliary guards but gained only `+0.008015` on
+`val_select`; T11 now penalizes aggressive actions on fresh support**.
 
 Open work:
 
-- implement and validate the predeclared T10 risk-margin calibration;
+- implement and validate the predeclared T11 risk-penalized action utility;
 - run fresh-calibration/rank/select in order without reading test;
 - no cache, student or test evaluation may start before teacher promotion;
 - the TTS metric-critic hypothesis remains a separate future campaign.

@@ -60,6 +60,7 @@ from sebench.t7_confidence import run_t7_confidence_search  # noqa: E402
 from sebench.t8_router import run_t8_router_search  # noqa: E402
 from sebench.t9_multi_router import run_t9_multi_router_search  # noqa: E402
 from sebench.t10_risk_router import run_t10_conservative_search  # noqa: E402
+from sebench.t11_penalty_router import run_t11_penalty_search  # noqa: E402
 from sebench.teacher_cache import (  # noqa: E402
     TeacherCacheTarget,
     build_multi_target_teacher_cache,
@@ -3368,6 +3369,171 @@ def run_t10_conservative_trial(
     return {"run_root": run_root.as_posix(), **summary}
 
 
+def run_t11_penalty_trial(
+    config: dict[str, Any],
+    *,
+    baseline_run_dir: str | Path,
+    t9_run_dir: str | Path,
+    t10_run_dir: str | Path,
+    support_run_dir: str | Path,
+    teacher_checkpoint: str | Path,
+    run_id: str,
+    smoke: bool = False,
+) -> dict[str, Any]:
+    dataset_audit = validate_campaign_config(config)
+    git = _git_state()
+    if git["dirty"]:
+        raise RuntimeError("T11 requires a clean committed snapshot.")
+    require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+    device = require_training_cuda(str(config["runtime"]["device"]))
+    run_root = (
+        Path(str(config["runtime"]["run_root"])).expanduser().resolve() / run_id
+    )
+    provenance_path = run_root / "provenance" / "provenance.json"
+    if not provenance_path.is_file():
+        raise FileNotFoundError("T11 requires a planned run contract.")
+    provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+    resolved_config = run_root / "provenance" / "config_resolved.yaml"
+    if (
+        provenance.get("status") != "planned"
+        or provenance.get("git_commit") != git["commit"]
+        or not resolved_config.is_file()
+        or sha256(resolved_config) != provenance.get("config_sha256")
+    ):
+        raise ValueError("T11 planned contract does not match clean code/config.")
+
+    baseline_path = (
+        Path(baseline_run_dir).expanduser().resolve()
+        / "metrics"
+        / "campaign_summary.json"
+    )
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    t9_path = (
+        Path(t9_run_dir).expanduser().resolve()
+        / "cells"
+        / "T9-MULTI-ACTION-ROUTER"
+        / "summary.json"
+    )
+    t9 = json.loads(t9_path.read_text(encoding="utf-8"))
+    t9_checkpoint = Path(str(t9["selected_checkpoint"]))
+    t10_path = (
+        Path(t10_run_dir).expanduser().resolve()
+        / "cells"
+        / "T10-CONSERVATIVE-ROUTER"
+        / "summary.json"
+    )
+    t10 = json.loads(t10_path.read_text(encoding="utf-8"))
+    expected_hash = str(config["model"]["teacher_checkpoint_sha256"])
+    if (
+        t10.get("status") != "failed"
+        or t10["val_select_deltas"] is None
+        or float(t10["val_select_deltas"]["pesq_mean"]) >= 0.01
+        or not t9_checkpoint.is_file()
+        or sha256(t9_checkpoint) != t9["selected_checkpoint_sha256"]
+        or baseline["baseline"]["checkpoint_sha256"] != expected_hash
+        or sha256(teacher_checkpoint) != expected_hash
+        or bool(t10.get("test_read"))
+    ):
+        raise ValueError("T11 requires the auxiliary-safe below-PESQ T10 result.")
+    identities_path = (
+        Path(support_run_dir).expanduser().resolve()
+        / "support"
+        / "identities.json"
+    )
+    source_contract = {
+        "baseline_summary_sha256": sha256(baseline_path),
+        "t9_summary_sha256": sha256(t9_path),
+        "t9_checkpoint_sha256": sha256(t9_checkpoint),
+        "t10_summary_sha256": sha256(t10_path),
+        "identities_sha256": sha256(identities_path),
+        "teacher_checkpoint_sha256": expected_hash,
+    }
+    provenance.update(
+        {
+            "status": "running",
+            "campaign_scope": "t11_risk_penalized_multi_action",
+            "verification_only": bool(smoke),
+            "dataset_audit": dataset_audit,
+            "source_contract": source_contract,
+        }
+    )
+    _atomic_json(provenance_path, provenance)
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    torch.use_deterministic_algorithms(True)
+
+    def progress(message: str) -> None:
+        print(f"[T11] {message}", file=sys.stderr, flush=True)
+
+    try:
+        result = run_t11_penalty_search(
+            teacher_checkpoint=teacher_checkpoint,
+            t9_checkpoint=t9_checkpoint,
+            t9_summary_path=t9_path,
+            t10_summary_path=t10_path,
+            identities_path=identities_path,
+            val_rank_manifest=config["dataset"]["val_rank"],
+            val_select_manifest=config["dataset"]["val_select"],
+            baseline_rank_metrics=baseline["baseline"]["val_rank_metrics"],
+            baseline_select_metrics=baseline["baseline"]["val_select_metrics"],
+            output_dir=run_root / "cells" / "T11-PENALTY-ROUTER",
+            device=device,
+            calibration_count=10 if smoke else 72,
+            max_eval_files=10 if smoke else None,
+            progress_callback=progress,
+        )
+    except BaseException as exc:
+        provenance["status"] = "failed"
+        provenance["failure"] = {
+            "type": exc.__class__.__name__,
+            "message": str(exc),
+            "traceback": traceback.format_exc(),
+        }
+        _atomic_json(provenance_path, provenance)
+        _atomic_json(
+            run_root / "status.json",
+            {"status": "failed", "valid_for_promotion": False},
+        )
+        raise
+    summary = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "campaign_scope": "t11_risk_penalized_multi_action",
+        "verification_only": bool(smoke),
+        "source_contract": source_contract,
+        "test_read": False,
+        "result": result,
+        "teacher_gate": result["gate"],
+    }
+    _atomic_json(run_root / "metrics" / "campaign_summary.json", summary)
+    provenance["status"] = (
+        "verification_complete"
+        if smoke
+        else (
+            "candidate_gate_passed"
+            if result["gate"]["passed"]
+            else "complete_failed_gate"
+        )
+    )
+    provenance["result_summary_sha256"] = sha256(
+        run_root / "cells" / "T11-PENALTY-ROUTER" / "summary.json"
+    )
+    _atomic_json(provenance_path, provenance)
+    _atomic_json(
+        run_root / "status.json",
+        {
+            "status": provenance["status"],
+            "campaign_scope": "t11_risk_penalized_multi_action",
+            "teacher_gate_passed": bool(result["gate"]["passed"]),
+            "valid_for_promotion": False,
+            "verification_only": bool(smoke),
+            "test_read": False,
+        },
+    )
+    return {"run_root": run_root.as_posix(), **summary}
+
+
 def run_all(
     config: dict[str, Any],
     *,
@@ -5345,6 +5511,14 @@ def parse_args() -> argparse.Namespace:
         t10_search.add_argument("--support-run-dir", required=True)
         t10_search.add_argument("--teacher-checkpoint", required=True)
         t10_search.add_argument("--run-id", required=True)
+    for command in ("smoke-t11-router", "search-t11-router"):
+        t11_search = subparsers.add_parser(command)
+        t11_search.add_argument("--baseline-run-dir", required=True)
+        t11_search.add_argument("--t9-run-dir", required=True)
+        t11_search.add_argument("--t10-run-dir", required=True)
+        t11_search.add_argument("--support-run-dir", required=True)
+        t11_search.add_argument("--teacher-checkpoint", required=True)
+        t11_search.add_argument("--run-id", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -5938,6 +6112,18 @@ def main() -> None:
             run_id=args.run_id,
             smoke=args.command == "smoke-t10-router",
         )
+    elif args.command in {"smoke-t11-router", "search-t11-router"}:
+        config = load_campaign_config(args.config)
+        result = run_t11_penalty_trial(
+            config,
+            baseline_run_dir=args.baseline_run_dir,
+            t9_run_dir=args.t9_run_dir,
+            t10_run_dir=args.t10_run_dir,
+            support_run_dir=args.support_run_dir,
+            teacher_checkpoint=args.teacher_checkpoint,
+            run_id=args.run_id,
+            smoke=args.command == "smoke-t11-router",
+        )
     else:
         config = load_campaign_config(args.config)
     if args.command == "validate":
@@ -6070,6 +6256,8 @@ def main() -> None:
         "search-t9-router",
         "smoke-t10-router",
         "search-t10-router",
+        "smoke-t11-router",
+        "search-t11-router",
         "smoke-resume",
         "continue-students",
     }:

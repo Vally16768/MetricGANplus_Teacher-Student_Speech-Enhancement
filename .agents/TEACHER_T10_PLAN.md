@@ -1,6 +1,6 @@
 # T10 conservative-risk teacher-routing plan
 
-Status: **predeclared — implementation pending**
+Status: **complete negative outcome — PESQ gate**
 
 ## Cause and hypothesis
 
@@ -46,3 +46,11 @@ PESQ improves and both guardrails pass. The final promotion gate remains
 passing result still requires independent recomputation, declared support
 seeds, paired bootstrap confidence interval and package audit before promotion
 or shutdown.
+
+## Observed outcome
+
+`20260728-t10-router-wb-s3003-a1` selected threshold `0.025`. Fresh calibration
+gain was `+0.010010`; `val_rank` gained `+0.008331`; `val_select` gained
+`+0.008015` PESQ with STOI `-0.001639` and SI-SDR `-0.207664` dB. Auxiliary
+guards passed, but PESQ missed the unchanged `+0.01` gate. Test was unread.
+T11 retains the four actions and introduces a frozen action-strength penalty.
