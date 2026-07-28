@@ -283,6 +283,7 @@ discussion.
 |---|---|---|---|
 | `20260728-t3-direction-support-s0-a1` | direction gate passed | 5,600 candidates; audit sign `0.9222`, rho `0.8982`, min quartile `0.8454` | no, support only |
 | `20260728-t3-e1-e2-smoke-a1` | CUDA flow passed | exact T0/cache/support hashes; E1/E2 update, rollback controls, WB evaluation and selection completed; E2 current-direction gate passed | no, two-file smoke |
+| `20260728-t3-e1-e2-full-s3003-a1` | invalid infrastructure stop | missing pre-CUDA CuBLAS determinism contract; zero E1 optimizer steps; stopped before E2 | no |
 
 The next evidence-producing run is the complete matched E1/E2 pilot. Test and
 students remain blocked.

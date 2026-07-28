@@ -169,6 +169,13 @@ metric/reference profile matches the run profile
   official/cache/support hashes; both branches accepted one update and E2
   passed its current-output direction recheck. Its two-file PESQ delta
   (`-0.000094`) is verification-only and is not a teacher claim.
+- First full T3 attempt `20260728-t3-e1-e2-full-s3003-a1` is invalid
+  infrastructure evidence: deterministic CUDA was enabled after E0 without
+  first setting the CuBLAS workspace contract. E1 recorded three identical
+  pre-update failures and zero optimizer steps; the run was stopped before E2.
+  The corrected entry point sets determinism before E0 and propagates
+  unexpected runtime failures instead of classifying them as scientific
+  rollback decisions.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

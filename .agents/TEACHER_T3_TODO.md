@@ -88,3 +88,4 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | 2026-07-28 | Passed the untouched PMSQE direction gate | audit 771 eligible; sign `0.9222`; rho `0.8982`; min quartile `0.8454`; 21/21 parameter gradients finite | implement matched E1/E2 resume/rollback |
 | 2026-07-28 | Implemented exact post-evaluation state and rollback | bit-exact model/optimizer/scheduler/RNG resume test; deterministic matched crops/order | run CUDA smoke |
 | 2026-07-28 | Passed matched E1/E2 CUDA smoke | both branches trained/evaluated/selected; E2 current-direction gate passed; two-file metrics explicitly non-promotable | commit clean trainer and start full pilot |
+| 2026-07-28 | First full T3 attempt stopped on deterministic-CUDA preflight | `...full-s3003-a1`; CuBLAS workspace contract missing; three E1 proposals rejected before optimizer step, then operator interrupt; no teacher update | set determinism before E0, fail fast, revalidate and use a fresh run |

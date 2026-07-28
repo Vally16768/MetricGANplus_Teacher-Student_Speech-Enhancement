@@ -2050,6 +2050,10 @@ def run_t3_matched_pilot(
     provenance["support"] = support_contract
     _atomic_json(run_root / "provenance" / "provenance.json", provenance)
     device = str(config["runtime"]["device"])
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    torch.use_deterministic_algorithms(True)
     dataset = dict(config["dataset"])
     smoke = mode == "smoke"
 
@@ -2131,24 +2135,44 @@ def run_t3_matched_pilot(
                 raise ValueError(f"T3 resume completed-branch audit failed: {branch}")
             continue
         _mark_stage(run_root, stage=branch, status="running")
-        branches[branch] = run_t3_branch(
-            branch=branch,
-            teacher_checkpoint=teacher_checkpoint,
-            teacher_cache_manifest=teacher_cache_manifest,
-            identities_path=identities_path,
-            weights_path=weights_path,
-            val_rank_manifest=dataset["val_rank"],
-            val_select_manifest=dataset["val_select"],
-            output_dir=run_root / "cells" / branch,
-            baseline_rank_metrics=baseline["val_rank_metrics"],
-            device=device,
-            seed=int(config["training"]["t3_direction_seed"]),
-            max_accepted_epochs=1 if smoke else 10,
-            batch_size=1,
-            smoke=smoke,
-            resume=True,
-            progress_callback=progress,
-        )
+        try:
+            branches[branch] = run_t3_branch(
+                branch=branch,
+                teacher_checkpoint=teacher_checkpoint,
+                teacher_cache_manifest=teacher_cache_manifest,
+                identities_path=identities_path,
+                weights_path=weights_path,
+                val_rank_manifest=dataset["val_rank"],
+                val_select_manifest=dataset["val_select"],
+                output_dir=run_root / "cells" / branch,
+                baseline_rank_metrics=baseline["val_rank_metrics"],
+                device=device,
+                seed=int(config["training"]["t3_direction_seed"]),
+                max_accepted_epochs=1 if smoke else 10,
+                batch_size=1,
+                smoke=smoke,
+                resume=True,
+                progress_callback=progress,
+            )
+        except BaseException as exc:
+            _mark_stage(
+                run_root,
+                stage=branch,
+                status="failed",
+                error=f"{exc.__class__.__name__}: {exc}",
+            )
+            provenance["status"] = "failed"
+            provenance["failure"] = {
+                "stage": branch,
+                "type": exc.__class__.__name__,
+                "message": str(exc),
+                "traceback": traceback.format_exc(),
+            }
+            _atomic_json(
+                run_root / "provenance" / "provenance.json",
+                provenance,
+            )
+            raise
         _mark_stage(
             run_root,
             stage=branch,

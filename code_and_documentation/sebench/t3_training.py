@@ -527,7 +527,7 @@ def run_t3_branch(
                 >= float(baseline_rank_metrics["sisdr_mean"]) - 0.25,
                 "local_direction": local_gate is None or bool(local_gate["passed"]),
             }
-        except (FloatingPointError, RuntimeError) as exc:
+        except FloatingPointError as exc:
             failure = f"{exc.__class__.__name__}: {exc}"
             train_metrics = {}
             rank_metrics = {}
