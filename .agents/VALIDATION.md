@@ -142,6 +142,12 @@ metric/reference profile matches the run profile
   internal torch-pesq buffers remained on CPU for a CUDA candidate. Zero model
   or optimizer updates occurred. The helper now moves every component module
   to the candidate device and the focused CUDA calibration regression passes.
+- T3 fixed support `20260728-t3-direction-support-s0-a1`: 1,000 train, 200
+  calibration and 200 untouched audit identities; pair and clean-utterance
+  disjoint from both supplied T2 supports; identity hash `04022b77...`;
+  independent audit zero issues. Train-only 16-row CUDA calibration froze
+  anchor `4.30122085`, PMSQE `0.00186623`, SI-SDR `0.10`; weights hash
+  `e9edaae1...`; validation/test rows used `0/0`.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

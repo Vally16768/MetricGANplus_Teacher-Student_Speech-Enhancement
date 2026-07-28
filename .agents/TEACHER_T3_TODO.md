@@ -2,8 +2,8 @@
 
 Status: **active plan — T3.1 implementation in progress**
 Last update: **2026-07-28**  
-Current phase: **T3.1 differentiable-loss provenance and tests**  
-Next action: **freeze train-only gradient weights on fresh T3 identities**
+Current phase: **T3.2 fixed local-direction support**
+Next action: **generate bounded T0 mask-logit candidates for the frozen identities**
 
 This board executes `TEACHER_T3_PLAN.md`. T1 and T2 remain immutable negative
 evidence.
@@ -27,15 +27,15 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | T3.1.1 | Pin PMSQE source/revision/license | torch-pesq 0.1.2; core hashes match `3aac3c8`; MIT; CPU/CUDA finite gradients | passed |
 | T3.1.2 | Implement MR-STFT/SI-SDR/anchor/PMSQE losses | isolated E1/E2 module; explicit WB/16 kHz and true-length contracts | passed |
 | T3.1.3 | Add numerical/gradient/invariance tests | 8 focused + 77 full tests; real VoiceBank CUDA waveform/21-tensor gradients finite | passed |
-| T3.1.4 | Calibrate train-only gradient weights | frozen values; no validation tuning | in-progress |
-| T3.1.5 | Run full tests, config validation and guard | all pass, zero issues | blocked |
+| T3.1.4 | Calibrate train-only gradient weights | 16 train rows; anchor `4.30122085`; PMSQE `0.00186623`; weights hash `e9edaae1...` | passed |
+| T3.1.5 | Run full tests, config validation and guard | 78/78; plan/campaign valid; project guard zero issues | passed |
 
 ## T3.2 — Fixed local-direction support
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T3.2.1 | Freeze 1000/200/200 T3 identities | pair-disjoint and T2-overlap report | blocked |
-| T3.2.2 | Generate teacher-manifold candidates | T0 masks and train-only micro-trajectories | blocked |
+| T3.2.1 | Freeze 1000/200/200 T3 identities | hash `04022b77...`; pair/clean disjoint from both T2 supports; audit zero issues | passed |
+| T3.2.2 | Generate teacher-manifold candidates | T0 masks and train-only micro-trajectories | in-progress |
 | T3.2.3 | Label candidates with true PESQ-WB | local FP16 cache; finite labels | blocked |
 | T3.2.4 | Audit PMSQE local direction | sign/rank/SNR/gradient gate | blocked |
 | T3.2.5 | Record E2 eligibility | pass or exact stop cause | blocked |
@@ -82,3 +82,4 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | 2026-07-28 | Passed direct-loss numerical and model compatibility tests | 77/77 full suite; zero-delta mask parity; real VoiceBank CUDA PMSQE and all 21 parameter gradients finite | freeze train-only weights |
 | 2026-07-28 | Froze fresh T3 support identities | 1,000/200/200; hash `04022b77...`; pair/clean disjoint from both T2 supports; audit zero issues | calibrate weights |
 | 2026-07-28 | Calibration preflight stopped safely on a device mismatch | internal torch-pesq module stayed on CPU while candidate was CUDA; zero weights/model updates; CUDA regression added | validate and retry from clean fix |
+| 2026-07-28 | Froze E1/E2 gradient weights on train only | 16 T3-train directions; anchor `4.30122085`, PMSQE `0.00186623`; hash `e9edaae1...`; 0 val/test rows | generate mask candidates |
