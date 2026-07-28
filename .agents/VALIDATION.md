@@ -148,6 +148,11 @@ metric/reference profile matches the run profile
   independent audit zero issues. Train-only 16-row CUDA calibration froze
   anchor `4.30122085`, PMSQE `0.00186623`, SI-SDR `0.10`; weights hash
   `e9edaae1...`; validation/test rows used `0/0`.
+- T3 candidate/direction implementation predeclares four bounded mask-logit
+  deltas, zero-delta/cache parity, FP16-only output storage and the 200-pair
+  untouched audit gate. Synthetic perfect-direction fixture passes all gate
+  components; focused suite `10/10`, full suite `79/79`, campaign validation
+  and project guard pass.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

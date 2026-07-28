@@ -270,6 +270,9 @@ and these candidates remain ignored FP16 local artifacts.
 clean-utterance exclusion against all supplied T2 supports. The root campaign
 entry point owns selection, independent reconciliation and 16-row CUDA
 gradient-weight calibration; neither validation nor test is read.
+It then creates four bounded mask-logit variants (`-0.04`, `-0.02`, `+0.02`,
+`+0.04`) per identity, stores only generated FP16 waveforms, labels them with
+true PESQ-WB and the direct surrogate, and applies the untouched audit gate.
 
 The earlier bounded frozen-proxy branch remains historical negative evidence,
 not the canonical T1 implementation. The alternating branch passed structural

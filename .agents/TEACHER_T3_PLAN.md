@@ -106,6 +106,9 @@ The frozen implementation contract is:
 - the direction support uses seed `3003`; weight calibration uses the first
   16 frozen direction-train identities, 32,000-sample segments and mask-logit
   delta `+0.02`, aggregating component waveform-gradient norms by their median.
+- fixed local candidates use mask-logit deltas `-0.04`, `-0.02`, `+0.02`,
+  `+0.04`; the zero-delta reconstruction must match the FP16 T0 cache with
+  waveform MAE at most `5e-4`.
 
 The source/license/hash record is
 `code_and_documentation/reference/torch_pesq_0.1.2.json`.

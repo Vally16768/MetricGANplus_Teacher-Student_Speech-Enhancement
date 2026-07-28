@@ -45,8 +45,10 @@ from sebench.metricgan_d2 import (  # noqa: E402
 )
 from sebench.runtime import require_shared_venv, require_training_cuda  # noqa: E402
 from sebench.t3_support import (  # noqa: E402
+    audit_t3_direction,
     audit_t3_identities,
     calibrate_t3_weights,
+    generate_t3_mask_candidates,
     prepare_t3_identities,
 )
 from sebench.teacher_cache import (  # noqa: E402
@@ -3832,6 +3834,11 @@ def parse_args() -> argparse.Namespace:
     t3_weights = subparsers.add_parser("calibrate-t3-weights")
     t3_weights.add_argument("--support-run-dir", required=True)
     t3_weights.add_argument("--teacher-checkpoint", required=True)
+    t3_candidates = subparsers.add_parser("generate-t3-candidates")
+    t3_candidates.add_argument("--support-run-dir", required=True)
+    t3_candidates.add_argument("--teacher-checkpoint", required=True)
+    t3_direction_audit = subparsers.add_parser("audit-t3-direction")
+    t3_direction_audit.add_argument("--support-run-dir", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -3852,6 +3859,12 @@ def main() -> None:
             Path(args.run_dir).expanduser().resolve()
             / "support"
             / "identities.json"
+        )
+    elif args.command == "audit-t3-direction":
+        run_root = Path(args.support_run_dir).expanduser().resolve()
+        result = audit_t3_direction(
+            candidates_path=run_root / "support" / "candidates" / "candidates.json",
+            output_dir=run_root / "reports",
         )
     elif args.command == "monitor-run":
         result = monitor_campaign_run(args.run_dir)
@@ -4047,6 +4060,43 @@ def main() -> None:
                 "campaign_scope": "t3_direction_support",
                 "valid_for_promotion": False,
                 "audit_valid": True,
+            },
+        )
+    elif args.command == "generate-t3-candidates":
+        config = load_campaign_config(args.config)
+        validate_campaign_config(config)
+        git = _git_state()
+        if git["dirty"]:
+            raise RuntimeError("T3 candidate generation requires a clean snapshot.")
+        require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+        device = require_training_cuda(str(config["runtime"]["device"]))
+        run_root = Path(args.support_run_dir).expanduser().resolve()
+        identities_path = run_root / "support" / "identities.json"
+        if not (run_root / "support" / "weights.json").is_file():
+            raise ValueError("T3 weights must be frozen before candidate generation.")
+        result = generate_t3_mask_candidates(
+            identities_path=identities_path,
+            teacher_checkpoint=args.teacher_checkpoint,
+            expected_teacher_sha256=config["model"][
+                "teacher_checkpoint_sha256"
+            ],
+            output_dir=run_root / "support" / "candidates",
+            device=device,
+            progress_callback=print,
+        )
+        provenance_path = run_root / "provenance" / "provenance.json"
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+        provenance["status"] = "candidates_complete"
+        provenance["candidate_generation_commit"] = git["commit"]
+        provenance["candidates_sha256"] = sha256(result["candidates_path"])
+        _atomic_json(provenance_path, provenance)
+        _atomic_json(
+            run_root / "status.json",
+            {
+                "status": "candidates_complete",
+                "campaign_scope": "t3_direction_support",
+                "valid_for_promotion": False,
+                "candidate_count": result["candidate_count"],
             },
         )
     elif args.command == "prepare-d2-range-support":
@@ -4374,6 +4424,8 @@ def main() -> None:
         "prepare-t3-support",
         "audit-t3-support",
         "calibrate-t3-weights",
+        "generate-t3-candidates",
+        "audit-t3-direction",
         "smoke-resume",
         "continue-students",
     }:
@@ -4384,6 +4436,7 @@ def main() -> None:
         "audit-d2-support",
         "audit-d2-range-support",
         "audit-t3-support",
+        "audit-t3-direction",
     } and not result["valid"]:
         raise SystemExit(1)
 

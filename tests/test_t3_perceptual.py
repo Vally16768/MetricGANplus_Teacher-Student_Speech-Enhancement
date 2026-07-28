@@ -24,7 +24,11 @@ from sebench.t3_perceptual import (  # noqa: E402
     TrueLengthSISDRLoss,
     calibrate_t3_gradient_weights,
 )
-from sebench.t3_support import audit_t3_identities, prepare_t3_identities  # noqa: E402
+from sebench.t3_support import (  # noqa: E402
+    audit_t3_direction,
+    audit_t3_identities,
+    prepare_t3_identities,
+)
 
 
 def _fixture(
@@ -135,6 +139,54 @@ class T3PerceptualLossTests(unittest.TestCase):
             self.assertFalse(
                 excluded_clean
                 & {str(row["clean"]) for row in result["records"]}
+            )
+
+    def test_t3_direction_gate_uses_only_audit_deltas(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            parents = []
+            for parent_index in range(50):
+                candidates = []
+                for candidate_index, delta in enumerate((-0.02, -0.01, 0.01, 0.02)):
+                    path = root / f"{parent_index}-{candidate_index}.pt"
+                    torch.save(torch.zeros(8, dtype=torch.float16), path)
+                    candidates.append(
+                        {
+                            "candidate": path.as_posix(),
+                            "delta_pesq": delta,
+                            "delta_pmsqe": -delta,
+                        }
+                    )
+                parents.append(
+                    {
+                        "partition": "audit",
+                        "estimated_input_snr_db": float(parent_index),
+                        "candidates": candidates,
+                    }
+                )
+            source = root / "candidates.json"
+            source.write_text(
+                json.dumps(
+                    {
+                        "status": "candidates_complete",
+                        "parents": parents,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            result = audit_t3_direction(
+                candidates_path=source,
+                output_dir=root / "report",
+            )
+            self.assertTrue(result["valid"])
+            self.assertTrue(result["passed"])
+            self.assertEqual(
+                result["summaries"]["audit"]["eligible_pairs"],
+                200,
+            )
+            self.assertEqual(
+                result["summaries"]["audit"]["sign_agreement"],
+                1.0,
             )
 
     def test_pmsqe_silent_reference_is_safe_and_neutral(self) -> None:

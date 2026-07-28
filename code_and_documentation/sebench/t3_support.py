@@ -11,10 +11,16 @@ from typing import Any, Iterable
 
 import numpy as np
 import torch
+import matplotlib.pyplot as plt
+from scipy.stats import spearmanr
 
+from metrics.pesq import pesq_score
 from sebench.audio import load_mono_audio
 from sebench.checkpoints import load_model_from_checkpoint
-from sebench.t3_perceptual import calibrate_t3_gradient_weights
+from sebench.t3_perceptual import (
+    DifferentiablePESQInspiredLoss,
+    calibrate_t3_gradient_weights,
+)
 
 
 def _sha256(path: str | Path) -> str:
@@ -358,4 +364,309 @@ def calibrate_t3_weights(
         "records": observed,
     }
     _atomic_json(Path(output_path).expanduser().resolve(), result)
+    return result
+
+
+def _input_snr(clean: torch.Tensor, noisy: torch.Tensor) -> float:
+    signal = float(torch.mean(clean.square()).clamp_min(1e-12))
+    noise = float(torch.mean((noisy - clean).square()).clamp_min(1e-12))
+    return float(10.0 * np.log10(signal / noise))
+
+
+def generate_t3_mask_candidates(
+    *,
+    identities_path: str | Path,
+    teacher_checkpoint: str | Path,
+    expected_teacher_sha256: str,
+    output_dir: str | Path,
+    device: str = "cuda",
+    logit_deltas: tuple[float, ...] = (-0.04, -0.02, 0.02, 0.04),
+    progress_callback: Any | None = None,
+) -> dict[str, Any]:
+    """Generate resumable FP16 mask-logit candidates and true PESQ labels."""
+
+    if not str(device).startswith("cuda") or not torch.cuda.is_available():
+        raise RuntimeError("T3 teacher-manifold candidate generation requires CUDA.")
+    identity_path = Path(identities_path).expanduser().resolve()
+    identities = json.loads(identity_path.read_text(encoding="utf-8"))
+    records = list(identities.get("records") or [])
+    if identities.get("status") != "identities_frozen" or not records:
+        raise ValueError("T3 candidates require frozen non-empty identities.")
+    checkpoint_path = Path(teacher_checkpoint).expanduser().resolve()
+    checkpoint_hash = _sha256(checkpoint_path)
+    if checkpoint_hash != str(expected_teacher_sha256):
+        raise ValueError("T3 candidate checkpoint SHA-256 mismatch.")
+    deltas = tuple(float(value) for value in logit_deltas)
+    if deltas != (-0.04, -0.02, 0.02, 0.04):
+        raise ValueError("T3 mask-logit deltas must remain -0.04,-0.02,+0.02,+0.04.")
+    root = Path(output_dir).expanduser().resolve()
+    candidates_root = root / "waveforms"
+    candidates_root.mkdir(parents=True, exist_ok=True)
+    progress_path = root / "progress.json"
+    output_path = root / "candidates.json"
+    existing: dict[str, dict[str, Any]] = {}
+    if progress_path.is_file():
+        progress = json.loads(progress_path.read_text(encoding="utf-8"))
+        if (
+            progress.get("identities_sha256") == _sha256(identity_path)
+            and progress.get("teacher_checkpoint_sha256") == checkpoint_hash
+        ):
+            existing = {
+                str(row["token"]): row for row in progress.get("parents") or []
+            }
+    model, package = load_model_from_checkpoint(checkpoint_path, device=device)
+    model.eval()
+    pmsqe = DifferentiablePESQInspiredLoss().to(device)
+    parity_errors: list[float] = []
+    for index, row in enumerate(records, start=1):
+        token = str(row["token"])
+        if token in existing:
+            continue
+        noisy, _ = load_mono_audio(str(row["noisy"]), 16_000)
+        clean, _ = load_mono_audio(str(row["clean"]), 16_000)
+        cached = torch.load(
+            str(row["teacher_t0"]),
+            map_location="cpu",
+            weights_only=True,
+        )
+        if not isinstance(cached, torch.Tensor) or cached.dtype != torch.float16:
+            raise TypeError("T3 candidate generation requires an FP16 T0 cache.")
+        cached = cached.float().reshape(-1)
+        length = min(noisy.numel(), clean.numel(), cached.numel())
+        noisy = noisy[:length].contiguous()
+        clean = clean[:length].contiguous()
+        cached = cached[:length].contiguous()
+        with torch.no_grad():
+            variants = model.forward_mask_logit_variants(
+                noisy.to(device).reshape(1, 1, -1),
+                (0.0, *deltas),
+            )[:, 0, 0]
+            parity_mae = float(
+                torch.mean(torch.abs(variants[0].cpu() - cached)).item()
+            )
+            if parity_mae > 5e-4:
+                raise RuntimeError(
+                    f"T3 zero-delta/cache parity MAE {parity_mae:.6g} exceeds 5e-4."
+                )
+            parity_errors.append(parity_mae)
+            clean_gpu = clean.to(device).reshape(1, -1)
+            clean_batch = clean_gpu.expand(variants.shape[0], -1).contiguous()
+            with torch.autocast(device_type="cuda", enabled=False):
+                pmsqe_values = (
+                    pmsqe.loss(clean_batch.float(), variants.float())
+                    .detach()
+                    .cpu()
+                    .numpy()
+                )
+        variant_cpu = variants.detach().cpu()
+        base_pesq = float(
+            pesq_score(clean.numpy(), variant_cpu[0].numpy(), 16_000, bandwidth="wb")
+        )
+        candidates: list[dict[str, Any]] = []
+        for variant_index, delta in enumerate(deltas, start=1):
+            candidate_token = hashlib.sha256(
+                f"{token}|mask_logit|{delta:+.3f}".encode("utf-8")
+            ).hexdigest()[:24]
+            candidate_path = candidates_root / f"{candidate_token}.pt"
+            torch.save(variant_cpu[variant_index].half(), candidate_path)
+            score = float(
+                pesq_score(
+                    clean.numpy(),
+                    variant_cpu[variant_index].numpy(),
+                    16_000,
+                    bandwidth="wb",
+                )
+            )
+            candidates.append(
+                {
+                    "candidate_token": candidate_token,
+                    "mask_logit_delta": delta,
+                    "candidate": candidate_path.as_posix(),
+                    "storage_dtype": "float16",
+                    "pesq": score,
+                    "pmsqe": float(pmsqe_values[variant_index]),
+                    "delta_pesq": score - base_pesq,
+                    "delta_pmsqe": float(pmsqe_values[variant_index] - pmsqe_values[0]),
+                }
+            )
+        existing[token] = {
+            "token": token,
+            "partition": row["partition"],
+            "sample_count": length,
+            "estimated_input_snr_db": _input_snr(clean, noisy),
+            "t0_pesq": base_pesq,
+            "t0_pmsqe": float(pmsqe_values[0]),
+            "zero_delta_cache_mae": parity_mae,
+            "candidates": candidates,
+        }
+        if index == 1 or index == len(records) or index % 25 == 0:
+            _atomic_json(
+                progress_path,
+                {
+                    "schema_version": 1,
+                    "status": "running",
+                    "identities_sha256": _sha256(identity_path),
+                    "teacher_checkpoint_sha256": checkpoint_hash,
+                    "completed": len(existing),
+                    "parents": list(existing.values()),
+                },
+            )
+            if progress_callback:
+                progress_callback(f"T3 mask candidates {len(existing)}/{len(records)}")
+    ordered = [existing[str(row["token"])] for row in records]
+    payload = {
+        "schema_version": 1,
+        "status": "candidates_complete",
+        "dataset": "VoiceBank+DEMAND",
+        "bandwidth": "wb",
+        "sample_rate": 16_000,
+        "pesq_mode": "wb",
+        "identities_sha256": _sha256(identity_path),
+        "teacher_checkpoint_sha256": checkpoint_hash,
+        "teacher_family": package["model_family"],
+        "mask_logit_deltas": list(deltas),
+        "parent_count": len(ordered),
+        "candidate_count": len(ordered) * len(deltas),
+        "storage_dtype": "float16",
+        "cache_inputs": False,
+        "zero_delta_cache_mae_max": max(parity_errors) if parity_errors else 0.0,
+        "parents": ordered,
+    }
+    _atomic_json(output_path, payload)
+    _atomic_json(
+        progress_path,
+        {
+            "schema_version": 1,
+            "status": "complete",
+            "identities_sha256": _sha256(identity_path),
+            "teacher_checkpoint_sha256": checkpoint_hash,
+            "completed": len(ordered),
+            "candidates_sha256": _sha256(output_path),
+        },
+    )
+    return {**payload, "candidates_path": output_path.as_posix()}
+
+
+def audit_t3_direction(
+    *,
+    candidates_path: str | Path,
+    output_dir: str | Path,
+) -> dict[str, Any]:
+    """Apply the one-shot true-PESQ local direction gate."""
+
+    path = Path(candidates_path).expanduser().resolve()
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    parents = list(payload.get("parents") or [])
+    issues: list[str] = []
+    if payload.get("status") != "candidates_complete":
+        issues.append("candidates are not complete")
+    rows_by_partition: dict[str, list[dict[str, float]]] = {
+        "train": [],
+        "calibration": [],
+        "audit": [],
+    }
+    missing = 0
+    wrong_dtype = 0
+    for parent in parents:
+        partition = str(parent["partition"])
+        for candidate in parent.get("candidates") or []:
+            candidate_path = Path(str(candidate["candidate"]))
+            if not candidate_path.is_file():
+                missing += 1
+                continue
+            tensor = torch.load(candidate_path, map_location="cpu", weights_only=True)
+            if not isinstance(tensor, torch.Tensor) or tensor.dtype != torch.float16:
+                wrong_dtype += 1
+            delta_true = float(candidate["delta_pesq"])
+            delta_predicted = -float(candidate["delta_pmsqe"])
+            if np.isfinite(delta_true) and np.isfinite(delta_predicted) and abs(delta_true) >= 1e-4:
+                rows_by_partition[partition].append(
+                    {
+                        "delta_true": delta_true,
+                        "delta_predicted": delta_predicted,
+                        "snr": float(parent["estimated_input_snr_db"]),
+                    }
+                )
+    if missing:
+        issues.append(f"missing candidate tensors: {missing}")
+    if wrong_dtype:
+        issues.append(f"non-FP16 candidate tensors: {wrong_dtype}")
+
+    def summarize(rows: list[dict[str, float]]) -> dict[str, Any]:
+        true = np.asarray([row["delta_true"] for row in rows], dtype=np.float64)
+        predicted = np.asarray(
+            [row["delta_predicted"] for row in rows],
+            dtype=np.float64,
+        )
+        snr = np.asarray([row["snr"] for row in rows], dtype=np.float64)
+        agreement = np.sign(true) == np.sign(predicted)
+        rho = float(spearmanr(true, predicted).statistic) if len(rows) > 1 else float("nan")
+        quartiles: list[dict[str, Any]] = []
+        if len(rows):
+            edges = np.quantile(snr, [0.25, 0.50, 0.75])
+            bins = np.digitize(snr, edges)
+            for index in range(4):
+                selected = bins == index
+                quartiles.append(
+                    {
+                        "quartile": index + 1,
+                        "count": int(selected.sum()),
+                        "sign_agreement": float(agreement[selected].mean())
+                        if selected.any()
+                        else float("nan"),
+                    }
+                )
+        return {
+            "eligible_pairs": len(rows),
+            "sign_agreement": float(agreement.mean()) if len(rows) else float("nan"),
+            "delta_spearman": rho,
+            "snr_quartiles": quartiles,
+        }
+
+    summaries = {key: summarize(value) for key, value in rows_by_partition.items()}
+    audit = summaries["audit"]
+    min_quartile = min(
+        float(row["sign_agreement"]) for row in audit["snr_quartiles"]
+    ) if audit["snr_quartiles"] else float("nan")
+    gate_checks = {
+        "eligible_pairs_at_least_200": int(audit["eligible_pairs"]) >= 200,
+        "sign_agreement_at_least_0_70": float(audit["sign_agreement"]) >= 0.70,
+        "delta_spearman_at_least_0_60": float(audit["delta_spearman"]) >= 0.60,
+        "every_snr_quartile_at_least_0_55": min_quartile >= 0.55,
+        "candidate_artifacts_valid": not issues,
+    }
+    passed = all(gate_checks.values())
+    root = Path(output_dir).expanduser().resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    audit_rows = rows_by_partition["audit"]
+    figure, axis = plt.subplots(figsize=(6, 5))
+    axis.scatter(
+        [row["delta_true"] for row in audit_rows],
+        [row["delta_predicted"] for row in audit_rows],
+        s=8,
+        alpha=0.45,
+    )
+    axis.axhline(0.0, color="black", linewidth=0.7)
+    axis.axvline(0.0, color="black", linewidth=0.7)
+    axis.set_xlabel("true delta PESQ-WB")
+    axis.set_ylabel("predicted improvement (-delta PMSQE)")
+    axis.set_title("T3 untouched direction audit")
+    figure.tight_layout()
+    plot_path = root / "direction_audit.png"
+    figure.savefig(plot_path, dpi=160)
+    plt.close(figure)
+    result = {
+        "schema_version": 1,
+        "status": "passed" if passed else "failed",
+        "valid": not issues,
+        "passed": passed,
+        "eligible_threshold": 1e-4,
+        "candidates_sha256": _sha256(path),
+        "summaries": summaries,
+        "audit_min_snr_quartile_sign_agreement": min_quartile,
+        "gate_checks": gate_checks,
+        "issues": issues,
+        "direction_plot": plot_path.as_posix(),
+    }
+    _atomic_json(root / "direction_audit.json", result)
     return result
