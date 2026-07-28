@@ -112,6 +112,9 @@ metric/reference profile matches the run profile
   T3-audit support separation and inherited exact router/checkpoint behavior.
   Campaign split validation and project guard pass; clean CUDA smoke remains
   pending.
+- T10 clean CUDA smoke `20260728-t10-router-smoke-wb-s3003-a1` completed
+  fresh support, conservative-margin selection, rank/select flow and
+  checkpoint round-trip. It is verification-only; test remained unread.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend
