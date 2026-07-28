@@ -140,8 +140,11 @@ metric/reference profile matches the run profile
   and margin `0.015`; rank gained `+0.011176`, but `val_select` gained only
   `+0.008425` PESQ. Auxiliary guards passed and test remained unread.
 - T13 implementation full suite `98/98` and VoiceBank campaign split
-  validation pass; architecture hashes and project guard pass; CUDA smoke
-  remains.
+  validation pass; architecture hashes and project guard pass.
+- T13 clean CUDA smoke `20260728-t13-router-smoke-wb-s3003-a1` completed
+  train/rank labeling, twelve metric-delta ridges, 336 policies and checkpoint
+  round-trip. Small support caused the intended prevalidation stop; select and
+  test were unread.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend
