@@ -1,6 +1,6 @@
 # Final results — official T0 and converged S0 students
 
-Status: **canonical corrected baseline plus reproduced negative T1 diagnostic**.
+Status: **canonical corrected baseline plus reproduced negative T1/T2 diagnostics**.
 
 This document is the article-facing results index for the completed P1–P6
 sequence. Detailed architecture, data and experimental contracts remain in
@@ -12,7 +12,9 @@ sequence. Detailed architecture, data and experimental contracts remain in
 The official MetricGAN+ WB checkpoint successfully supervised converged WB and
 NB causal students. The proposed T1 phase did not produce an improved teacher:
 its metric discriminator failed current-output calibration before any
-generator update. Therefore S1 students were correctly not trained.
+generator update. The exact-parity T2 successor and its single train-only
+score-widening ablation also failed scalar and local-gradient gates. Therefore
+no T2 teacher update, C2 cache or S2 students were produced.
 
 ## Canonical S0 results
 
@@ -48,6 +50,20 @@ held-out current E0 outputs. It produced:
 There is no T1−T0 or S1−S0 effect size because T1 was never accepted and S1
 was never run. Reporting those comparisons as zero would be incorrect.
 
+## T2 discriminator stop gate
+
+| Metric | Required | D2-OFFICIAL | D2-RANGE |
+|---|---:|---:|---:|
+| normalized MAE | ≤ 0.06 | 0.289481 | 0.328655 |
+| Pearson | ≥ 0.80 | 0.762561 | 0.728317 |
+| Spearman | ≥ 0.80 | 0.776770 | 0.759910 |
+| local sign agreement | ≥ 0.70 | 0.529114 | 0.326582 |
+| local delta Spearman | ≥ 0.60 | -0.492946 | -0.622144 |
+
+Both discriminators failed. D2-RANGE widened the train-only PESQ support but
+degraded every primary audit measure relative to D2-OFFICIAL. There is no
+T2−T0 or S2−S0 effect size because the teacher was never updated.
+
 ## Claim-to-artifact map
 
 | Claim | Evidence |
@@ -57,6 +73,7 @@ was never run. Reporting those comparisons as zero would be incorrect.
 | Public model hashes equal audited local selections | v2 model inventory and import manifest |
 | Padding no longer changes recurrent evaluation | true-length regression test and v2 corrective audit |
 | T1 discriminator was unsafe for G updates | A3 two-refresh calibration metrics and negative audit |
+| T2 critic variants were unsafe for G updates | D2-OFFICIAL/D2-RANGE fixed-audit and local-direction reports |
 | No downstream work occurred after gate failure | zero G updates; no E1/E2/C1/S1 artifacts; execution board |
 
 ## Article assets and limitations
@@ -71,6 +88,10 @@ was never run. Reporting those comparisons as zero would be incorrect.
   `docs/audits/2026-07-27-converged-s0-baseline-v2.md`;
 - T1 negative audit:
   `docs/audits/2026-07-27-teacher-calibration-t1-negative.md`.
+- T2 negative audits and checkpoint packages:
+  `docs/audits/2026-07-28-d2-official-negative.md`,
+  `docs/audits/2026-07-28-d2-range-negative.md` and
+  `experiments/runs/20260728-t2-d2-*-negative/`.
 
 The principal limitations are one seed, no listener study, no uncertainty
 across retrainings and a failed T1 calibration stage. The separate TTS

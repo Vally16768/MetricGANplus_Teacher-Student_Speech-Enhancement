@@ -112,7 +112,17 @@ metric/reference profile matches the run profile
   zero teacher updates.
 - D2-RANGE train-only support/fitting implementation: `68/68` tests, including
   fixed-audit isolation, FP16-only derived candidates and balanced PESQ-bin
-  sampling; CUDA smoke remains the next gate.
+  sampling; production CUDA smoke passed.
+- D2-RANGE support `20260728-t2-d2-range-support-s0-a1`: 7,000 candidates,
+  1,000 train parents, seven declared types, 200 fixed audit identities, zero
+  missing/non-FP16/non-finite artifacts; support SHA-256 `3d563216...`.
+- strict D2-RANGE `20260728-t2-d2-range-s0-a1`: best epoch 6, early stop 11;
+  audit nMAE `0.3287`, Pearson `0.7283`, Spearman `0.7599`; local sign
+  `0.3266`, delta Spearman `-0.6221`; failed safely with zero G updates.
+- sanitized D2-OFFICIAL/D2-RANGE negative packages: 12/12 listed files each,
+  hashes and sizes reconcile, no private path in text/checkpoints, no file
+  above 100 MiB; final `68/68` tests, plan/config validation and project guard
+  pass.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

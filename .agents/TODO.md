@@ -53,10 +53,10 @@ Update this register whenever a gate changes state.
 | C46 | Close the ordered P1–P6 program | final S0 table and negative T1 evidence audited and pushed at `a485306`; conditional P5 work marked not applicable | passed |
 | C47 | Define a separate T2 teacher-successor protocol | indexed plan/TODO preserve T1, restore official batch-1 parity, fit D to convergence, add local directional gate and block students until teacher promotion | passed |
 | C48 | Establish exact official discriminator parity | SpeechBrain v1.1.0 `36c180c`; exact frontend/model/labels/update order; 65/65 tests and CUDA gradient smoke passed | passed |
-| C49 | Fit and audit a trustworthy D2 on current T0 outputs | disjoint train/calibration/audit support; full scalar and local directional gates | in-progress |
-| C50 | Run matched E1-control/E2-metric teacher pilots | same init/seed/schedule; true val metrics; rollback and resume verified | blocked |
+| C49 | Fit and audit a trustworthy D2 on current T0 outputs | D2-OFFICIAL and train-only D2-RANGE failed scalar/local gates; negative packages retained | failed |
+| C50 | Run matched E1-control/E2-metric teacher pilots | blocked by final D2 failure; zero generator updates | blocked |
 | C51 | Confirm and promote T2 across declared seeds | +0.01 PESQ-WB, STOI/SI-SDR guards, E2>E1, independent audit | blocked |
-| C52 | Transfer an accepted T2 to fresh S2-WB/S2-NB | C2 local cache; S0-matched students; bandwidth-correct evaluation and final report | blocked |
+| C52 | Transfer an accepted T2 to fresh S2-WB/S2-NB | not run: no accepted T2 teacher or C2 cache exists | blocked |
 
 ## Execution rule
 

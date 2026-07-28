@@ -256,3 +256,23 @@ outside the warm-start prediction range. S1 reproduced S0 from the identical
 T0 cache. Full remains blocked; the next trial is teacher-only and must repair
 calibration before any S1 training. See
 `docs/audits/2026-07-27-alternating-teacher-pilot-a1.md`.
+
+### T2 discriminator successor — final negative outcome
+
+`D2-OFFICIAL` restored exact SpeechBrain v1.1.0 frontend/model/update parity,
+then fitted a fresh batch-size-one discriminator on a fixed
+1,000/200/200 train/calibration/audit support. It failed both the scalar and
+local-direction gates. The conditional `D2-RANGE` ablation added 7,000
+train-only candidates with balanced PESQ-bin sampling while preserving the
+same audit. It also failed and degraded local guidance.
+
+| Strategy | Best/stop | nMAE | Pearson | Spearman | Local sign | Local rho |
+|---|---:|---:|---:|---:|---:|---:|
+| D2-OFFICIAL | 1 / 6 | 0.2895 | 0.7626 | 0.7768 | 0.5291 | -0.4929 |
+| D2-RANGE | 6 / 11 | 0.3287 | 0.7283 | 0.7599 | 0.3266 | -0.6221 |
+
+Neither checkpoint is approved for generator guidance. E1/E2, T2 teacher
+confirmation, C2 and S2-WB/S2-NB are not applicable under the predeclared
+gate. Sanitized negative packages, including their failed weights, remain in
+`experiments/runs/20260728-t2-d2-*-negative/` for reproducibility and article
+discussion.

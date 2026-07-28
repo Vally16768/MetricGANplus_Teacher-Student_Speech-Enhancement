@@ -19,7 +19,7 @@ status. Historical experiment directories are evidence, not canonical docs.
 | `.agents/EXECUTION_TODO.md` | completed iterative P1–P6 execution board and evidence ledger | canonical complete |
 | `.agents/TEACHER_IMPROVEMENT_PLAN.md` | executed failed T1 calibration protocol and separate TTS-transfer boundary | canonical negative outcome |
 | `.agents/TEACHER_SUCCESSOR_PLAN.md` | predeclared calibration- and local-gradient-gated T2 teacher successor | canonical planned |
-| `.agents/TEACHER_SUCCESSOR_TODO.md` | detailed iterative T2 execution board and evidence ledger | canonical active |
+| `.agents/TEACHER_SUCCESSOR_TODO.md` | completed iterative T2 board with final negative discriminator outcome | canonical complete |
 | `docs/ARTIFACT_POLICY.md` | artifact policy | active, reconcile with this control plane |
 | `docs/FINAL_RESULTS.md` | canonical article-facing S0 table, negative T1 outcome and claim-to-artifact map | canonical reproduced |
 | `docs/audits/2026-07-26-initial-audit.md` | initial forensic audit | historical observed |
@@ -40,9 +40,12 @@ status. Historical experiment directories are evidence, not canonical docs.
 | `docs/audits/2026-07-27-converged-s0-baseline-v2.md` | corrective true-length evaluation and canonical S0 promotion audit | active reproduced |
 | `docs/audits/2026-07-27-teacher-calibration-t1-negative.md` | final calibrated-discriminator failure, stop decision and downstream non-execution | active reproduced negative evidence |
 | `docs/audits/2026-07-28-d2-official-negative.md` | strict D2-OFFICIAL scalar/local gate failure and conditional D2-RANGE activation | active observed negative evidence |
+| `docs/audits/2026-07-28-d2-range-negative.md` | final D2-RANGE failure, T2 stop decision and no downstream teacher/student work | active observed negative evidence |
 | `experiments/README.md` | experiment directory explanation | active, consolidate later |
 | `experiments/runs/20260727-converged-s0-baseline-v1/reports/report.md` | padding-sensitive historical metric table | immutable superseded evidence |
 | `experiments/runs/20260727-converged-s0-baseline-v2/reports/report.md` | canonical true-length S0 metric table and correction statement | immutable reproduced evidence |
+| `experiments/runs/20260728-t2-d2-official-negative/reports/report.md` | D2-OFFICIAL failed scalar/local fidelity evidence | immutable observed negative evidence |
+| `experiments/runs/20260728-t2-d2-range-negative/reports/report.md` | D2-RANGE final failed gate and downstream stop | immutable observed negative evidence |
 | `code_and_documentation/configs/research_plan_voicebank_wb_nb.yaml` | machine-independent canonical WB/NB campaign contract | canonical configuration, non-Markdown |
 
 Rules:

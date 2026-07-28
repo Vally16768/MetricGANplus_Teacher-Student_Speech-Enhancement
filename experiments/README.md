@@ -39,3 +39,14 @@ leagă de dimensiune și SHA-256. Orice modificare ulterioară este detectată d
 care au eșuat un gate științific. Nu sunt modele promovate. Diagnosticul T1
 curent este
 [`20260727-teacher-calibration-t1-negative.json`](results/20260727-teacher-calibration-t1-negative.json).
+
+Checkpoint-urile D2 eșuate sunt păstrate explicit ca dovezi negative, nu ca
+modele promovate:
+
+| Run | Rezultat |
+|---|---|
+| [`20260728-t2-d2-official-negative`](runs/20260728-t2-d2-official-negative/) | arhitectură oficială; gate scalar și local eșuat |
+| [`20260728-t2-d2-range-negative`](runs/20260728-t2-d2-range-negative/) | suport train-only lărgit; gate final eșuat |
+
+Ambele pachete exclud datasetul, audio, cache-ul teacher, suportul/replay-ul
+D2 și starea de training regenerabilă.

@@ -1,0 +1,76 @@
+{
+  "copy_mode": "selected-negative-evidence-and-hash-verified",
+  "excluded_classes": [
+    "VoiceBank+DEMAND audio",
+    "teacher cache",
+    "D2 generated support/replay",
+    "training-state checkpoints"
+  ],
+  "file_count": 12,
+  "files": [
+    {
+      "bytes": 194801,
+      "path": "metrics/history.json",
+      "sha256": "8bdf83237a35755cd91daff4982863f7d6f02219a0872789687f356f042a0a90"
+    },
+    {
+      "bytes": 114412,
+      "path": "metrics/summary.json",
+      "sha256": "09cc7ebb30bcb0a00ba630531dae95cd6eb41424d995d98e7ec208e47874cf1c"
+    },
+    {
+      "bytes": 91544,
+      "path": "models/D2-RANGE.pt",
+      "sha256": "e6726d500c168eac4880a2d3e0364e8b3283dc06597adf86f451720602e57239"
+    },
+    {
+      "bytes": 252,
+      "path": "provenance/command.txt",
+      "sha256": "673c93b1511454adf9470c8d204dc81caaefd0b2a1d197dc47284795c29f119f"
+    },
+    {
+      "bytes": 3574,
+      "path": "provenance/config_resolved.yaml",
+      "sha256": "d94a70989103b7462ab6f880ec6aedac7409cfb79be9d3f3886f24f334b879af"
+    },
+    {
+      "bytes": 75,
+      "path": "provenance/environment.txt",
+      "sha256": "276c3332b5187df87075ae72f49d947ba76997de4f8b2fbd9d6c033f3fd47bea"
+    },
+    {
+      "bytes": 2696,
+      "path": "provenance/provenance.json",
+      "sha256": "e0e7969b72507a598d570a8e68c5e5c7afb86d0ba914614f3b0b108d5d52a26f"
+    },
+    {
+      "bytes": 59366,
+      "path": "reports/audit_calibration.png",
+      "sha256": "3c7962e706b1b73d35a0c203cdca4199f0d478dc7e552c4abd86b1c9f99e6a35"
+    },
+    {
+      "bytes": 55253,
+      "path": "reports/directional_deltas.png",
+      "sha256": "4299308f75fbf6dd1bb0781f7ab1bdcb5920d46b75b49a617d0c5793e011ca7a"
+    },
+    {
+      "bytes": 1052,
+      "path": "reports/report.md",
+      "sha256": "415c7d26c41267b4a50fb9964f7a0cc39b8dad0bb4ea4cbd390aaeaf58206192"
+    },
+    {
+      "bytes": 88543,
+      "path": "reports/training_history.png",
+      "sha256": "c5dc3ba4ee3d748c5e0eff3031fc4f3ae88bc89ff1378a7e14bf3e813d413b6c"
+    },
+    {
+      "bytes": 146,
+      "path": "status.json",
+      "sha256": "9c4fd2bd81621e844c42e40241efc10b9b6285cf05adcc6e06e34c886f0c3d02"
+    }
+  ],
+  "run_id": "20260728-t2-d2-range-negative",
+  "schema_version": 1,
+  "source_run_id": "20260728-t2-d2-range-s0-a1",
+  "total_bytes": 611714
+}

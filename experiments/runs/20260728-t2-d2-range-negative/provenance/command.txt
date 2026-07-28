@@ -1,0 +1,1 @@
+METRICGAN_MANIFEST_ROOT=<external-read-only-manifests> METRICGAN_RUN_ROOT=<local-runs> METRICGAN_SHARED_VENV=<shared-venv> shared-venv/bin/python campaign.py train-d2-range --support-run-dir <local-d2-range-support> --run-id 20260728-t2-d2-range-s0-a1

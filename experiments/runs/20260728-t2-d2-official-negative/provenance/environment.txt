@@ -1,0 +1,1 @@
+Python 3.11; PyTorch 2.8.0+cu128; CUDA; shared Desktop virtual environment

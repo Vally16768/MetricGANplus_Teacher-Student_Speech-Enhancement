@@ -1,9 +1,9 @@
 # T2 teacher successor TODO
 
-Status: **active — D2-OFFICIAL failed; D2-RANGE implementation under validation**
+Status: **complete negative outcome — both D2 branches failed; downstream stopped**
 Last update: **2026-07-28**  
-Current phase: **T2.4 D2-RANGE**
-Next action: **commit the tested implementation, then run the CUDA smoke**
+Current phase: **T2 stopped at discriminator gate**
+Next action: **retain negative evidence; predeclare a separate successor before new training**
 
 This board owns the iterative execution of
 `TEACHER_SUCCESSOR_PLAN.md`. The completed P1–P6 board and failed T1 evidence
@@ -97,10 +97,10 @@ Unblock: T2.2 passes.
 | ID | Item | Evidence | Status |
 |---|---|---|---|
 | T2.4.1 | Confirm eligible D2 failure mode | parity intact; eval/train-BN diagnostic cannot satisfy scalar/local gates | passed |
-| T2.4.2 | Build declared train-only score widening | deterministic interpolation/output-mask candidates; balanced PESQ bins | in-progress |
-| T2.4.3 | Refit with identical audit/stopping protocol | immutable run and checkpoint | blocked |
-| T2.4.4 | Reapply full and local gates | independent audit report | blocked |
-| T2.4.5 | Record final discriminator decision | accepted D2 or downstream stop | blocked |
+| T2.4.2 | Build declared train-only score widening | 7,000 candidates; 1,000 train parents; support `3d563216...`; clean audit | passed |
+| T2.4.3 | Refit with identical audit/stopping protocol | best epoch 6; early stop 11; checkpoint `e6726d50...` | passed |
+| T2.4.4 | Reapply full and local gates | nMAE 0.3287; r 0.7283; rho 0.7599; local sign 0.3266; rho -0.6221 | failed |
+| T2.4.5 | Record final discriminator decision | D2 rejected; no G update; public negative packages retained | passed |
 
 Unblock only if T2.3 fails for the predeclared eligible reason. If T2.3
 passes, mark T2.4 `not-applicable`.
@@ -109,14 +109,14 @@ passes, mark T2.4 `not-applicable`.
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T2.5.1 | Freeze E0 and matched E1/E2 configs | same init/seed/support/schedule | blocked |
-| T2.5.2 | Test rejected-update rollback and resume | exact G/D/control-state restoration | blocked |
-| T2.5.3 | Run E1 control CUDA smoke | no metric gradient | blocked |
-| T2.5.4 | Run E2 metric CUDA smoke | accepted D only; guards active | blocked |
-| T2.5.5 | Run monitored E1/E2 pilot | `val_rank` histories; immutable outputs | blocked |
-| T2.5.6 | Evaluate candidate pair on `val_select` | paired PESQ/STOI/SI-SDR | blocked |
-| T2.5.7 | Decide optional E3 LR | only safe positive/sub-threshold E2 | blocked |
-| T2.5.8 | Record pilot gate | pass, fail or inconclusive | blocked |
+| T2.5.1 | Freeze E0 and matched E1/E2 configs | same init/seed/support/schedule | not-applicable |
+| T2.5.2 | Test rejected-update rollback and resume | exact G/D/control-state restoration | not-applicable |
+| T2.5.3 | Run E1 control CUDA smoke | no metric gradient | not-applicable |
+| T2.5.4 | Run E2 metric CUDA smoke | accepted D only; guards active | not-applicable |
+| T2.5.5 | Run monitored E1/E2 pilot | `val_rank` histories; immutable outputs | not-applicable |
+| T2.5.6 | Evaluate candidate pair on `val_select` | paired PESQ/STOI/SI-SDR | not-applicable |
+| T2.5.7 | Decide optional E3 LR | only safe positive/sub-threshold E2 | not-applicable |
+| T2.5.8 | Record pilot gate | pass, fail or inconclusive | not-applicable |
 
 Unblock: one D2 branch passes both discriminator gates.
 
@@ -124,11 +124,11 @@ Unblock: one D2 branch passes both discriminator gates.
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T2.6.1 | Run declared E0/E1/E2 seed set | complete immutable runs | blocked |
-| T2.6.2 | Compute paired uncertainty | seed and utterance-level intervals | blocked |
-| T2.6.3 | Apply teacher promotion gate | +0.01 PESQ, STOI/SI-SDR guards, E2>E1 | blocked |
-| T2.6.4 | Evaluate selected T2 on test once | reporting-only test record | blocked |
-| T2.6.5 | Audit and select teacher hash | zero unresolved provenance/metric issues | blocked |
+| T2.6.1 | Run declared E0/E1/E2 seed set | complete immutable runs | not-applicable |
+| T2.6.2 | Compute paired uncertainty | seed and utterance-level intervals | not-applicable |
+| T2.6.3 | Apply teacher promotion gate | +0.01 PESQ, STOI/SI-SDR guards, E2>E1 | not-applicable |
+| T2.6.4 | Evaluate selected T2 on test once | reporting-only test record | not-applicable |
+| T2.6.5 | Audit and select teacher hash | zero unresolved provenance/metric issues | not-applicable |
 
 Unblock: T2.5 passes.
 
@@ -136,11 +136,11 @@ Unblock: T2.5 passes.
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T2.7.1 | Build content-addressed C2 | accepted T2 hash; local FP16 outputs | blocked |
-| T2.7.2 | Train fresh S2-WB | S0-matched architecture/policy; PESQ-WB | blocked |
-| T2.7.3 | Train fresh S2-NB | S0-matched architecture/policy; PESQ-NB | blocked |
-| T2.7.4 | Apply max-50 convergence rule | early stop or ceiling-limited decision | blocked |
-| T2.7.5 | Audit C2/S2 provenance | hashes, histories, support and bandwidth | blocked |
+| T2.7.1 | Build content-addressed C2 | accepted T2 hash; local FP16 outputs | not-applicable |
+| T2.7.2 | Train fresh S2-WB | S0-matched architecture/policy; PESQ-WB | not-applicable |
+| T2.7.3 | Train fresh S2-NB | S0-matched architecture/policy; PESQ-NB | not-applicable |
+| T2.7.4 | Apply max-50 convergence rule | early stop or ceiling-limited decision | not-applicable |
+| T2.7.5 | Audit C2/S2 provenance | hashes, histories, support and bandwidth | not-applicable |
 
 Unblock: T2.6 teacher promotion passes.
 
@@ -148,12 +148,12 @@ Unblock: T2.6 teacher promotion passes.
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T2.8.1 | Compare `T2−T0` | paired WB teacher metrics | blocked |
-| T2.8.2 | Compare `S2-WB−S0-WB` | WB reference/PESQ-WB | blocked |
-| T2.8.3 | Compare `S2-NB−S0-NB` | NB reference/PESQ-NB | blocked |
-| T2.8.4 | Generate article-ready report/figures | claim-to-artifact map | blocked |
-| T2.8.5 | Run independent package/privacy audit | zero unresolved issues | blocked |
-| T2.8.6 | Promote authorized Git artifacts | clean tested commit/push | blocked |
+| T2.8.1 | Compare `T2−T0` | paired WB teacher metrics | not-applicable |
+| T2.8.2 | Compare `S2-WB−S0-WB` | WB reference/PESQ-WB | not-applicable |
+| T2.8.3 | Compare `S2-NB−S0-NB` | NB reference/PESQ-NB | not-applicable |
+| T2.8.4 | Generate article-ready report/figures | negative D2 claim-to-artifact map | passed |
+| T2.8.5 | Run independent package/privacy audit | 12/12 files per package; hashes/sizes/private paths pass; guard 0 issues | passed |
+| T2.8.6 | Promote authorized Git artifacts | local tested commit; remote push blocked by missing GitHub HTTPS credentials | blocked |
 
 Unblock: T2.7 passes. If an upstream gate fails, replace downstream items with
 `not-applicable` and publish the negative evidence instead.
@@ -169,3 +169,6 @@ Unblock: T2.7 passes. If an upstream gate fails, replace downstream items with
 | 2026-07-28 | Passed resumable D2 code and clean CUDA smoke A1 | 67/67 tests; exact interrupted/resumed state; batch-1 current/history/current; checkpoint/state/plots; verification-only relaxed gate | run strict D2-OFFICIAL fit |
 | 2026-07-28 | Rejected strict D2-OFFICIAL A1 at both mandatory gates | best epoch 1/stop 6; audit nMAE 0.2895, r 0.7626, rho 0.7768; directional sign 0.5291, rho -0.4929; checkpoint `34112ac7...`; no G update | activate the predeclared D2-RANGE branch |
 | 2026-07-28 | Implemented train-only D2-RANGE support and balanced fitting path | fixed audit unchanged; six deterministic variants plus T0; FP16 derived cache; 68/68 tests | clean commit then CUDA smoke |
+| 2026-07-28 | Passed D2-RANGE support audit and CUDA smoke | 7,000 candidates/1,000 train parents; 200 fixed audit; support `3d563216...`; zero issues; production entry-point smoke passed | run strict D2-RANGE |
+| 2026-07-28 | Rejected strict D2-RANGE and stopped T2 downstream | best 6/stop 11; nMAE 0.3287, r 0.7283, rho 0.7599; local sign 0.3266, rho -0.6221; no G/C2/S2 work | audit and commit negative packages |
+| 2026-07-28 | Closed the T2 evidence package locally | both failed checkpoints/metrics/plots sanitized; 12/12 files each reconcile; 68/68 tests; plan/config/guard pass | commit locally; push awaits GitHub credentials |
