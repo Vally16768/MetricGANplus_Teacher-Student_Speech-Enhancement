@@ -198,6 +198,11 @@ metric/reference profile matches the run profile
   exact bounded state interpolation and the declared PMSQE-primary constrained
   loss composition. Research-plan/campaign validation, architecture hashes,
   project guard and diff check pass before the clean CUDA smoke.
+- Clean contracted CUDA smoke
+  `20260728-t4b-microstep-smoke-wb-s3003-a1` completed an exact-T0 one-step
+  trajectory, alpha `1/.5` interpolation, ordinary checkpoint round trip and
+  two-file WB rank/select evaluation. Metrics and gradients remained finite;
+  `production_support=false`, `verification_only=true` and `test_read=false`.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

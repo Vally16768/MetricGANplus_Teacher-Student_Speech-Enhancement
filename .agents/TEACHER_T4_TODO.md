@@ -3,7 +3,7 @@
 Status: **in progress — T4-B implementation and validation**
 Last update: **2026-07-28**
 Current phase: **T4.2 conditional micro-step backtracking**
-Next action: **commit T4-B and run its clean contracted CUDA smoke**
+Next action: **commit smoke evidence and execute the full contracted T4-B pilot**
 
 This board executes `TEACHER_T4_PLAN.md`. T0 remains the selected teacher; T1,
 T2 and T3 remain immutable negative evidence.
@@ -39,8 +39,8 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | T4.2.1 | Confirm T4-B eligibility | T4-A passed both guardrails but gained only `+0.002034` PESQ | passed |
 | T4.2.2 | Implement exact micro-step/resume trajectory | horizons `1,4,16,64,256`; each incomplete horizon restarts exact T0 | passed |
 | T4.2.3 | Implement checkpoint interpolation line search | alpha `1,.5,.25,.125,.0625`; true `val_rank` gate | passed |
-| T4.2.4 | Run focused/full tests and CUDA smoke | 85/85 and validators pass; clean CUDA smoke pending | in-progress |
-| T4.2.5 | Run contracted T4-B pilot | stop at first unsafe horizon; no full harmful epoch | pending |
+| T4.2.4 | Run focused/full tests and CUDA smoke | 85/85; `...t4b...smoke...a1` complete; finite one-step/checkpoints/eval | passed |
+| T4.2.5 | Run contracted T4-B pilot | stop at first unsafe horizon; no full harmful epoch | in-progress |
 | T4.2.6 | Apply one-shot `val_select` gate and audit | gain `>=.01`; STOI/SI-SDR guards; no test | pending |
 
 ## T4.3 — Exit or successor
@@ -61,3 +61,4 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | 2026-07-28 | Passed complete pre-run validation | 83/83 tests; research plan and real campaign validation pass; project guard zero issues | commit and create run contract |
 | 2026-07-28 | Closed T4-A below the promotion threshold | selected `-0.10`; `val_select` PESQ `+0.002034`; both quality guardrails pass; test unread | activate T4-B |
 | 2026-07-28 | Implemented deterministic T4-B micro-step/backtracking | exact T0 per horizon; atomic horizon resume; ordinary checkpoints; 85/85 tests and validators pass | clean commit and CUDA smoke |
+| 2026-07-28 | Passed clean T4-B CUDA smoke | one T0 micro-step; alpha `1/.5`; two-file rank/select path; finite artifacts; explicitly verification-only | full contracted pilot |
