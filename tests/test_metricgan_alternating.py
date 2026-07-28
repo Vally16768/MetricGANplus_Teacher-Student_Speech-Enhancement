@@ -28,7 +28,7 @@ from sebench.metricgan_alternating import (  # noqa: E402
     refresh_metricgan_discriminator,
 )
 from sebench.metric_proxy_training import build_proxy_records  # noqa: E402
-from sebench.metricgan_d2 import prepare_d2_support  # noqa: E402
+from sebench.metricgan_d2 import audit_d2_support, prepare_d2_support  # noqa: E402
 
 
 class IdentityTeacher(torch.nn.Module):
@@ -416,6 +416,21 @@ class AlternatingMetricGANTests(unittest.TestCase):
                 payload["source_hashes_before"],
                 payload["source_hashes_after"],
             )
+            run_root = root / "run"
+            (run_root / "support").mkdir(parents=True)
+            for name in ("support.json", "coverage.json", "coverage.png"):
+                source = root / "support" / name
+                target = run_root / "support" / name
+                if source.suffix == ".png":
+                    target.write_bytes(source.read_bytes())
+                else:
+                    target.write_text(
+                        source.read_text(encoding="utf-8"),
+                        encoding="utf-8",
+                    )
+            audit = audit_d2_support(run_root)
+            self.assertTrue(audit["valid"], audit)
+            self.assertEqual(audit["record_count"], 8)
 
 
 if __name__ == "__main__":

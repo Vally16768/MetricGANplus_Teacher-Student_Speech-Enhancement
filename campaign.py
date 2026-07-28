@@ -35,7 +35,7 @@ from sebench.metric_proxy_training import (  # noqa: E402
     build_proxy_records,
     train_metric_proxy,
 )
-from sebench.metricgan_d2 import prepare_d2_support  # noqa: E402
+from sebench.metricgan_d2 import audit_d2_support, prepare_d2_support  # noqa: E402
 from sebench.runtime import require_shared_venv, require_training_cuda  # noqa: E402
 from sebench.teacher_cache import (  # noqa: E402
     TeacherCacheTarget,
@@ -3759,6 +3759,8 @@ def parse_args() -> argparse.Namespace:
     d2_support.add_argument("--run-id", required=True)
     d2_support.add_argument("--teacher-cache-manifest", required=True)
     d2_support.add_argument("--teacher-cache-metadata", required=True)
+    d2_support_audit = subparsers.add_parser("audit-d2-support")
+    d2_support_audit.add_argument("--run-dir", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -3770,6 +3772,8 @@ def main() -> None:
     args = parse_args()
     if args.command == "audit-run":
         result = audit_campaign_run(args.run_dir)
+    elif args.command == "audit-d2-support":
+        result = audit_d2_support(args.run_dir)
     elif args.command == "monitor-run":
         result = monitor_campaign_run(args.run_dir)
     elif args.command == "close-baseline":
@@ -3990,12 +3994,14 @@ def main() -> None:
         "smoke-teacher",
         "pilot-teacher",
         "monitor-run",
+        "prepare-d2-support",
+        "audit-d2-support",
         "smoke-resume",
         "continue-students",
     }:
         raise ValueError(args.command)
     print(json.dumps(result, indent=2, sort_keys=True))
-    if args.command == "audit-run" and not result["valid"]:
+    if args.command in {"audit-run", "audit-d2-support"} and not result["valid"]:
         raise SystemExit(1)
 
 

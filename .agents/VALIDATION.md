@@ -91,6 +91,14 @@ metric/reference profile matches the run profile
 - direct shared-venv CUDA smoke on NVIDIA GTX 1660 Ti produced finite D
   parameter gradients and, after freezing D, a finite candidate waveform
   gradient with no D gradients.
+- fixed D2 support `20260728-t2-d2-support-s0-a3` independently reconciles
+  1000 train, 200 calibration and 200 untouched audit records; 1400 unique
+  pair/utterance tokens, zero missing or non-FP16 T0 targets, zero non-finite
+  fields, no copied inputs and unchanged source hashes. Support SHA-256:
+  `545ac1bfa2ad4075d89ecdcf89f1dd138e1524df93a4ac9065076aa75238e3e4`.
+- the source manifests do not retain VoiceBank speaker/noise identities;
+  exact speaker-disjointness is not claimed for D2 support. Dataset-level
+  frozen split overlap remains zero.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

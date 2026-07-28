@@ -402,3 +402,92 @@ def prepare_d2_support(
         },
     )
     return {**payload, "support_path": support_path.as_posix()}
+
+
+def audit_d2_support(run_dir: str | Path) -> dict[str, Any]:
+    """Independently reconcile a prepared D2 support package."""
+    root = Path(run_dir).expanduser().resolve()
+    support_path = root / "support" / "support.json"
+    issues: list[str] = []
+    if not support_path.is_file():
+        return {
+            "schema_version": 1,
+            "valid": False,
+            "issues": ["missing support/support.json"],
+        }
+    payload = json.loads(support_path.read_text(encoding="utf-8"))
+    records = list(payload.get("records") or [])
+    sizes = {
+        key: int(value)
+        for key, value in dict(payload.get("sizes") or {}).items()
+    }
+    observed_counts = {
+        partition: sum(row.get("partition") == partition for row in records)
+        for partition in ("train", "calibration", "audit")
+    }
+    if payload.get("status") != "complete":
+        issues.append("support status is not complete")
+    if observed_counts != sizes:
+        issues.append("partition counts do not match declared sizes")
+    tokens = [str(row.get("token") or "") for row in records]
+    if not tokens or len(tokens) != len(set(tokens)) or any(not token for token in tokens):
+        issues.append("support tokens are missing or duplicated")
+    if not bool(payload.get("utterance_disjoint")):
+        issues.append("support is not declared utterance-disjoint")
+    if payload.get("source_hashes_before") != payload.get("source_hashes_after"):
+        issues.append("source hashes changed during preparation")
+    if bool(payload.get("cache_inputs", True)):
+        issues.append("support declares copied source inputs")
+    if str(payload.get("storage_dtype")) != "float16":
+        issues.append("support storage dtype is not FP16")
+    for directory in (root / "support" / "noisy", root / "support" / "clean"):
+        if directory.exists():
+            issues.append(f"unexpected copied-input directory: {directory.name}")
+    for artifact in (
+        root / "support" / "coverage.json",
+        root / "support" / "coverage.png",
+    ):
+        if not artifact.is_file() or artifact.stat().st_size <= 0:
+            issues.append(f"missing coverage artifact: {artifact.name}")
+    missing_enhanced = 0
+    wrong_dtype = 0
+    nonfinite = 0
+    for row in records:
+        enhanced_path = Path(str(row.get("enhanced") or ""))
+        if not enhanced_path.is_file():
+            missing_enhanced += 1
+            continue
+        tensor = torch.load(
+            enhanced_path,
+            map_location="cpu",
+            weights_only=True,
+        )
+        if not isinstance(tensor, torch.Tensor) or tensor.dtype != torch.float16:
+            wrong_dtype += 1
+        for key in ("enhanced_pesq", "noisy_pesq", "estimated_input_snr_db"):
+            if not math.isfinite(float(row.get(key, float("nan")))):
+                nonfinite += 1
+    if missing_enhanced:
+        issues.append(f"missing enhanced targets: {missing_enhanced}")
+    if wrong_dtype:
+        issues.append(f"non-FP16 enhanced targets: {wrong_dtype}")
+    if nonfinite:
+        issues.append(f"non-finite metric fields: {nonfinite}")
+    return {
+        "schema_version": 1,
+        "valid": not issues,
+        "issues": issues,
+        "support_sha256": _sha256(support_path),
+        "record_count": len(records),
+        "counts": observed_counts,
+        "unique_tokens": len(set(tokens)),
+        "missing_enhanced": missing_enhanced,
+        "wrong_dtype": wrong_dtype,
+        "nonfinite_metric_fields": nonfinite,
+        "source_hashes_unchanged": payload.get("source_hashes_before")
+        == payload.get("source_hashes_after"),
+        "speaker_disjoint_verified": bool(
+            payload.get("speaker_disjoint_verified")
+        ),
+        "speaker_limitation": payload.get("speaker_limitation"),
+    }

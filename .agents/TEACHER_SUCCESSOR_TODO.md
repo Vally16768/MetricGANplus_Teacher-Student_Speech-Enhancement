@@ -2,8 +2,8 @@
 
 Status: **active — no training started**  
 Last update: **2026-07-28**  
-Current phase: **T2.2 fixed discriminator support**
-Next action: **freeze speaker/utterance-disjoint D2 support IDs**
+Current phase: **T2.3 D2-OFFICIAL**
+Next action: **implement resumable D-only fitting and gates**
 
 This board owns the iterative execution of
 `TEACHER_SUCCESSOR_PLAN.md`. The completed P1–P6 board and failed T1 evidence
@@ -70,11 +70,11 @@ Gate: all parity and invariance checks pass before any D2 fitting.
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T2.2.1 | Freeze D train/calibration/audit IDs | speaker/utterance disjoint manifests | in-progress |
-| T2.2.2 | Generate T0 candidates locally | T0/manifest hashes, FP16, no input copies | pending |
-| T2.2.3 | Compute true PESQ-WB labels | finite labels, mode/sample-rate provenance | pending |
-| T2.2.4 | Audit score and condition coverage | plots/tables by type, score, speaker, SNR/noise | pending |
-| T2.2.5 | Verify dataset read-only boundary | zero source mutation; local cache only | pending |
+| T2.2.1 | Freeze D train/calibration/audit IDs | pair/clean-utterance disjoint; source speaker IDs unavailable | passed |
+| T2.2.2 | Generate T0 candidates locally | T0/manifest hashes, FP16, no input copies | passed |
+| T2.2.3 | Compute true PESQ-WB labels | finite labels, mode/sample-rate provenance | passed |
+| T2.2.4 | Audit score and condition coverage | plots/tables by type, score and estimated SNR | passed |
+| T2.2.5 | Verify dataset read-only boundary | zero source mutation; local cache only | passed |
 
 Unblock: T2.1 passes.
 
@@ -82,13 +82,13 @@ Unblock: T2.1 passes.
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T2.3.1 | Implement resumable D-only fitting | D/optimizer/scheduler/patience/replay state | blocked |
-| T2.3.2 | Add interrupted/resumed equivalence test | selected hash and control state match | blocked |
-| T2.3.3 | Run clean CUDA smoke | batch 1, three passes, true labels observed | blocked |
-| T2.3.4 | Fit D2 to declared stopping rule | immutable history and selected checkpoint | blocked |
-| T2.3.5 | Apply untouched audit fidelity gate | MAE/correlation/range/subgroups | blocked |
-| T2.3.6 | Apply local directional gate | sign agreement and delta-rank report | blocked |
-| T2.3.7 | Record D2 decision | pass or exact failure cause | blocked |
+| T2.3.1 | Implement resumable D-only fitting | D/optimizer/scheduler/patience/replay state | in-progress |
+| T2.3.2 | Add interrupted/resumed equivalence test | selected hash and control state match | pending |
+| T2.3.3 | Run clean CUDA smoke | batch 1, three passes, true labels observed | pending |
+| T2.3.4 | Fit D2 to declared stopping rule | immutable history and selected checkpoint | pending |
+| T2.3.5 | Apply untouched audit fidelity gate | MAE/correlation/range/subgroups | pending |
+| T2.3.6 | Apply local directional gate | sign agreement and delta-rank report | pending |
+| T2.3.7 | Record D2 decision | pass or exact failure cause | pending |
 
 Unblock: T2.2 passes.
 
@@ -165,3 +165,4 @@ Unblock: T2.7 passes. If an upstream gate fails, replace downstream items with
 | 2026-07-28 | Predeclared T2 after final T1 calibration failure | T1 A3: MAE/correlation/range failed, zero G updates; official recipe comparison completed | T2.1 exact official parity |
 | 2026-07-28 | Activated the clean T2 successor sequence | one worktree/main; no active training; GPU available; plan/guard valid | pin official SpeechBrain revision |
 | 2026-07-28 | Passed exact SpeechBrain v1.1.0 D parity | pinned `36c180c`; corrected magnitude/constant-pad/time-first frontend; 65/65 tests; CUDA D/G-gradient smoke; plan/campaign/guard pass | freeze D2 support IDs |
+| 2026-07-28 | Prepared and independently audited fixed D2 support A3 | 1000/200/200; 1400 unique; support `545ac1bf`; source hashes unchanged; no missing/non-FP16/nonfinite records; T0 PESQ mean 2.861 | implement resumable D-only fitting |
