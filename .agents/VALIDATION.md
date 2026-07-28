@@ -175,6 +175,9 @@ metric/reference profile matches the run profile
 - T16 eight-action implementation passed the full suite (`102/102`) and
   project guard (`0` issues); the exact frozen action list and serialized
   router dimensions are covered before CUDA smoke.
+- T16 smoke A1 stopped safely before select/test because the generalized
+  search omitted forwarding the custom lows at final router configuration.
+  The missing forwarding is corrected before a fresh A2 contract.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

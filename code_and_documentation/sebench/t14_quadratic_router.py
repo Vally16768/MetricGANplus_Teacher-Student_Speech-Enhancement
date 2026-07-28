@@ -308,6 +308,7 @@ def run_t14_quadratic_search(
         model,
         ridges=folded,
         threshold=float(selected["threshold"]),
+        lows=lows,
         feature_transform="quadratic",
     )
     checkpoint = root / checkpoint_filename

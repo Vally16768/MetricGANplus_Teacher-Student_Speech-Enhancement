@@ -21,3 +21,4 @@ Next action: **commit clean snapshot and run CUDA smoke**
 |---|---|---|---|
 | 2026-07-28 | Closed T15 and opened T16 | OOF calibration did not improve T14 | implement fine actions |
 | 2026-07-28 | Implemented and statically validated T16 | full suite `102/102`; guard `0` issues | commit and smoke CUDA |
+| 2026-07-28 | Smoke A1 stopped safely | omitted forwarding custom lows at final configure; select/test unread | fix and rerun smoke |
