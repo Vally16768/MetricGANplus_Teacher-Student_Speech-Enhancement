@@ -36,8 +36,10 @@ This directory is the canonical control plane for the research project.
 | [TEACHER_T11_TODO.md](TEACHER_T11_TODO.md) | Completed T11 board and below-gate evidence | T11 audit |
 | [TEACHER_T12_PLAN.md](TEACHER_T12_PLAN.md) | Executed rank-selected risk-policy successor | T12 audit |
 | [TEACHER_T12_TODO.md](TEACHER_T12_TODO.md) | Completed T12 board and below-gate evidence | T12 audit |
-| [TEACHER_T13_PLAN.md](TEACHER_T13_PLAN.md) | Active train-only multi-objective router successor | all T13 work |
-| [TEACHER_T13_TODO.md](TEACHER_T13_TODO.md) | Active T13 dependency board and exit gates | every T13 iteration |
+| [TEACHER_T13_PLAN.md](TEACHER_T13_PLAN.md) | Executed train-only multi-objective router | T13 audit |
+| [TEACHER_T13_TODO.md](TEACHER_T13_TODO.md) | Completed T13 board and below-gate evidence | T13 audit |
+| [TEACHER_T14_PLAN.md](TEACHER_T14_PLAN.md) | Active quadratic multi-objective successor | all T14 work |
+| [TEACHER_T14_TODO.md](TEACHER_T14_TODO.md) | Active T14 dependency board and exit gates | every T14 iteration |
 
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
@@ -54,12 +56,13 @@ single-action oracle ceiling was only `+0.014197`. T9 raised the oracle to
 `+0.031116`, but its PESQ-only decisions over-consumed SI-SDR; threshold
 `0.02` retained `+0.017368` PESQ and missed SI-SDR by `0.029120` dB. T0
 remains selected. T10 gained `+0.008015`; T11 gained `+0.008349`; T12 used
-`val_rank` correctly but reached only `+0.008425` on `val_select`. T13 now
-models per-action PESQ/STOI/SI-SDR deltas from train-only support**.
+`val_rank` correctly but reached only `+0.008425`; T13 improved this to
+`+0.008806` on `val_select`. T14 now regularizes quadratic interactions in
+the per-action PESQ/STOI/SI-SDR router**.
 
 Open work:
 
-- implement and validate the predeclared T13 multi-objective router;
-- fit train-only metric deltas, rank on `val_rank`, then read `val_select` once;
+- implement and validate the predeclared T14 quadratic router;
+- fit train-only quadratic metric deltas, rank, then read `val_select` once;
 - no cache, student or test evaluation may start before teacher promotion;
 - the TTS metric-critic hypothesis remains a separate future campaign.

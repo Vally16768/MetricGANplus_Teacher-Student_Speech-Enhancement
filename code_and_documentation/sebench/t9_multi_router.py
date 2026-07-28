@@ -124,6 +124,7 @@ def configure_multi_action_router(
     threshold: float,
     lows: Iterable[float] = T9_ACTION_LOWS,
     enabled: bool = True,
+    feature_transform: str = "identity",
 ) -> None:
     target = model.base_model if hasattr(model, "base_model") else model
     action_lows = tuple(float(value) for value in lows)
@@ -152,6 +153,7 @@ def configure_multi_action_router(
         weights=[row["weights"] for row in ridges],
         biases=[float(row["bias"]) for row in ridges],
         threshold=float(threshold),
+        feature_transform=feature_transform,
     )
 
 

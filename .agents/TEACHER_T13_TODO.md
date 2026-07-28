@@ -1,8 +1,8 @@
 # T13 teacher-improvement TODO
 
-Status: **in progress — production train/rank search**
+Status: **complete — negative outcome**
 Last update: **2026-07-28**
-Next action: **commit smoke evidence and run full 584-fit/128-rank search**
+Next action: **continue from `.agents/TEACHER_T14_TODO.md`**
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
@@ -11,11 +11,11 @@ Next action: **commit smoke evidence and run full 584-fit/128-rank search**
 | T13.1.1 | Implement train-only metric-delta fits | 584 refs; PESQ/STOI/SI-SDR ridge per action | passed |
 | T13.1.2 | Implement exact deployable utility folding | no metric/reference at inference | passed |
 | T13.1.3 | Add tests, hashes, guard and CUDA smoke | 98/98; guard; `20260728-t13-router-smoke-wb-s3003-a1` | passed |
-| T13.2.1 | Fit full support and rank 336 policies | `val_rank` only | in-progress |
-| T13.2.2 | Evaluate one checkpoint on `val_select` | no test | blocked |
-| T13.2.3 | Apply final gate | unchanged | blocked |
+| T13.2.1 | Fit full support and rank 336 policies | rank `+0.010932`; auxiliaries safe | passed |
+| T13.2.2 | Evaluate one checkpoint on `val_select` | select `+0.008806`; test unread | passed |
+| T13.2.3 | Apply final gate | PESQ below `+0.01` | failed |
 | T13.2.4 | Independently confirm/promote/shutdown | only after candidate pass | blocked |
-| T13.2.5 | Predeclare successor if failed | preserve evidence | blocked |
+| T13.2.5 | Predeclare successor if failed | `.agents/TEACHER_T14_PLAN.md` | passed |
 
 ## Progress log
 
@@ -26,3 +26,4 @@ Next action: **commit smoke evidence and run full 584-fit/128-rank search**
 | 2026-07-28 | Passed unit/integration suite and split validation | 98/98; VoiceBank campaign valid | refresh hashes and guard |
 | 2026-07-28 | Refreshed architecture hashes and passed project guard | zero issues | commit and run CUDA smoke |
 | 2026-07-28 | Completed clean CUDA smoke | fit/rank labels, 12 ridges, 336 policies and checkpoint round-trip; intended small-support stop | production search |
+| 2026-07-28 | Completed production T13 | `20260728-t13-router-wb-s3003-a1`; select `+0.008806`; auxiliaries safe | open T14 |

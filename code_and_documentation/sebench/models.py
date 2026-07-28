@@ -351,6 +351,7 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         multi_router_weights: list[list[float]] | tuple[tuple[float, ...], ...] | None = None,
         multi_router_biases: list[float] | tuple[float, ...] | None = None,
         multi_router_threshold: float = 0.0,
+        multi_router_feature_transform: str = "identity",
     ) -> None:
         super().__init__()
         feature_bins = n_fft // 2 + 1
@@ -404,6 +405,7 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
             float(value) for value in (multi_router_biases or ())
         )
         self.multi_router_threshold = float(multi_router_threshold)
+        self.multi_router_feature_transform = str(multi_router_feature_transform)
         if self.confidence_calibration_temperature <= 0.0:
             raise ValueError(
                 "Confidence-calibration temperature must be positive."
@@ -479,6 +481,7 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
             "multi_router_weights": [list(row) for row in self.multi_router_weights],
             "multi_router_biases": list(self.multi_router_biases),
             "multi_router_threshold": self.multi_router_threshold,
+            "multi_router_feature_transform": self.multi_router_feature_transform,
         }
         if official_checkpoint_sha256:
             self.model_config["official_checkpoint_sha256"] = str(
@@ -613,6 +616,11 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         return logits + correction
 
     def _validate_multi_router(self) -> None:
+        if self.multi_router_feature_transform not in {"identity", "quadratic"}:
+            raise ValueError("Unsupported multi-router feature transform.")
+        expected_features = (
+            16 if self.multi_router_feature_transform == "identity" else 152
+        )
         action_count = len(self.multi_router_lows)
         collections = (
             self.multi_router_feature_means,
@@ -629,8 +637,10 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
             self.multi_router_feature_scales,
             self.multi_router_weights,
         ):
-            if any(len(row) != 16 for row in rows):
-                raise ValueError("T9 multi-action router requires 16 features per action.")
+            if any(len(row) != expected_features for row in rows):
+                raise ValueError(
+                    "Multi-action router feature dimension does not match transform."
+                )
         if any(
             value <= 0.0
             for row in self.multi_router_feature_scales
@@ -648,6 +658,7 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         weights: list[list[float]] | tuple[tuple[float, ...], ...],
         biases: list[float] | tuple[float, ...],
         threshold: float,
+        feature_transform: str = "identity",
     ) -> None:
         self.multi_router_enabled = bool(enabled)
         self.multi_router_lows = tuple(float(value) for value in lows)
@@ -662,6 +673,7 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         )
         self.multi_router_biases = tuple(float(value) for value in biases)
         self.multi_router_threshold = float(threshold)
+        self.multi_router_feature_transform = str(feature_transform)
         self._validate_multi_router()
         self.model_config.update(
             {
@@ -678,6 +690,7 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
                 ],
                 "multi_router_biases": list(self.multi_router_biases),
                 "multi_router_threshold": self.multi_router_threshold,
+                "multi_router_feature_transform": self.multi_router_feature_transform,
             }
         )
 
@@ -798,6 +811,16 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
             raise RuntimeError("T9 multi-action router is not enabled or is incomplete.")
         scores = []
         for index, action_features in enumerate(features):
+            if self.multi_router_feature_transform == "quadratic":
+                products = [
+                    action_features[:, left] * action_features[:, right]
+                    for left in range(16)
+                    for right in range(left, 16)
+                ]
+                action_features = torch.cat(
+                    (action_features, torch.stack(products, dim=1)),
+                    dim=1,
+                )
             mean = action_features.new_tensor(self.multi_router_feature_means[index])
             scale = action_features.new_tensor(self.multi_router_feature_scales[index])
             weights = action_features.new_tensor(self.multi_router_weights[index])

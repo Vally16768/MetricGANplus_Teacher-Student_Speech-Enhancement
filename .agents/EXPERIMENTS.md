@@ -354,3 +354,9 @@ selected penalty `0.015`, margin `0.015`. Rank PESQ gained `+0.011176`; the
 single `val_select` evaluation gained only `+0.008425`, with STOI `-0.001635`
 and SI-SDR `-0.224316` dB. T13 is the active train-only multi-objective
 successor; test remained unread.
+
+`20260728-t13-router-wb-s3003-a1` fitted PESQ/STOI/SI-SDR deltas on all 584
+train-only support examples and selected an SI-SDR-aware policy. It gained
+`+0.010932` on `val_rank` and `+0.008806` on `val_select`; STOI
+`-0.001482` and SI-SDR `-0.237882` dB passed. T14 is the active quadratic
+successor; test remained unread.

@@ -145,6 +145,11 @@ metric/reference profile matches the run profile
   train/rank labeling, twelve metric-delta ridges, 336 policies and checkpoint
   round-trip. Small support caused the intended prevalidation stop; select and
   test were unread.
+- T13 production `20260728-t13-router-wb-s3003-a1` selected an SI-SDR-aware
+  policy; rank gained `+0.010932`, but `val_select` gained only `+0.008806`
+  PESQ. Both auxiliary guards passed and test remained unread.
+- T14 implementation full suite `99/99` and VoiceBank campaign split
+  validation pass; architecture hashes and project guard pass; smoke remains.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

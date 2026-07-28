@@ -50,6 +50,7 @@ from sebench.t12_rank_router import rank_policy_grid  # noqa: E402
 from sebench.t13_multiobjective_router import (  # noqa: E402
     fold_multiobjective_ridges,
 )
+from sebench.t14_quadratic_router import quadratic_features  # noqa: E402
 
 
 class T4CalibrationTests(unittest.TestCase):
@@ -550,6 +551,37 @@ class T4CalibrationTests(unittest.TestCase):
         self.assertAlmostEqual(folded[0]["weights"][0], 6.5)
         self.assertAlmostEqual(folded[0]["bias"], -0.454)
         self.assertAlmostEqual(folded[3]["bias"], -0.514)
+
+    def test_t14_quadratic_router_transform_and_score(self) -> None:
+        raw = np.arange(32, dtype=np.float64).reshape(2, 16)
+        transformed = quadratic_features(raw)
+        self.assertEqual(transformed.shape, (2, 152))
+        self.assertEqual(transformed[0, 16], raw[0, 0] ** 2)
+        self.assertEqual(transformed[0, 17], raw[0, 0] * raw[0, 1])
+        model = build_enhancer(
+            "metricgan_plus_teacher_official_wb",
+            "small",
+            initialize_from_official=False,
+            n_fft=512,
+            hop_length=256,
+            win_length=512,
+        )
+        weights = [[0.0] * 152 for _ in range(4)]
+        for row in weights:
+            row[16] = 1.0
+        model.configure_multi_action_router(
+            enabled=True,
+            lows=[-0.2, -0.4, -0.6, -0.8],
+            feature_means=[[0.0] * 152 for _ in range(4)],
+            feature_scales=[[1.0] * 152 for _ in range(4)],
+            weights=weights,
+            biases=[0.0] * 4,
+            threshold=0.0,
+            feature_transform="quadratic",
+        )
+        features = [torch.ones(2, 16) * 3.0 for _ in range(4)]
+        scores = model.multi_router_scores(features)
+        self.assertTrue(torch.equal(scores, torch.full((2, 4), 9.0)))
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # T13 train-only multi-objective router plan
 
-Status: **predeclared — implementation validation**
+Status: **executed — final PESQ gate failed**
 
 ## Cause and hypothesis
 
@@ -40,3 +40,10 @@ inference.
 A passing single run is only a candidate and requires independent
 recomputation, confirmations, paired bootstrap and package audit. A failure
 blocks caches/students and activates only a separately predeclared successor.
+
+## Outcome
+
+T13 selected STOI weight `0`, SI-SDR weight `0.02`, strength penalty `0.02`
+and margin `0.0025`. Rank gained `+0.010932` PESQ; `val_select` gained
+`+0.008806`, with STOI `-0.001482` and SI-SDR `-0.237882` dB. The PESQ gate
+failed and test remained unread.

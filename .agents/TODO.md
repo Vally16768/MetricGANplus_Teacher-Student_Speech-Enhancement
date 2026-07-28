@@ -70,7 +70,8 @@ Update this register whenever a gate changes state.
 | C63 | Execute T10 conservative-risk routing | select `+0.008015`; auxiliary guards passed; PESQ gate failed | failed |
 | C64 | Execute T11 risk-penalized routing | rank `+0.010068`, select `+0.008349`; auxiliary guards pass but PESQ gate fails | failed |
 | C65 | Execute T12 rank-selected risk policy | rank `+0.011176`, select `+0.008425`; auxiliary guards pass but PESQ gate fails | failed |
-| C66 | Execute T13 multi-objective routing | train-only PESQ/STOI/SI-SDR delta models and 336 frozen policies | in-progress |
+| C66 | Execute T13 multi-objective routing | rank `+0.010932`, select `+0.008806`; safe but below PESQ gate | failed |
+| C67 | Execute T14 quadratic multi-objective routing | 152 features, 12 regularized fits and 336 policies | in-progress |
 
 ## Execution rule
 
