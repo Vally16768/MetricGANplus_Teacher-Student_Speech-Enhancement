@@ -15,6 +15,10 @@ if str(CODE) not in sys.path:
     sys.path.insert(0, str(CODE))
 
 from sebench.models import build_enhancer  # noqa: E402
+from sebench.checkpoints import (  # noqa: E402
+    load_model_from_checkpoint,
+    save_checkpoint_package,
+)
 from sebench.t3_perceptual import T3LossBreakdown  # noqa: E402
 from sebench.t4_calibration import apply_uniform_mask_logit_bias  # noqa: E402
 from sebench.t4_microstep import (  # noqa: E402
@@ -27,6 +31,10 @@ from sebench.t5_zeroth_order import (  # noqa: E402
     prepare_t5_support_manifests,
 )
 from sebench.t6_affine import apply_affine_logit_calibration  # noqa: E402
+from sebench.t7_confidence import (  # noqa: E402
+    confidence_candidate_grid,
+    configure_confidence_calibration,
+)
 
 
 class T4CalibrationTests(unittest.TestCase):
@@ -173,6 +181,71 @@ class T4CalibrationTests(unittest.TestCase):
                 1.2 * bias + curve,
                 atol=3e-8,
             )
+        )
+
+    def test_t7_confidence_formula_and_disabled_parity(self) -> None:
+        model = build_enhancer(
+            "metricgan_plus_teacher_official_wb",
+            "small",
+            initialize_from_official=False,
+            n_fft=512,
+            hop_length=256,
+            win_length=512,
+        )
+        logits = torch.tensor([-10.0, -4.0, 2.0])
+        self.assertTrue(torch.equal(model.calibrate_mask_logits(logits), logits))
+        configure_confidence_calibration(
+            model,
+            enabled=True,
+            low=-0.4,
+            high=0.05,
+            threshold=-4.0,
+            temperature=1.5,
+        )
+        gate = torch.sigmoid((logits + 4.0) / 1.5)
+        expected = logits - 0.4 + 0.45 * gate
+        self.assertTrue(
+            torch.allclose(model.calibrate_mask_logits(logits), expected)
+        )
+        self.assertEqual(len(confidence_candidate_grid()), 24)
+
+    def test_t7_checkpoint_roundtrip_preserves_calibration(self) -> None:
+        model = build_enhancer(
+            "metricgan_plus_teacher_official_wb",
+            "small",
+            initialize_from_official=False,
+            n_fft=512,
+            hop_length=256,
+            win_length=512,
+        )
+        configure_confidence_calibration(
+            model,
+            enabled=True,
+            low=-0.3,
+            high=0.05,
+            threshold=-2.0,
+            temperature=1.5,
+        )
+        noisy = 0.02 * torch.randn(1, 1, 4_000)
+        with torch.no_grad():
+            expected = model(noisy)
+        with tempfile.TemporaryDirectory() as temporary:
+            checkpoint = Path(temporary) / "t7.pt"
+            save_checkpoint_package(
+                checkpoint,
+                model,
+                model_family="metricgan_plus_teacher_official_wb",
+                variant="small",
+            )
+            observed_model, package = load_model_from_checkpoint(checkpoint)
+            with torch.no_grad():
+                observed = observed_model(noisy)
+        self.assertTrue(torch.allclose(observed, expected, atol=2e-6, rtol=1e-5))
+        self.assertTrue(
+            package["model_config"]["confidence_calibration_enabled"]
+        )
+        self.assertEqual(
+            package["model_config"]["confidence_calibration_threshold"], -2.0
         )
 
 

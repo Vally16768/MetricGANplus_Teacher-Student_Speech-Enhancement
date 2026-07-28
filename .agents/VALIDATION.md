@@ -77,6 +77,11 @@ metric/reference profile matches the run profile
 - final strict calibration A3: 2/2 refreshes on 100 update plus 100 disjoint
   held-out outputs; final gate failed at normalized MAE 0.2133, Pearson 0.5545
   and Spearman 0.5435; zero generator updates and zero audit issues.
+- T6 production search selected exact T5 at scale `1.0`; PESQ `+0.005075`,
+  STOI `-0.000782`, SI-SDR `-0.245701` dB; gate failed and test was unread.
+- T7 implementation: 90/90 unit/integration tests passed, including disabled
+  parity, exact confidence formula and portable checkpoint round-trip;
+  campaign split validation and project guard passed.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

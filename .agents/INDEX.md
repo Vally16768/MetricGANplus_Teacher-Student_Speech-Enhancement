@@ -22,8 +22,10 @@ This directory is the canonical control plane for the research project.
 | [TEACHER_T4_TODO.md](TEACHER_T4_TODO.md) | Completed T4 board and negative scalar/micro-step evidence | T4 audit |
 | [TEACHER_T5_PLAN.md](TEACHER_T5_PLAN.md) | Executed true-PESQ frequency-curve successor | T5 audit |
 | [TEACHER_T5_TODO.md](TEACHER_T5_TODO.md) | Completed T5 board and below-gate evidence | T5 audit |
-| [TEACHER_T6_PLAN.md](TEACHER_T6_PLAN.md) | Active true-PESQ affine-logit successor | all T6 work |
-| [TEACHER_T6_TODO.md](TEACHER_T6_TODO.md) | Active T6 dependency board and exit gates | every T6 iteration |
+| [TEACHER_T6_PLAN.md](TEACHER_T6_PLAN.md) | Executed affine-logit successor | T6 audit |
+| [TEACHER_T6_TODO.md](TEACHER_T6_TODO.md) | Completed T6 board and below-gate evidence | T6 audit |
+| [TEACHER_T7_PLAN.md](TEACHER_T7_PLAN.md) | Active confidence-conditioned true-PESQ successor | all T7 work |
+| [TEACHER_T7_TODO.md](TEACHER_T7_TODO.md) | Active T7 dependency board and exit gates | every T7 iteration |
 
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
@@ -34,12 +36,13 @@ T1 failed calibration. T2 then restored exact official parity, but both
 D2-OFFICIAL and D2-RANGE failed scalar/local-direction gates. T3 direct
 perceptual direction passed locally, but every full E1/E2 proposal was harmful.
 T4 found only `+0.002034`; T5 improved this to `+0.005075` but remained below
-the gate and nearly exhausted SI-SDR margin. T0 remains selected; T6 now tests
-guarded affine-logit calibration**.
+the gate and nearly exhausted SI-SDR margin. T6 selected exact T5, showing
+global temperature adds no useful capacity. T0 remains selected; T7 now tests
+confidence-conditioned logit calibration**.
 
 Open work:
 
-- implement and validate the predeclared T6 affine-logit search;
+- implement and validate the predeclared T7 confidence-conditioned search;
 - run fit/cal/rank/select in order without reading test;
 - no cache, student or test evaluation may start before teacher promotion;
 - the TTS metric-critic hypothesis remains a separate future campaign.

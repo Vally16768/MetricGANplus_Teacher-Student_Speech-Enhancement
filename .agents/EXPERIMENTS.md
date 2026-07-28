@@ -313,3 +313,9 @@ calibration supports. Its eight-knot sweep generalized positively through
 `val_rank`; sweep 3 was selected. On `val_select`, PESQ improved `+0.005075`,
 STOI changed `-0.000782` and SI-SDR `-0.245701` dB. The result is safe but
 below the `+0.01` teacher gate and is retained as negative evidence.
+
+`20260728-t6-affine-wb-s3003-a1` tested two retained T5 curves at seven global
+logit scales on fresh disjoint 96/96 support. Scale `1.0` and T5 sweep 3 won,
+so the `val_select` deltas were exactly the T5 result. Global temperature added
+no improvement, the gate failed, and test remained unread. T7 is the active
+confidence-conditioned successor.

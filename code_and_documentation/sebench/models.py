@@ -333,6 +333,11 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         feature_domain: str = "sqrt_magnitude",
         window_type: str = "hann",
         official_checkpoint_sha256: str | None = None,
+        confidence_calibration_enabled: bool = False,
+        confidence_calibration_low: float = 0.0,
+        confidence_calibration_high: float = 0.0,
+        confidence_calibration_threshold: float = -4.0,
+        confidence_calibration_temperature: float = 1.5,
     ) -> None:
         super().__init__()
         feature_bins = n_fft // 2 + 1
@@ -345,6 +350,21 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         self.num_layers = num_layers
         self.linear_dim = linear_dim
         self.feature_domain = str(feature_domain)
+        self.confidence_calibration_enabled = bool(
+            confidence_calibration_enabled
+        )
+        self.confidence_calibration_low = float(confidence_calibration_low)
+        self.confidence_calibration_high = float(confidence_calibration_high)
+        self.confidence_calibration_threshold = float(
+            confidence_calibration_threshold
+        )
+        self.confidence_calibration_temperature = float(
+            confidence_calibration_temperature
+        )
+        if self.confidence_calibration_temperature <= 0.0:
+            raise ValueError(
+                "Confidence-calibration temperature must be positive."
+            )
         if self.feature_domain not in {
             "sqrt_magnitude",
             "official_log_magnitude",
@@ -384,6 +404,11 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
             "window_type": self.window_type,
             # Reconstruct saved packages without requiring a network/cache hit.
             "initialize_from_official": False,
+            "confidence_calibration_enabled": self.confidence_calibration_enabled,
+            "confidence_calibration_low": self.confidence_calibration_low,
+            "confidence_calibration_high": self.confidence_calibration_high,
+            "confidence_calibration_threshold": self.confidence_calibration_threshold,
+            "confidence_calibration_temperature": self.confidence_calibration_temperature,
         }
         if official_checkpoint_sha256:
             self.model_config["official_checkpoint_sha256"] = str(
@@ -453,6 +478,50 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
             length=length,
         ).unsqueeze(1)
 
+    def configure_confidence_calibration(
+        self,
+        *,
+        enabled: bool,
+        low: float,
+        high: float,
+        threshold: float,
+        temperature: float,
+    ) -> None:
+        """Configure the deployable T7 confidence-conditioned logit transform."""
+        temperature = float(temperature)
+        if temperature <= 0.0:
+            raise ValueError(
+                "Confidence-calibration temperature must be positive."
+            )
+        self.confidence_calibration_enabled = bool(enabled)
+        self.confidence_calibration_low = float(low)
+        self.confidence_calibration_high = float(high)
+        self.confidence_calibration_threshold = float(threshold)
+        self.confidence_calibration_temperature = temperature
+        self.model_config.update(
+            {
+                "confidence_calibration_enabled": self.confidence_calibration_enabled,
+                "confidence_calibration_low": self.confidence_calibration_low,
+                "confidence_calibration_high": self.confidence_calibration_high,
+                "confidence_calibration_threshold": self.confidence_calibration_threshold,
+                "confidence_calibration_temperature": self.confidence_calibration_temperature,
+            }
+        )
+
+    def calibrate_mask_logits(self, logits: torch.Tensor) -> torch.Tensor:
+        """Apply T7 calibration without a clean-reference dependency."""
+        if not self.confidence_calibration_enabled:
+            return logits
+        gate = torch.sigmoid(
+            (logits - self.confidence_calibration_threshold)
+            / self.confidence_calibration_temperature
+        )
+        correction = self.confidence_calibration_low + (
+            self.confidence_calibration_high
+            - self.confidence_calibration_low
+        ) * gate
+        return logits + correction
+
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         if input.ndim != 3:
             raise ValueError("Expected input tensor shaped (batch, 1, length).")
@@ -464,7 +533,13 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         else:
             features = magnitude.pow(0.5)
         features = features.transpose(1, 2)
-        mask = self.mask_generator(features).transpose(1, 2).clamp_min(0.0)
+        if self.confidence_calibration_enabled:
+            logits = self.mask_generator.forward_logits(features)
+            logits = self.calibrate_mask_logits(logits)
+            mask = self.mask_generator.learnable_sigmoid(logits)
+        else:
+            mask = self.mask_generator(features)
+        mask = mask.transpose(1, 2).clamp_min(0.0)
         masked = mask * features.transpose(1, 2)
         if self.feature_domain == "official_log_magnitude":
             enhanced_magnitude = torch.expm1(masked).clamp_min(0.0)
@@ -499,6 +574,7 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
             features_frequency_first = magnitude.pow(0.5)
         features = features_frequency_first.transpose(1, 2)
         logits = self.mask_generator.forward_logits(features)
+        logits = self.calibrate_mask_logits(logits)
         outputs: list[torch.Tensor] = []
         for delta in logit_deltas:
             mask = self.mask_generator.learnable_sigmoid(
@@ -641,6 +717,11 @@ def build_metricgan_standalone(
     feature_domain: str = "sqrt_magnitude",
     window_type: str = "hann",
     official_checkpoint_sha256: str | None = None,
+    confidence_calibration_enabled: bool = False,
+    confidence_calibration_low: float = 0.0,
+    confidence_calibration_high: float = 0.0,
+    confidence_calibration_threshold: float = -4.0,
+    confidence_calibration_temperature: float = 1.5,
 ) -> MetricGANLikeEnhancer:
     if variant == "small":
         hidden_size = 200
@@ -665,6 +746,11 @@ def build_metricgan_standalone(
         feature_domain=feature_domain,
         window_type=window_type,
         official_checkpoint_sha256=official_checkpoint_sha256,
+        confidence_calibration_enabled=confidence_calibration_enabled,
+        confidence_calibration_low=confidence_calibration_low,
+        confidence_calibration_high=confidence_calibration_high,
+        confidence_calibration_threshold=confidence_calibration_threshold,
+        confidence_calibration_temperature=confidence_calibration_temperature,
     )
 
 
@@ -739,6 +825,11 @@ def build_model(
     win_length: int = 320,
     initialize_from_official: bool = True,
     official_checkpoint_sha256: str | None = None,
+    confidence_calibration_enabled: bool = False,
+    confidence_calibration_low: float = 0.0,
+    confidence_calibration_high: float = 0.0,
+    confidence_calibration_threshold: float = -4.0,
+    confidence_calibration_temperature: float = 1.5,
 ) -> nn.Module:
     if variant not in MODEL_VARIANTS:
         raise ValueError(f"Unsupported model variant: {variant}")
@@ -794,6 +885,11 @@ def build_model(
                 official_checkpoint_sha256
                 or METRICGAN_PLUS_CHECKPOINT_SHA256
             ),
+            confidence_calibration_enabled=confidence_calibration_enabled,
+            confidence_calibration_low=confidence_calibration_low,
+            confidence_calibration_high=confidence_calibration_high,
+            confidence_calibration_threshold=confidence_calibration_threshold,
+            confidence_calibration_temperature=confidence_calibration_temperature,
         )
     if model_family == "metricgan_plus_native8k":
         if spectral_native_gate:
@@ -858,6 +954,11 @@ def build_enhancer(
     win_length: int = 320,
     initialize_from_official: bool = True,
     official_checkpoint_sha256: str | None = None,
+    confidence_calibration_enabled: bool = False,
+    confidence_calibration_low: float = 0.0,
+    confidence_calibration_high: float = 0.0,
+    confidence_calibration_threshold: float = -4.0,
+    confidence_calibration_temperature: float = 1.5,
 ) -> nn.Module:
     base_model = build_model(
         model_family,
@@ -873,6 +974,11 @@ def build_enhancer(
         win_length=win_length,
         initialize_from_official=initialize_from_official,
         official_checkpoint_sha256=official_checkpoint_sha256,
+        confidence_calibration_enabled=confidence_calibration_enabled,
+        confidence_calibration_low=confidence_calibration_low,
+        confidence_calibration_high=confidence_calibration_high,
+        confidence_calibration_threshold=confidence_calibration_threshold,
+        confidence_calibration_temperature=confidence_calibration_temperature,
     )
     postfilter_config = resolve_postfilter_config(postfilter_mode, postfilter_preset)
     if not postfilter_config.enabled:

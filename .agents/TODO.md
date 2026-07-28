@@ -63,7 +63,8 @@ Update this register whenever a gate changes state.
 | C56 | Confirm and transfer an accepted T3 | three seeds, C3, fresh S3-WB/S3-NB and final audit | blocked |
 | C57 | Execute T4 bounded true-PESQ trust region | T4-A safe `+0.002034`; T4-B effectively T0; no promotion | failed |
 | C58 | Execute T5 direct true-PESQ frequency-curve search | safe `+0.005075` PESQ but below gate; SI-SDR near limit | failed |
-| C59 | Execute T6 affine-logit true-PESQ search | two T5 curves × seven temperatures on fresh fit/cal support | in-progress |
+| C59 | Execute T6 affine-logit true-PESQ search | exact T5 selected; PESQ `+0.005075`, below gate | failed |
+| C60 | Execute T7 confidence-conditioned true-PESQ search | 24 candidates on fresh 96/96 support; unchanged gate | in-progress |
 
 ## Execution rule
 

@@ -315,6 +315,15 @@ T6 expands only the final-layer calibration to
 train-only 96/96 fit/calibration support filters a fixed seven-scale grid
 before `val_rank` and one-shot `val_select`.
 
+T7 adds a checkpoint-configured, confidence-conditioned transform after the
+official final linear layer and before its learnable sigmoid:
+`z + low + (high-low)*sigmoid((z-threshold)/temperature)`. It uses only the
+teacher's own logits at inference. A fixed 24-candidate grid is filtered on
+fresh disjoint train-only 96/96 fit/calibration support, then at most two
+candidates reach `val_rank` selection and one reaches `val_select`. Disabled
+calibration is exactly the original T0 path; checkpoint reconstruction restores
+the transform from portable `model_config`.
+
 The earlier bounded frozen-proxy branch remains historical negative evidence,
 not the canonical T1 implementation. The alternating branch passed structural
 smoke but failed its clean pilot promotion gate: current-output D calibration
@@ -418,6 +427,11 @@ smoke-t6-affine / search-t6-affine
   -> two frozen curves x seven exact final-logit scales
   -> top-5 calibration, top-3 rank, one selected val_select
   -> ordinary checkpoint; never test/cache/students
+smoke-t7-confidence / search-t7-confidence
+  -> fresh disjoint 96/96 train-only support
+  -> fixed confidence-conditioned low/high/threshold grid
+  -> top-8 fit, top-4 calibration, top-2 rank, one selected val_select
+  -> checkpoint round-trip; never test/cache/students
 promote-baseline
   -> accept only an audited/promotable converged S0 closure
   -> preserve corrective true-length evaluation provenance when present
@@ -457,6 +471,8 @@ Evidence:
 - T5 zeroth-order frequency curve:
   `code_and_documentation/sebench/t5_zeroth_order.py`;
 - T6 affine-logit search: `code_and_documentation/sebench/t6_affine.py`;
+- T7 confidence-conditioned search:
+  `code_and_documentation/sebench/t7_confidence.py`;
 - configuration: `configs/voicebank_campaign.yaml`;
 - post-cleanup GPU smoke:
   `20260727-postcleanup-smoke-wbnb-s0-a5` (six cells, audit zero issues).

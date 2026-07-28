@@ -56,6 +56,7 @@ from sebench.t4_calibration import run_t4_logit_bias_scan  # noqa: E402
 from sebench.t4_microstep import run_t4_microstep_backtracking  # noqa: E402
 from sebench.t5_zeroth_order import run_t5_frequency_search  # noqa: E402
 from sebench.t6_affine import run_t6_affine_search  # noqa: E402
+from sebench.t7_confidence import run_t7_confidence_search  # noqa: E402
 from sebench.teacher_cache import (  # noqa: E402
     TeacherCacheTarget,
     build_multi_target_teacher_cache,
@@ -2797,6 +2798,140 @@ def run_t6_affine_trial(
     return {"run_root": run_root.as_posix(), **summary}
 
 
+def run_t7_confidence_trial(
+    config: dict[str, Any],
+    *,
+    baseline_run_dir: str | Path,
+    t6_run_dir: str | Path,
+    support_run_dir: str | Path,
+    teacher_checkpoint: str | Path,
+    run_id: str,
+    smoke: bool = False,
+) -> dict[str, Any]:
+    dataset_audit = validate_campaign_config(config)
+    git = _git_state()
+    if git["dirty"]:
+        raise RuntimeError("T7 requires a clean committed snapshot.")
+    require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+    device = require_training_cuda(str(config["runtime"]["device"]))
+    run_root = Path(str(config["runtime"]["run_root"])).expanduser().resolve() / run_id
+    provenance_path = run_root / "provenance" / "provenance.json"
+    if not provenance_path.is_file():
+        raise FileNotFoundError("T7 requires a planned run contract.")
+    provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+    if provenance.get("status") != "planned" or provenance.get("git_commit") != git["commit"]:
+        raise ValueError("T7 planned contract does not match the clean commit.")
+    resolved_config = run_root / "provenance" / "config_resolved.yaml"
+    if not resolved_config.is_file() or sha256(resolved_config) != provenance.get("config_sha256"):
+        raise ValueError("T7 run contract config mismatch.")
+
+    baseline_root = Path(baseline_run_dir).expanduser().resolve()
+    baseline_path = baseline_root / "metrics" / "campaign_summary.json"
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    t6_root = Path(t6_run_dir).expanduser().resolve()
+    t6_path = t6_root / "cells" / "T6-AFFINE-LOGIT" / "summary.json"
+    t6 = json.loads(t6_path.read_text(encoding="utf-8"))
+    expected_hash = str(config["model"]["teacher_checkpoint_sha256"])
+    if (
+        t6.get("status") != "failed"
+        or bool(t6["gate"]["passed"])
+        or float(t6["val_select_deltas"]["pesq_mean"]) >= 0.01
+        or t6["teacher_checkpoint_sha256"] != expected_hash
+        or baseline["baseline"]["checkpoint_sha256"] != expected_hash
+        or sha256(teacher_checkpoint) != expected_hash
+        or bool(t6.get("test_read"))
+        or bool(baseline.get("test_read"))
+    ):
+        raise ValueError("T7 requires the terminal below-threshold T6 result.")
+
+    support_root = Path(support_run_dir).expanduser().resolve()
+    identities_path = support_root / "support" / "identities.json"
+    source_contract = {
+        "baseline_summary_sha256": sha256(baseline_path),
+        "t6_summary_sha256": sha256(t6_path),
+        "identities_sha256": sha256(identities_path),
+        "teacher_checkpoint_sha256": expected_hash,
+    }
+    provenance.update({
+        "status": "running",
+        "campaign_scope": "t7_true_pesq_confidence_logit",
+        "verification_only": bool(smoke),
+        "dataset_audit": dataset_audit,
+        "source_contract": source_contract,
+    })
+    _atomic_json(provenance_path, provenance)
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    torch.use_deterministic_algorithms(True)
+
+    def progress(message: str) -> None:
+        print(f"[T7] {message}", file=sys.stderr, flush=True)
+
+    try:
+        result = run_t7_confidence_search(
+            teacher_checkpoint=teacher_checkpoint,
+            identities_path=identities_path,
+            val_rank_manifest=config["dataset"]["val_rank"],
+            val_select_manifest=config["dataset"]["val_select"],
+            baseline_rank_metrics=baseline["baseline"]["val_rank_metrics"],
+            baseline_select_metrics=baseline["baseline"]["val_select_metrics"],
+            output_dir=run_root / "cells" / "T7-CONFIDENCE-LOGIT",
+            device=device,
+            lows=(-0.20,) if smoke else (-0.20, -0.30, -0.40),
+            highs=(0.00, 0.05) if smoke else (0.00, 0.05),
+            thresholds=(-4.0,) if smoke else (-6.0, -4.0, -2.0, 0.0),
+            fit_count=2 if smoke else 96,
+            calibration_count=2 if smoke else 96,
+            top_fit=2 if smoke else 8,
+            top_calibration=1 if smoke else 4,
+            top_rank=1 if smoke else 2,
+            max_eval_files=2 if smoke else None,
+            progress_callback=progress,
+        )
+    except BaseException as exc:
+        provenance["status"] = "failed"
+        provenance["failure"] = {
+            "type": exc.__class__.__name__,
+            "message": str(exc),
+            "traceback": traceback.format_exc(),
+        }
+        _atomic_json(provenance_path, provenance)
+        _atomic_json(
+            run_root / "status.json",
+            {"status": "failed", "valid_for_promotion": False},
+        )
+        raise
+
+    summary = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "campaign_scope": "t7_true_pesq_confidence_logit",
+        "verification_only": bool(smoke),
+        "source_contract": source_contract,
+        "test_read": False,
+        "result": result,
+        "teacher_gate": result["gate"],
+    }
+    _atomic_json(run_root / "metrics" / "campaign_summary.json", summary)
+    provenance["status"] = "verification_complete" if smoke else (
+        "candidate_gate_passed" if result["gate"]["passed"] else "complete_failed_gate"
+    )
+    provenance["result_summary_sha256"] = sha256(
+        run_root / "cells" / "T7-CONFIDENCE-LOGIT" / "summary.json"
+    )
+    _atomic_json(provenance_path, provenance)
+    _atomic_json(run_root / "status.json", {
+        "status": provenance["status"],
+        "campaign_scope": "t7_true_pesq_confidence_logit",
+        "teacher_gate_passed": bool(result["gate"]["passed"]),
+        "valid_for_promotion": False,
+        "verification_only": bool(smoke),
+        "test_read": False,
+    })
+    return {"run_root": run_root.as_posix(), **summary}
+
+
 def run_all(
     config: dict[str, Any],
     *,
@@ -4746,6 +4881,13 @@ def parse_args() -> argparse.Namespace:
         t6_search.add_argument("--support-run-dir", required=True)
         t6_search.add_argument("--teacher-checkpoint", required=True)
         t6_search.add_argument("--run-id", required=True)
+    for command in ("smoke-t7-confidence", "search-t7-confidence"):
+        t7_search = subparsers.add_parser(command)
+        t7_search.add_argument("--baseline-run-dir", required=True)
+        t7_search.add_argument("--t6-run-dir", required=True)
+        t7_search.add_argument("--support-run-dir", required=True)
+        t7_search.add_argument("--teacher-checkpoint", required=True)
+        t7_search.add_argument("--run-id", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -5295,6 +5437,17 @@ def main() -> None:
             run_id=args.run_id,
             smoke=args.command == "smoke-t6-affine",
         )
+    elif args.command in {"smoke-t7-confidence", "search-t7-confidence"}:
+        config = load_campaign_config(args.config)
+        result = run_t7_confidence_trial(
+            config,
+            baseline_run_dir=args.baseline_run_dir,
+            t6_run_dir=args.t6_run_dir,
+            support_run_dir=args.support_run_dir,
+            teacher_checkpoint=args.teacher_checkpoint,
+            run_id=args.run_id,
+            smoke=args.command == "smoke-t7-confidence",
+        )
     else:
         config = load_campaign_config(args.config)
     if args.command == "validate":
@@ -5419,6 +5572,8 @@ def main() -> None:
         "search-t5-frequency",
         "smoke-t6-affine",
         "search-t6-affine",
+        "smoke-t7-confidence",
+        "search-t7-confidence",
         "smoke-resume",
         "continue-students",
     }:

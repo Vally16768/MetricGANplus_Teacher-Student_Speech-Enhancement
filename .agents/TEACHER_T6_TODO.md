@@ -1,8 +1,8 @@
 # T6 teacher-improvement TODO
 
-Status: **in progress — affine-logit implementation**
+Status: **complete negative outcome — exact T5 selection**
 Last update: **2026-07-28**
-Next action: **commit validated T6 and run clean contracted CUDA smoke**
+Next action: **none; T7 is active**
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
@@ -11,11 +11,11 @@ Next action: **commit validated T6 and run clean contracted CUDA smoke**
 | T6.0.3 | Predeclare two curves × seven scales | 14 fit, top-5 cal, top-3 rank | passed |
 | T6.1.1 | Implement exact affine folding | ordinary checkpoint | passed |
 | T6.1.2 | Add equivalence/split/selection tests | 88/88; exact weight/bias algebra | passed |
-| T6.1.3 | Run clean contracted CUDA smoke | verification-only | pending |
-| T6.2.1 | Run full true-PESQ grid | fit/cal/rank/select; no test | pending |
-| T6.2.2 | Apply teacher gate | unchanged thresholds | pending |
-| T6.2.3 | Independently confirm/promote/shutdown | 3 seeds + bootstrap + audit | blocked |
-| T6.2.4 | Predeclare successor if failed | preserve evidence; no relaxed gate | blocked |
+| T6.1.3 | Run clean contracted CUDA smoke | `20260728-t6-affine-smoke-wb-s3003-a1` | passed |
+| T6.2.1 | Run full true-PESQ grid | `20260728-t6-affine-wb-s3003-a1`; no test read | passed |
+| T6.2.2 | Apply teacher gate | PESQ `+0.005075`; exact T5 selection | failed |
+| T6.2.3 | Independently confirm/promote/shutdown | single-seed gate failed | blocked |
+| T6.2.4 | Predeclare successor if failed | `.agents/TEACHER_T7_PLAN.md` | passed |
 
 ## Progress log
 
@@ -23,3 +23,4 @@ Next action: **commit validated T6 and run clean contracted CUDA smoke**
 |---|---|---|---|
 | 2026-07-28 | Opened T6 after bounded T5 gain | additive curve generalized but exhausted SI-SDR margin before +0.01 PESQ | implement affine capacity |
 | 2026-07-28 | Implemented and validated affine search | fresh support offsets; 14/5/3 funnel; 88/88 tests and guard pass | clean CUDA smoke |
+| 2026-07-28 | Completed smoke and production search | scale `1.0` selected; deltas exactly match T5; gate failed; test unread | close T6 and activate T7 |

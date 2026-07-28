@@ -1,6 +1,6 @@
 # T6 true-PESQ affine-logit calibration plan
 
-Status: **active — predeclared affine-capacity successor**
+Status: **complete negative outcome — selected exact T5**
 
 ## Cause and hypothesis
 
@@ -34,3 +34,11 @@ weight/bias and needs no runtime wrapper.
 Selection and promotion keep the unchanged `+0.01` PESQ, `-0.002` STOI and
 `-0.25` dB SI-SDR gate. A single-seed pass still requires independent
 re-evaluation, three declared seeds and paired bootstrap before shutdown.
+
+## Observed outcome
+
+`20260728-t6-affine-wb-s3003-a1` completed the clean 14/5/3 funnel on fresh
+96/96 support. It selected T5 sweep 3 with scale `1.0`, producing exactly the
+T5 `val_select` deltas: PESQ `+0.005075`, STOI `-0.000782` and SI-SDR
+`-0.245701` dB. The gate failed and test remained unread. T7 replaces global
+calibration with confidence-conditioned logits.
