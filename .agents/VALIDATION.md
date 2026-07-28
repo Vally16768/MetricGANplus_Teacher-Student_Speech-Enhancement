@@ -181,6 +181,12 @@ metric/reference profile matches the run profile
 - Corrected T16 smoke A2 completed all eight actions, 336 rank policies and
   checkpoint round-trip. Verification-only `val_select` and test remained
   unread.
+- T16 production `20260728-t16-router-wb-s3003-a1` completed from the clean
+  snapshot. Rank PESQ was `+0.010967`; the frozen checkpoint achieved
+  `+0.009619` on select with safe STOI (`-0.001496`) and SI-SDR
+  (`-0.231453` dB). It missed the PESQ gate by `0.000381`; checkpoint
+  round-trip passed and test remained unread. The terminal no-T17 rule now
+  closes the search.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

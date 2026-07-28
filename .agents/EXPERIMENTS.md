@@ -366,6 +366,13 @@ calibration to the T14 quadratic predictors. It gained `+0.011033` on
 STOI `-0.001426` and SI-SDR `-0.236114` dB passed. T16 is the active
 fine-action successor; test remained unread.
 
+`20260728-t16-router-wb-s3003-a1` was the terminal predeclared search. Its
+eight-action quadratic router gained `+0.010967` PESQ on `val_rank` and
+`+0.009619` on `val_select`, the best safe router result but `0.000381` below
+the promotion gate. STOI changed `-0.001496` and SI-SDR `-0.231453` dB;
+round-trip and contracts passed, and test remained unread. Per the terminal
+rule, no T17 is authorized.
+
 `20260728-t13-router-wb-s3003-a1` fitted PESQ/STOI/SI-SDR deltas on all 584
 train-only support examples and selected an SI-SDR-aware policy. It gained
 `+0.010932` on `val_rank` and `+0.008806` on `val_select`; STOI

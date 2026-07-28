@@ -1,8 +1,8 @@
 # T16 teacher-improvement TODO
 
-Status: **in progress — validation**
+Status: **complete — terminal negative result**
 Last update: **2026-07-28**
-Next action: **commit smoke evidence and run final production T16**
+Next action: **none — campaign search closed by terminal rule**
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
@@ -11,9 +11,9 @@ Next action: **commit smoke evidence and run final production T16**
 | T16.1.1 | Generalize quadratic fit/router to eight actions | exact frozen lows | passed |
 | T16.1.2 | Add action-count and round-trip tests | exact eight actions/config | passed |
 | T16.1.3 | Suite, hashes, guard, clean CUDA smoke | `102/102`; guard; corrected A2 passed | passed |
-| T16.2.1 | Full fit/rank/select | no test | in-progress |
-| T16.2.2 | Apply gate and confirm if passing | unchanged | blocked |
-| T16.2.3 | Stop campaign if failed | no T17; preserve and audit evidence | blocked |
+| T16.2.1 | Full fit/rank/select | rank `+0.010967`; select `+0.009619`; no test | passed |
+| T16.2.2 | Apply gate and confirm if passing | PESQ short by `0.000381` | failed |
+| T16.2.3 | Stop campaign if failed | no T17; evidence preserved | passed |
 
 ## Progress log
 
@@ -23,3 +23,4 @@ Next action: **commit smoke evidence and run final production T16**
 | 2026-07-28 | Implemented and statically validated T16 | full suite `102/102`; guard `0` issues | commit and smoke CUDA |
 | 2026-07-28 | Smoke A1 stopped safely | omitted forwarding custom lows at final configure; select/test unread | fix and rerun smoke |
 | 2026-07-28 | Corrected smoke A2 passed | eight actions; round-trip; select/test unread | run final production T16 |
+| 2026-07-28 | Closed final production T16 | best safe select `+0.009619`, still below `+0.01`; test unread | stop search, no T17 |

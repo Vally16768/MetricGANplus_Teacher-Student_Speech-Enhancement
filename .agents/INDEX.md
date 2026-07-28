@@ -42,8 +42,8 @@ This directory is the canonical control plane for the research project.
 | [TEACHER_T14_TODO.md](TEACHER_T14_TODO.md) | Completed T14 board and below-gate evidence | T14 audit |
 | [TEACHER_T15_PLAN.md](TEACHER_T15_PLAN.md) | Executed cross-fitted quadratic calibration | T15 audit |
 | [TEACHER_T15_TODO.md](TEACHER_T15_TODO.md) | Completed T15 board and below-gate evidence | T15 audit |
-| [TEACHER_T16_PLAN.md](TEACHER_T16_PLAN.md) | Active fine-action quadratic successor | all T16 work |
-| [TEACHER_T16_TODO.md](TEACHER_T16_TODO.md) | Active T16 dependency board and exit gates | every T16 iteration |
+| [TEACHER_T16_PLAN.md](TEACHER_T16_PLAN.md) | Executed terminal fine-action quadratic search | T16 audit |
+| [TEACHER_T16_TODO.md](TEACHER_T16_TODO.md) | Completed terminal T16 board | canonical closure |
 
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
@@ -62,12 +62,13 @@ single-action oracle ceiling was only `+0.014197`. T9 raised the oracle to
 remains selected. T10 gained `+0.008015`; T11 gained `+0.008349`; T12 used
 `val_rank` correctly but reached only `+0.008425`; T13 improved this to
 `+0.008806`; T14 improved this to `+0.009365` on `val_select`; T15 OOF
-calibration regressed to `+0.009070`. T16 now tests a predeclared eight-action
-quadratic router**.
+calibration regressed to `+0.009070`. Terminal T16 reached the best safe
+result, `+0.009619`, but remained `0.000381` below the gate; search is closed
+without T17**.
 
 Open work:
 
-- implement and validate the predeclared T16 fine-action router;
-- fit train-only quadratic deltas, rank, then read select once;
+- preserve T16 and earlier negative evidence for the article;
+- do not continue teacher search without a new explicit research mandate;
 - no cache, student or test evaluation may start before teacher promotion;
 - the TTS metric-critic hypothesis remains a separate future campaign.
