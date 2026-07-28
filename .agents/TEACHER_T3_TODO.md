@@ -1,9 +1,9 @@
 # T3 teacher-improvement TODO
 
-Status: **active execution — clean full E1/E2 pilot pending**
+Status: **complete negative outcome — no T3 teacher promoted**
 Last update: **2026-07-28**  
-Current phase: **T3.3 matched E1/E2 pilot**
-Next action: **commit the audited trainer, then run the clean full pilot**
+Current phase: **T3.3 closed; D3 ineligible after harmful epoch-scale E2**
+Next action: **execute T4 scalar logit calibration, then conditional micro-step trust region**
 
 This board executes `TEACHER_T3_PLAN.md`. T1 and T2 remain immutable negative
 evidence.
@@ -46,19 +46,19 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 |---|---|---|---|
 | T3.3.1 | Test rollback and exact resume | model/optimizer/scheduler/RNG equivalence; focused tests pass | passed |
 | T3.3.2 | Run E1/E2 CUDA smoke | `20260728-t3-e1-e2-smoke-a1`; both branches accepted one update; verification-only | passed |
-| T3.3.3 | Run monitored E1/E2 pilot | matched init/seed/order; immutable histories | in-progress |
-| T3.3.4 | Apply `val_select` teacher gate | PESQ/STOI/SI-SDR and E2−E1 | blocked |
-| T3.3.5 | Record direct-loss decision | pass, inconclusive or failed | blocked |
+| T3.3.3 | Run monitored E1/E2 pilot | `...full-s3003-a2`; matched init/order; six complete rollback histories | passed |
+| T3.3.4 | Apply `val_select` teacher gate | both selected checkpoints equal T0; delta `0`; gate failed | failed |
+| T3.3.5 | Record direct-loss decision | local direction good, epoch-scale updates harmful; zero accepted epochs | failed |
 
 ## T3.4 — Conditional D3/E3 rank critic
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T3.4.1 | Confirm D3 eligibility | E2 gate outcome matches plan condition | blocked |
-| T3.4.2 | Implement pairwise D3 fitting | Huber + rank loss; resumable | blocked |
-| T3.4.3 | Pass fixed local/finite-difference gate | sign/rank/SNR/current-gradient evidence | blocked |
-| T3.4.4 | Run E3 smoke and pilot | frozen accepted D3; rollback active | blocked |
-| T3.4.5 | Apply E3 teacher gate | true metrics vs E0 and E1 | blocked |
+| T3.4.1 | Confirm D3 eligibility | plan prohibits D3 after harmful E2 | not-applicable |
+| T3.4.2 | Implement pairwise D3 fitting | not run after harmful E2 | not-applicable |
+| T3.4.3 | Pass fixed local/finite-difference gate | not run after harmful E2 | not-applicable |
+| T3.4.4 | Run E3 smoke and pilot | not run after harmful E2 | not-applicable |
+| T3.4.5 | Apply E3 teacher gate | no E3 candidate | not-applicable |
 
 ## T3.5 — Confirmation and students
 
@@ -90,3 +90,4 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | 2026-07-28 | Passed matched E1/E2 CUDA smoke | both branches trained/evaluated/selected; E2 current-direction gate passed; two-file metrics explicitly non-promotable | commit clean trainer and start full pilot |
 | 2026-07-28 | First full T3 attempt stopped on deterministic-CUDA preflight | `...full-s3003-a1`; CuBLAS workspace contract missing; three E1 proposals rejected before optimizer step, then operator interrupt; no teacher update | set determinism before E0, fail fast, revalidate and use a fresh run |
 | 2026-07-28 | Passed corrected contract-adoption CUDA smoke | `...contract-smoke-a2`; planned contract adopted, deterministic E1/E2 updates and current E2 direction gate completed | commit evidence and start fresh full pilot |
+| 2026-07-28 | Closed full matched T3 pilot as negative | E1/E2 each rolled back at LR `1e-6`, `5e-7`, `2.5e-7`; E2 local sign/rho stayed strong but PESQ remained harmful; selected T0 delta `0` | preserve evidence; activate T4 trust-region plan |

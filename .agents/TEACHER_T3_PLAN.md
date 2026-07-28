@@ -1,9 +1,15 @@
 # T3 teacher-improvement plan
 
-Status: **active — direction gate and E1/E2 CUDA smoke passed; full pilot pending**
+Status: **complete negative outcome — full E1/E2 pilot selected exact T0**
 Owner: MetricGAN+ teacher–student campaign  
 Predecessor: T2/D2, closed as negative evidence  
 Execution board: `TEACHER_T3_TODO.md`
+
+Outcome: the full seed-3003 run proposed six epoch-scale updates at learning
+rates `1e-6`, `5e-7` and `2.5e-7`. Every proposal reduced true `val_rank`
+PESQ-WB and was rolled back. E1 and E2 both selected the exact T0 checkpoint,
+so the `val_select` gain was zero. D3/E3 is ineligible under the predeclared
+harmful-E2 stop rule. T4 is the active successor.
 
 ## Objective
 

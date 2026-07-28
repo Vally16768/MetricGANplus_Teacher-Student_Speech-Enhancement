@@ -289,6 +289,12 @@ incomplete branch only from that atomic post-evaluation state.
 For a new production run it also adopts the skill-generated planned run
 contract only when its config hash and clean Git commit match exactly.
 
+T4-A keeps the network graph unchanged and folds one bounded uniform
+mask-logit shift into the 257-bin `linear2.bias`. It scans a frozen grid with
+true PESQ-WB on `val_rank`, rejects STOI/SI-SDR violations, and reads
+`val_select` only for the single selected delta. The ordinary checkpoint is
+therefore offline-loadable without a runtime wrapper.
+
 The earlier bounded frozen-proxy branch remains historical negative evidence,
 not the canonical T1 implementation. The alternating branch passed structural
 smoke but failed its clean pilot promotion gate: current-output D calibration
@@ -372,6 +378,11 @@ smoke-t3-teacher / train-t3-teacher
   -> per-proposal rollback, plateau LR, early stopping and exact resume state
   -> E2 current-output local direction recheck on frozen calibration identities
   -> true WB val_select gate; never read test or train students
+scan-t4-logit-bias
+  -> adopt clean planned contract and exact failed-T3 baseline
+  -> true-WB val_rank scan of bounded uniform mask-logit bias
+  -> one selected val_select evaluation and unchanged teacher gate
+  -> never read test or train students
 promote-baseline
   -> accept only an audited/promotable converged S0 closure
   -> preserve corrective true-length evaluation provenance when present
@@ -405,6 +416,7 @@ Evidence:
   `code_and_documentation/sebench/metricgan_alternating.py`;
 - teacher cache: `code_and_documentation/sebench/teacher_cache.py`;
 - matched T3 pilot: `code_and_documentation/sebench/t3_training.py`;
+- T4 bounded calibration: `code_and_documentation/sebench/t4_calibration.py`;
 - configuration: `configs/voicebank_campaign.yaml`;
 - post-cleanup GPU smoke:
   `20260727-postcleanup-smoke-wbnb-s0-a5` (six cells, audit zero issues).

@@ -180,6 +180,16 @@ metric/reference profile matches the run profile
   `20260728-t3-e1-e2-contract-smoke-a2` passed the complete E0/E1/E2 CUDA
   path on the clean fix commit: both deterministic updates were accepted,
   E2 current-direction passed, and the run stayed verification-only.
+- Full corrected T3 run `20260728-t3-e1-e2-full-s3003-a2` completed from the
+  exact official T0 and frozen support. E1 and E2 each rejected and rolled
+  back proposals at learning rates `1e-6`, `5e-7` and `2.5e-7`; both selected
+  the exact T0 hash and had zero `val_select` gain. This is valid negative
+  evidence, not a promoted teacher.
+- T4-A focused tests verify that a folded `linear2.bias` produces the exact
+  bounded mask-logit variant and rejects shifts outside `+/-0.10`.
+- T4-A pre-run validation passes `83/83` repository tests, the canonical
+  research-plan validator, the real `campaign.py validate` entry point,
+  architecture-source hash reconciliation, project guard and diff check.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

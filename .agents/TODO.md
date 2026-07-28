@@ -59,8 +59,9 @@ Update this register whenever a gate changes state.
 | C52 | Transfer an accepted T2 to fresh S2-WB/S2-NB | not run: no accepted T2 teacher or C2 cache exists | blocked |
 | C53 | Define the T3 teacher successor | direct PMSQE branch plus conditional pairwise local critic; strict teacher/student gates | passed |
 | C54 | Implement and audit T3 differentiable losses | pinned source, WB contracts, untouched local-direction gate and CUDA tests passed | passed |
-| C55 | Run matched T3 teacher pilots | E1-SUP vs E2-PMSQE smoke passed; full clean pilot is active; E3 remains conditional | in-progress |
+| C55 | Run matched T3 teacher pilots | full E1/E2 produced six rollbacks and no accepted epoch; D3 ineligible after harmful E2 | failed |
 | C56 | Confirm and transfer an accepted T3 | three seeds, C3, fresh S3-WB/S3-NB and final audit | blocked |
+| C57 | Execute T4 bounded true-PESQ trust region | scalar mask-logit calibration, then conditional micro-step/backtracking; same teacher gate | in-progress |
 
 ## Execution rule
 

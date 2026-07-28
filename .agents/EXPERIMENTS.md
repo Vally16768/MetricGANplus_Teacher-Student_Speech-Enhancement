@@ -285,6 +285,7 @@ discussion.
 | `20260728-t3-e1-e2-smoke-a1` | CUDA flow passed | exact T0/cache/support hashes; E1/E2 update, rollback controls, WB evaluation and selection completed; E2 current-direction gate passed | no, two-file smoke |
 | `20260728-t3-e1-e2-full-s3003-a1` | invalid infrastructure stop | missing pre-CUDA CuBLAS determinism contract; zero E1 optimizer steps; stopped before E2 | no |
 | `20260728-t3-e1-e2-contract-smoke-a2` | corrected CUDA flow passed | clean planned contract adopted; deterministic E1/E2 updates and E2 current-direction recheck passed | no, two-file smoke |
+| `20260728-t3-e1-e2-full-s3003-a2` | complete negative outcome | E1/E2 each rolled back at `1e-6`, `5e-7`, `2.5e-7`; selected checkpoints equal T0 and `val_select` gain is zero | no |
 
-The next evidence-producing run is the complete matched E1/E2 pilot. Test and
-students remain blocked.
+T3 is closed. The next evidence-producing run is T4-A bounded mask-logit
+calibration. Test, teacher cache regeneration and students remain blocked.
