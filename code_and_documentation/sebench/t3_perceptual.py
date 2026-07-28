@@ -432,10 +432,26 @@ def calibrate_t3_gradient_weights(
         raise ValueError("anchor_fraction_bound must be in (0, 1).")
     if not 0.0 < pmsqe_fraction_bound < 1.0:
         raise ValueError("pmsqe_fraction_bound must be in (0, 1).")
-    mrstft = MultiResolutionSTFTLoss()(candidate, clean, lengths=lengths)
-    sisdr = TrueLengthSISDRLoss()(candidate, clean, lengths=lengths)
-    anchor = T0LogMagnitudeAnchorLoss()(candidate, teacher_t0, lengths=lengths)
-    pmsqe = DifferentiablePESQInspiredLoss()(candidate, clean, lengths=lengths)
+    mrstft = MultiResolutionSTFTLoss().to(candidate.device)(
+        candidate,
+        clean,
+        lengths=lengths,
+    )
+    sisdr = TrueLengthSISDRLoss().to(candidate.device)(
+        candidate,
+        clean,
+        lengths=lengths,
+    )
+    anchor = T0LogMagnitudeAnchorLoss().to(candidate.device)(
+        candidate,
+        teacher_t0,
+        lengths=lengths,
+    )
+    pmsqe = DifferentiablePESQInspiredLoss().to(candidate.device)(
+        candidate,
+        clean,
+        lengths=lengths,
+    )
     components = (mrstft + 0.10 * sisdr, anchor, pmsqe)
     norms: list[float] = []
     for component in components:

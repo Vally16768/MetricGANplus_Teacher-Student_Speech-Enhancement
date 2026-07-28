@@ -249,6 +249,16 @@ class T3PerceptualLossTests(unittest.TestCase):
         self.assertTrue(torch.isfinite(values.total))
         self.assertTrue(torch.isfinite(candidate.grad).all())
         self.assertGreater(float(candidate.grad.norm()), 0.0)
+        calibration_candidate = (
+            teacher + 0.0005 * torch.randn_like(teacher)
+        ).requires_grad_(True)
+        calibration = calibrate_t3_gradient_weights(
+            candidate=calibration_candidate,
+            clean=clean,
+            teacher_t0=teacher,
+        )
+        self.assertGreater(calibration.anchor_weight, 0.0)
+        self.assertGreater(calibration.pmsqe_weight, 0.0)
 
 
 if __name__ == "__main__":

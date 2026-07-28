@@ -80,3 +80,5 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | 2026-07-28 | Pinned and audited the direct perceptual dependency | torch-pesq 0.1.2 wheel/core hashes; upstream `3aac3c8`; MIT; shared-venv CPU/CUDA gradient smoke | implement E1/E2 loss stack |
 | 2026-07-28 | Implemented the isolated E1/E2 loss stack | MR-STFT, true-length SI-SDR, official-frontend T0 anchor, WB-only PMSQE, train-only gradient calibration | complete numerical/CUDA validation |
 | 2026-07-28 | Passed direct-loss numerical and model compatibility tests | 77/77 full suite; zero-delta mask parity; real VoiceBank CUDA PMSQE and all 21 parameter gradients finite | freeze train-only weights |
+| 2026-07-28 | Froze fresh T3 support identities | 1,000/200/200; hash `04022b77...`; pair/clean disjoint from both T2 supports; audit zero issues | calibrate weights |
+| 2026-07-28 | Calibration preflight stopped safely on a device mismatch | internal torch-pesq module stayed on CPU while candidate was CUDA; zero weights/model updates; CUDA regression added | validate and retry from clean fix |

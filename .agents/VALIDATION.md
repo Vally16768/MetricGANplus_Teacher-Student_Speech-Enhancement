@@ -138,6 +138,10 @@ metric/reference profile matches the run profile
   T2 supports, and calibrate weights only on 16 frozen train directions under
   CUDA. Full suite `78/78` and campaign validation pass; scientific support
   generation remains pending on a clean commit.
+- First T3 weight-calibration attempt stopped before output because the helper's
+  internal torch-pesq buffers remained on CPU for a CUDA candidate. Zero model
+  or optimizer updates occurred. The helper now moves every component module
+  to the candidate device and the focused CUDA calibration regression passes.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.
