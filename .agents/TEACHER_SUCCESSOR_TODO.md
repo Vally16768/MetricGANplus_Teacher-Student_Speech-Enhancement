@@ -2,8 +2,8 @@
 
 Status: **active — no training started**  
 Last update: **2026-07-28**  
-Current phase: **T2.1 official parity**  
-Next action: **pin the official SpeechBrain revision and parity fixtures**
+Current phase: **T2.2 fixed discriminator support**
+Next action: **freeze speaker/utterance-disjoint D2 support IDs**
 
 This board owns the iterative execution of
 `TEACHER_SUCCESSOR_PLAN.md`. The completed P1–P6 board and failed T1 evidence
@@ -57,12 +57,12 @@ T2.1 official parity
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T2.1.1 | Pin official SpeechBrain revision and recipe files | revision, file hashes, provenance record | in-progress |
-| T2.1.2 | Test frontend and normalized-label parity | fixed tensor/PESQ fixtures within tolerance | pending |
-| T2.1.3 | Test architecture/state-dict output parity | same weights produce matching outputs | pending |
-| T2.1.4 | Test batch-1 update and replay-order parity | clean/enh/noisy, current/history/current trace | pending |
-| T2.1.5 | Test true-length and batch invariance | no padding/batch-induced score change | pending |
-| T2.1.6 | Run full tests, plan validation and project guard | all pass, zero guard issues | pending |
+| T2.1.1 | Pin official SpeechBrain revision and recipe files | revision, file hashes, provenance record | passed |
+| T2.1.2 | Test frontend and normalized-label parity | fixed tensor/PESQ fixtures within tolerance | passed |
+| T2.1.3 | Test architecture/state-dict output parity | same weights produce matching outputs | passed |
+| T2.1.4 | Test batch-1 update and replay-order parity | clean/enh/noisy, current/history/current trace | passed |
+| T2.1.5 | Test true-length and batch invariance | no padding/batch-induced score change | passed |
+| T2.1.6 | Run full tests, plan validation and project guard | all pass, zero guard issues | passed |
 
 Gate: all parity and invariance checks pass before any D2 fitting.
 
@@ -70,11 +70,11 @@ Gate: all parity and invariance checks pass before any D2 fitting.
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T2.2.1 | Freeze D train/calibration/audit IDs | speaker/utterance disjoint manifests | blocked |
-| T2.2.2 | Generate T0 candidates locally | T0/manifest hashes, FP16, no input copies | blocked |
-| T2.2.3 | Compute true PESQ-WB labels | finite labels, mode/sample-rate provenance | blocked |
-| T2.2.4 | Audit score and condition coverage | plots/tables by type, score, speaker, SNR/noise | blocked |
-| T2.2.5 | Verify dataset read-only boundary | zero source mutation; local cache only | blocked |
+| T2.2.1 | Freeze D train/calibration/audit IDs | speaker/utterance disjoint manifests | in-progress |
+| T2.2.2 | Generate T0 candidates locally | T0/manifest hashes, FP16, no input copies | pending |
+| T2.2.3 | Compute true PESQ-WB labels | finite labels, mode/sample-rate provenance | pending |
+| T2.2.4 | Audit score and condition coverage | plots/tables by type, score, speaker, SNR/noise | pending |
+| T2.2.5 | Verify dataset read-only boundary | zero source mutation; local cache only | pending |
 
 Unblock: T2.1 passes.
 
@@ -164,3 +164,4 @@ Unblock: T2.7 passes. If an upstream gate fails, replace downstream items with
 |---|---|---|---|
 | 2026-07-28 | Predeclared T2 after final T1 calibration failure | T1 A3: MAE/correlation/range failed, zero G updates; official recipe comparison completed | T2.1 exact official parity |
 | 2026-07-28 | Activated the clean T2 successor sequence | one worktree/main; no active training; GPU available; plan/guard valid | pin official SpeechBrain revision |
+| 2026-07-28 | Passed exact SpeechBrain v1.1.0 D parity | pinned `36c180c`; corrected magnitude/constant-pad/time-first frontend; 65/65 tests; CUDA D/G-gradient smoke; plan/campaign/guard pass | freeze D2 support IDs |

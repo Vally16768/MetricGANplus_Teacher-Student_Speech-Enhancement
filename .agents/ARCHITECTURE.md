@@ -1,6 +1,7 @@
 # Architecture register
 
-Status: `teacher-only-t1`; converged S0 is published and E0 freeze is active.
+Status: `teacher-successor-t2-parity`; converged S0 is published and E0
+freeze is active.
 
 ## A0 — End-to-end research pipeline
 
@@ -18,7 +19,13 @@ Status: `teacher-only-t1`; converged S0 is published and E0 freeze is active.
               |             +--> [fresh WB student S0]
               |             +--> [fresh NB student S0]
               |
-              +--> [T1 control + T1 alternating MetricGAN fine-tuning]
+              +--> [D2 official-parity calibration]
+                            |
+                            v
+                   [D2 scalar + local-direction gates]
+                            |
+                            v
+              +--> [T2 control + T2 MetricGAN fine-tuning]
                             |
                             v
                   [true WB val_select gate]
@@ -176,9 +183,18 @@ before each G epoch:
 
 The non-differentiable PESQ implementation creates labels for D; PESQ itself is
 not differentiated through. `T0_PESQ` is the stage-T1 teacher metric condition.
-D now matches SpeechBrain's four valid-convolution, spectral-normalized
-architecture and its current/history/current refresh order. The generator
-target is the official normalized clean score `1`; D is frozen during G.
+D matches SpeechBrain's four valid-convolution, spectral-normalized
+architecture and its current/history/current refresh order. T2 parity also
+uses the exact SpeechBrain discriminator frontend:
+`log1p(abs(STFT))`, constant centered padding and
+`[batch, time, frequency]` layout. The earlier T1 frontend incorrectly used
+`sqrt(abs(STFT))`, reflect padding and a transposed layout; all T1
+discriminator evidence remains historical and is not reused as D2 evidence.
+The pinned parity source is SpeechBrain `v1.1.0` revision
+`36c180c7bfad3bf5c48bd76a24799812952c4565`, recorded in
+`code_and_documentation/reference/speechbrain_metricgan_v1.1.0.json`.
+The generator target is the official normalized clean score `1`; D is frozen
+during G.
 T1 also reads the local T0 teacher cache and anchors its waveform to the
 accepted official output; the fine-tune learning rate is `1e-5`.
 

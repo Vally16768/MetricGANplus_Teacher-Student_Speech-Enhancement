@@ -259,16 +259,40 @@ class SpeechBrainMetricDiscriminator(nn.Module):
             win_length=self.win_length,
             window=window,
             center=True,
-            pad_mode="reflect",
+            pad_mode="constant",
             return_complex=True,
         )
-        return torch.log1p(spectrum.abs().clamp_min(1e-8).sqrt())
+        # SpeechBrain's MetricGAN recipe applies
+        # ``log1p(spectral_magnitude(stft, power=0.5))``. Its helper first
+        # forms real**2 + imag**2 and then raises that power spectrum to 0.5,
+        # which is the ordinary complex magnitude (not sqrt(magnitude)).
+        # SpeechBrain also exposes the frontend as [batch, time, frequency].
+        return torch.log1p(spectrum.abs()).transpose(1, 2)
 
     def normalized_score(
         self,
         candidate: torch.Tensor,
         reference: torch.Tensor,
+        *,
+        lengths: torch.Tensor | None = None,
     ) -> torch.Tensor:
+        if lengths is not None:
+            if candidate.shape[0] != reference.shape[0]:
+                raise ValueError("Candidate/reference batch sizes must match.")
+            if int(lengths.numel()) != int(candidate.shape[0]):
+                raise ValueError("One absolute sample length is required per item.")
+            scores = []
+            for index, length_value in enumerate(lengths.detach().cpu().tolist()):
+                sample_count = int(length_value)
+                if sample_count <= 0 or sample_count > int(candidate.shape[-1]):
+                    raise ValueError("Metric discriminator length is out of bounds.")
+                scores.append(
+                    self.normalized_score(
+                        candidate[index : index + 1, ..., :sample_count],
+                        reference[index : index + 1, ..., :sample_count],
+                    )
+                )
+            return torch.cat(scores, dim=0)
         features = torch.stack(
             [self._features(candidate), self._features(reference)],
             dim=1,

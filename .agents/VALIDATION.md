@@ -79,6 +79,18 @@ metric/reference profile matches the run profile
   and Spearman 0.5435; zero generator updates and zero audit issues.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
+- T2 parity audit identified that the historical T1 discriminator frontend
+  used sqrt-magnitude, reflect padding and frequency-first layout instead of
+  SpeechBrain's magnitude, constant padding and time-first layout. T1 remains
+  valid negative evidence for that implementation and cannot seed D2.
+- corrected T2 discriminator parity: SpeechBrain v1.1.0 revision `36c180c`;
+  fixed-tensor frontend and imported-state output parity passed; exact
+  clean/enhanced/noisy plus historical update trace passed; true-length batch
+  invariance passed; complete suite `65/65`, canonical plan/campaign
+  validation and project guard passed.
+- direct shared-venv CUDA smoke on NVIDIA GTX 1660 Ti produced finite D
+  parameter gradients and, after freezing D, a finite candidate waveform
+  gradient with no D gradients.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

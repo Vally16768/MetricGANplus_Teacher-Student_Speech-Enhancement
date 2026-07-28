@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "project": "speechbrain/speechbrain",
+  "release": "v1.1.0",
+  "revision": "36c180c7bfad3bf5c48bd76a24799812952c4565",
+  "verified_utc": "2026-07-28",
+  "installed_version": "1.1.0",
+  "installed_model_source_sha256": "e5ae503ed1b4310eeda5392b0179ee88b214ee22917dc698108317ae68447394",
+  "sources": {
+    "recipes/Voicebank/enhance/MetricGAN/train.py": "4c24e158abbed600ebd39c8633f769dc438577ef8961808b69ebd3cea9b37e82",
+    "recipes/Voicebank/enhance/MetricGAN/hparams/train.yaml": "219d7393e3e187e9853ce4b9684834efeab58ee3b35ddedb21c9654d6134d918",
+    "recipes/Voicebank/enhance/MetricGAN/models/MetricGAN.yaml": "fb8d8c05ee2ea47525ec2e8074967bddfe4a619f1eae2f8b9dadfa42f9a288d3",
+    "speechbrain/lobes/models/MetricGAN.py": "e5ae503ed1b4310eeda5392b0179ee88b214ee22917dc698108317ae68447394"
+  },
+  "parity_contract": {
+    "sample_rate": 16000,
+    "n_fft": 512,
+    "hop_length_samples": 256,
+    "win_length_samples": 512,
+    "window": "torch.hamming_window",
+    "center": true,
+    "pad_mode": "constant",
+    "feature": "log1p(abs(stft))",
+    "feature_layout": "batch_time_frequency",
+    "discriminator_batch_size": 1,
+    "number_of_samples": 100,
+    "history_portion": 0.2,
+    "update_order": [
+      "current_clean_enhanced_noisy",
+      "historical_enhanced",
+      "current_clean_enhanced_noisy"
+    ],
+    "normalized_pesq": "(pesq + 0.5) / 5"
+  }
+}

@@ -8,6 +8,8 @@ from pathlib import Path
 from unittest import mock
 
 import torch
+from speechbrain.lobes.models.MetricGAN import MetricDiscriminator
+from speechbrain.processing.features import STFT, spectral_magnitude
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -137,6 +139,106 @@ class AlternatingMetricGANTests(unittest.TestCase):
         self.assertIsInstance(restored, SpeechBrainMetricDiscriminator)
         self.assertTrue(all(parameter.requires_grad for parameter in restored.parameters()))
 
+    def test_discriminator_frontend_matches_pinned_speechbrain_recipe(
+        self,
+    ) -> None:
+        torch.manual_seed(17)
+        candidate = torch.randn(2, 16_000)
+        local = SpeechBrainMetricDiscriminator()
+        official_stft = STFT(
+            sample_rate=16_000,
+            win_length=32,
+            hop_length=16,
+            n_fft=512,
+            window_fn=torch.hamming_window,
+        )
+        official_features = torch.log1p(
+            spectral_magnitude(official_stft(candidate), power=0.5)
+        )
+        torch.testing.assert_close(
+            local._features(candidate),
+            official_features,
+            rtol=1e-6,
+            atol=1e-6,
+        )
+
+    def test_discriminator_output_matches_pinned_speechbrain_model(
+        self,
+    ) -> None:
+        torch.manual_seed(23)
+        official = MetricDiscriminator()
+        local = SpeechBrainMetricDiscriminator()
+        renamed_state = {}
+        for key, value in official.state_dict().items():
+            local_key = key
+            for official_prefix, local_prefix in (
+                ("BN.", "batch_norm."),
+                ("Linear1.", "linear1."),
+                ("Linear2.", "linear2."),
+                ("Linear3.", "linear3."),
+            ):
+                if local_key.startswith(official_prefix):
+                    local_key = local_prefix + local_key[len(official_prefix) :]
+                    break
+            renamed_state[local_key] = value
+        local.load_state_dict(renamed_state, strict=True)
+        official.eval()
+        local.eval()
+
+        candidate = torch.randn(1, 16_000)
+        reference = torch.randn(1, 16_000)
+        official_stft = STFT(
+            sample_rate=16_000,
+            win_length=32,
+            hop_length=16,
+            n_fft=512,
+            window_fn=torch.hamming_window,
+        )
+
+        def features(waveform: torch.Tensor) -> torch.Tensor:
+            return torch.log1p(
+                spectral_magnitude(official_stft(waveform), power=0.5)
+            )
+
+        official_input = torch.stack(
+            [features(candidate), features(reference)],
+            dim=1,
+        )
+        with torch.inference_mode():
+            expected = official(official_input).squeeze(-1)
+            observed = local.normalized_score(candidate, reference)
+        torch.testing.assert_close(observed, expected, rtol=1e-6, atol=1e-6)
+
+    def test_discriminator_eval_is_batch_invariant_at_true_length(self) -> None:
+        torch.manual_seed(29)
+        discriminator = SpeechBrainMetricDiscriminator().eval()
+        candidates = torch.randn(2, 12_000)
+        references = torch.randn(2, 12_000)
+        lengths = torch.tensor([12_000, 9_000])
+        candidates[1, 9_000:] = 17.0
+        references[1, 9_000:] = -19.0
+        with torch.inference_mode():
+            true_length_scores = discriminator.normalized_score(
+                candidates,
+                references,
+                lengths=lengths,
+            )
+            separate = torch.cat(
+                [
+                    discriminator.normalized_score(
+                        candidates[index : index + 1, : int(lengths[index])],
+                        references[index : index + 1, : int(lengths[index])],
+                    )
+                    for index in range(2)
+                ]
+            )
+        torch.testing.assert_close(
+            true_length_scores,
+            separate,
+            rtol=1e-5,
+            atol=1e-6,
+        )
+
     def test_refresh_uses_local_generated_cache_without_copying_inputs(
         self,
     ) -> None:
@@ -162,6 +264,13 @@ class AlternatingMetricGANTests(unittest.TestCase):
                     "sebench.metricgan_alternating.pesq_score",
                     return_value=2.5,
                 ),
+                mock.patch(
+                    "sebench.metricgan_alternating._update_discriminator",
+                    wraps=__import__(
+                        "sebench.metricgan_alternating",
+                        fromlist=["_update_discriminator"],
+                    )._update_discriminator,
+                ) as update,
             ):
                 summary = refresh_metricgan_discriminator(
                     discriminator=discriminator,
@@ -178,6 +287,14 @@ class AlternatingMetricGANTests(unittest.TestCase):
             self.assertEqual(
                 summary["strategy"],
                 "speechbrain_current_historical_current",
+            )
+            self.assertEqual(update.call_count, 7)
+            self.assertEqual(
+                [float(call.args[4]) for call in update.call_args_list],
+                [1.0, 0.6, 0.6, 0.6, 1.0, 0.6, 0.6],
+            )
+            self.assertTrue(
+                all(call.args[2].dim() == 1 for call in update.call_args_list)
             )
             self.assertEqual(summary["current_record_count"], 1)
             self.assertEqual(summary["historical_record_count"], 1)
