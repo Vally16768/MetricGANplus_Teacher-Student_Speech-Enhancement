@@ -1,6 +1,6 @@
 # T14 quadratic multi-objective router plan
 
-Status: **predeclared — implementation validation**
+Status: **executed — final PESQ gate failed**
 
 ## Cause and hypothesis
 
@@ -31,3 +31,11 @@ requires noisy speech only and evaluates no objective metric.
 A passing result remains a candidate until independent recomputation,
 confirmation, paired bootstrap and package audit. Failure blocks students and
 activates only a newly predeclared successor.
+
+## Outcome
+
+T14 selected SI-SDR weight `0.02`, strength penalty `0.02` and margin
+`0.0025`. Rank gained `+0.011275` PESQ; `val_select` gained `+0.009365`,
+with STOI `-0.001466` and SI-SDR `-0.241138` dB. It is the strongest routed
+result so far but remains `0.000635` below the unchanged PESQ gate. Test was
+unread.

@@ -38,8 +38,10 @@ This directory is the canonical control plane for the research project.
 | [TEACHER_T12_TODO.md](TEACHER_T12_TODO.md) | Completed T12 board and below-gate evidence | T12 audit |
 | [TEACHER_T13_PLAN.md](TEACHER_T13_PLAN.md) | Executed train-only multi-objective router | T13 audit |
 | [TEACHER_T13_TODO.md](TEACHER_T13_TODO.md) | Completed T13 board and below-gate evidence | T13 audit |
-| [TEACHER_T14_PLAN.md](TEACHER_T14_PLAN.md) | Active quadratic multi-objective successor | all T14 work |
-| [TEACHER_T14_TODO.md](TEACHER_T14_TODO.md) | Active T14 dependency board and exit gates | every T14 iteration |
+| [TEACHER_T14_PLAN.md](TEACHER_T14_PLAN.md) | Executed quadratic multi-objective successor | T14 audit |
+| [TEACHER_T14_TODO.md](TEACHER_T14_TODO.md) | Completed T14 board and below-gate evidence | T14 audit |
+| [TEACHER_T15_PLAN.md](TEACHER_T15_PLAN.md) | Active cross-fitted quadratic calibration successor | all T15 work |
+| [TEACHER_T15_TODO.md](TEACHER_T15_TODO.md) | Active T15 dependency board and exit gates | every T15 iteration |
 
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
@@ -57,12 +59,12 @@ single-action oracle ceiling was only `+0.014197`. T9 raised the oracle to
 `0.02` retained `+0.017368` PESQ and missed SI-SDR by `0.029120` dB. T0
 remains selected. T10 gained `+0.008015`; T11 gained `+0.008349`; T12 used
 `val_rank` correctly but reached only `+0.008425`; T13 improved this to
-`+0.008806` on `val_select`. T14 now regularizes quadratic interactions in
-the per-action PESQ/STOI/SI-SDR router**.
+`+0.008806`; T14 improved this to `+0.009365` on `val_select`. T15 now
+cross-fits train-only affine calibration for the quadratic predictors**.
 
 Open work:
 
-- implement and validate the predeclared T14 quadratic router;
-- fit train-only quadratic metric deltas, rank, then read `val_select` once;
+- implement and validate the predeclared T15 OOF calibration;
+- fit train-only calibrated quadratic deltas, rank, then read select once;
 - no cache, student or test evaluation may start before teacher promotion;
 - the TTS metric-critic hypothesis remains a separate future campaign.

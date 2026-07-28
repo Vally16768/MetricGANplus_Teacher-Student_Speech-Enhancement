@@ -8,7 +8,7 @@ or publication material.
 Before acting:
 
 1. Read `.agents/INDEX.md`.
-2. Read `.agents/TEACHER_T14_TODO.md` and reconcile its active item with
+2. Read `.agents/TEACHER_T15_TODO.md` and reconcile its active item with
    evidence. Use `.agents/TEACHER_T5_TODO.md`, `.agents/TEACHER_T4_TODO.md`,
    `.agents/TEACHER_T6_TODO.md`, `.agents/TEACHER_T7_TODO.md`,
    `.agents/TEACHER_T8_TODO.md`,
@@ -16,6 +16,7 @@ Before acting:
    `.agents/TEACHER_T10_TODO.md`, `.agents/TEACHER_T11_TODO.md`,
    `.agents/TEACHER_T12_TODO.md`,
    `.agents/TEACHER_T13_TODO.md`,
+   `.agents/TEACHER_T14_TODO.md`,
    `.agents/TEACHER_SUCCESSOR_TODO.md` and `.agents/EXECUTION_TODO.md` for
    completed predecessor evidence.
 3. Read the task-specific canonical registers linked from the index.

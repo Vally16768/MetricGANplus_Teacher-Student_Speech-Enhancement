@@ -355,6 +355,12 @@ single `val_select` evaluation gained only `+0.008425`, with STOI `-0.001635`
 and SI-SDR `-0.224316` dB. T13 is the active train-only multi-objective
 successor; test remained unread.
 
+`20260728-t14-router-wb-s3003-a1` fitted regularized quadratic delta models
+and selected the same multi-objective family on `val_rank`. It gained
+`+0.011275` on rank and the current best `+0.009365` on `val_select`; STOI
+`-0.001466` and SI-SDR `-0.241138` dB passed. T15 is the active train-only
+OOF-calibration successor; test remained unread.
+
 `20260728-t13-router-wb-s3003-a1` fitted PESQ/STOI/SI-SDR deltas on all 584
 train-only support examples and selected an SI-SDR-aware policy. It gained
 `+0.010932` on `val_rank` and `+0.008806` on `val_select`; STOI
