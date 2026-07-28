@@ -286,6 +286,8 @@ contains the selected state, counters, history and source hashes.
 The root `train-t3-teacher --resume` command binds the original clean commit
 and support contract, reuses completed E0/branch summaries, and resumes an
 incomplete branch only from that atomic post-evaluation state.
+For a new production run it also adopts the skill-generated planned run
+contract only when its config hash and clean Git commit match exactly.
 
 The earlier bounded frozen-proxy branch remains historical negative evidence,
 not the canonical T1 implementation. The alternating branch passed structural

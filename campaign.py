@@ -1943,7 +1943,55 @@ def run_t3_matched_pilot(
     resume: bool = False,
 ) -> dict[str, Any]:
     """Run the matched T3 E1/E2 teacher branches; never read test."""
-    if resume:
+    planned_root = (
+        Path(str(config["runtime"]["run_root"])).expanduser().resolve() / run_id
+    )
+    planned_provenance_path = planned_root / "provenance" / "provenance.json"
+    adopting_contract = (
+        not resume
+        and planned_provenance_path.is_file()
+        and json.loads(
+            planned_provenance_path.read_text(encoding="utf-8")
+        ).get("status")
+        == "planned"
+    )
+    if adopting_contract:
+        dataset_audit = validate_campaign_config(config)
+        git = _git_state()
+        if git["dirty"]:
+            raise RuntimeError("T3 run-contract adoption requires a clean worktree.")
+        require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+        config["runtime"]["device"] = require_training_cuda(
+            str(config["runtime"]["device"])
+        )
+        run_root = planned_root
+        provenance = json.loads(
+            planned_provenance_path.read_text(encoding="utf-8")
+        )
+        if provenance.get("git_commit") != git["commit"]:
+            raise ValueError("T3 run contract was created from another commit.")
+        resolved_config = run_root / "provenance" / "config_resolved.yaml"
+        if (
+            not resolved_config.is_file()
+            or sha256(resolved_config) != provenance.get("config_sha256")
+        ):
+            raise ValueError("T3 run-contract config identity mismatch.")
+        provenance.update(
+            {
+                "status": "running",
+                "mode": mode,
+                "campaign_scope": T3_DIRECT_SCOPE,
+                "verification_only": mode != "full",
+                "dataset_audit": dataset_audit,
+                "environment": {
+                    "python": sys.version,
+                    "torch": torch.__version__,
+                    "cuda_available": torch.cuda.is_available(),
+                    "cuda_device": torch.cuda.get_device_name(0),
+                },
+            }
+        )
+    elif resume:
         validate_campaign_config(config)
         git = _git_state()
         if git["dirty"]:
