@@ -90,6 +90,9 @@ metric/reference profile matches the run profile
 - T8 implementation: 92/92 unit/integration tests passed, including ridge
   recovery, exact T0/T7 routing and portable checkpoint round-trip; campaign
   split validation and project guard passed.
+- T8 clean CUDA smoke `20260728-t8-router-smoke-wb-s3003-a1` completed 10/10
+  fit/cal labels, ridge, threshold selection, round-trip and the intended
+  pre-validation stop; verification-only and no validation/test read.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend
