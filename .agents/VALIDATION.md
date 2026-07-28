@@ -99,7 +99,11 @@ metric/reference profile matches the run profile
 - T9 implementation: 94/94 unit/integration tests pass, including exact
   multi-action selection, checkpoint round-trip and fresh calibration
   partition/clean disjointness; campaign split validation and project guard
-  pass. Clean CUDA smoke remains pending.
+  pass.
+- T9 clean CUDA smoke `20260728-t9-router-smoke-wb-s3003-a1` completed 10/10
+  fit/cal labels, four ridge models, multi-action selection and checkpoint
+  round-trip. Its small-support guardrail failure caused the intended stop
+  before validation; it is verification-only and test remained unread.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

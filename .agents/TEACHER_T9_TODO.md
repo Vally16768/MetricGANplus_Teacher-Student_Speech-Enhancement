@@ -1,8 +1,8 @@
 # T9 teacher-improvement TODO
 
-Status: **in progress — clean CUDA smoke**
+Status: **in progress — production support**
 Last update: **2026-07-28**
-Next action: **commit the validated snapshot and run clean CUDA smoke**
+Next action: **commit smoke evidence and run the 256/128 T9 search**
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
@@ -11,8 +11,8 @@ Next action: **commit the validated snapshot and run clean CUDA smoke**
 | T9.0.3 | Predeclare actions/ridge/thresholds/gates | `.agents/TEACHER_T9_PLAN.md` | passed |
 | T9.1.1 | Implement deployable multi-action router | checkpoint config; no clean inference input | passed |
 | T9.1.2 | Add action-selection and round-trip tests | exact action, round-trip, partition/clean disjointness | passed |
-| T9.1.3 | Run full suite, guard and clean CUDA smoke | 94/94, campaign validation and guard pass; smoke pending | in-progress |
-| T9.2.1 | Generate action labels and apply pre-validation gates | stop before validation on failure | blocked |
+| T9.1.3 | Run full suite, guard and clean CUDA smoke | 94/94; guard; `20260728-t9-router-smoke-wb-s3003-a1` | passed |
+| T9.2.1 | Generate action labels and apply pre-validation gates | stop before validation on failure | in-progress |
 | T9.2.2 | Evaluate frozen router on rank/select | no test | blocked |
 | T9.2.3 | Apply final teacher gate | unchanged thresholds | blocked |
 | T9.2.4 | Independently confirm/promote/shutdown | 3 seeds + bootstrap + audit | blocked |
@@ -26,3 +26,4 @@ Next action: **commit the validated snapshot and run clean CUDA smoke**
 | 2026-07-28 | Implemented T9 model/support/search/CLI | exact four-action selection, portable checkpoint and fresh calibration partition | full validation |
 | 2026-07-28 | Passed complete CPU/unit and split validation | 94/94 tests; VoiceBank split audit zero overlap | refresh hashes and guard |
 | 2026-07-28 | Passed architecture/privacy/project guard | refreshed source hashes; zero issues | commit and CUDA smoke |
+| 2026-07-28 | Completed clean CUDA smoke | 10/10 fit/cal, four ridges, action selection and checkpoint round-trip; intended pre-validation stop; no validation/test read | production 256/128 search |
