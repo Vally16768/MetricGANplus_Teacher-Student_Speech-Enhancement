@@ -154,6 +154,9 @@ metric/reference profile matches the run profile
   checkpoint reload because intermediate constructors omitted the saved
   transform. No select/test read occurred. Constructor forwarding and a real
   quadratic package round-trip regression are now fixed; full suite `99/99`.
+- Corrected T14 smoke `20260728-t14-router-smoke-wb-s3003-a2` completed the
+  152-feature fit, all 336 policies and quadratic checkpoint round-trip.
+  Verification-only select/test remained unread.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

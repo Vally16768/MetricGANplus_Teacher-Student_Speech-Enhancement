@@ -1,8 +1,8 @@
 # T14 teacher-improvement TODO
 
-Status: **in progress — implementation validation**
+Status: **in progress — production quadratic search**
 Last update: **2026-07-28**
-Next action: **run full tests, campaign validation, hashes and guard**
+Next action: **commit corrected smoke evidence and run full search**
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
@@ -10,8 +10,8 @@ Next action: **run full tests, campaign validation, hashes and guard**
 | T14.0.2 | Predeclare quadratic successor | `.agents/TEACHER_T14_PLAN.md` | passed |
 | T14.1.1 | Implement deterministic 152-feature transform | checkpoint-configured/noisy-only | passed |
 | T14.1.2 | Implement regularized metric-delta fits and policy flow | 584 train-only; 336 rank policies | passed |
-| T14.1.3 | Tests, hashes, guard and CUDA smoke | first smoke found constructor forwarding defect; fixed; 99/99 | in-progress |
-| T14.2.1 | Full fit/rank/select | no test | blocked |
+| T14.1.3 | Tests, hashes, guard and CUDA smoke | 99/99; guard; corrected smoke A2 round-trip passed | passed |
+| T14.2.1 | Full fit/rank/select | no test | in-progress |
 | T14.2.2 | Apply final teacher gate | unchanged | blocked |
 | T14.2.3 | Independently confirm/promote/shutdown | only after candidate pass | blocked |
 | T14.2.4 | Predeclare successor if failed | preserve evidence | blocked |
@@ -26,3 +26,4 @@ Next action: **run full tests, campaign validation, hashes and guard**
 | 2026-07-28 | Refreshed hashes and passed project guard | zero issues | commit and CUDA smoke |
 | 2026-07-28 | First smoke stopped at checkpoint reload | transform was saved but omitted by intermediate constructors; select/test unread | fix forwarding and retest |
 | 2026-07-28 | Fixed all constructor forwarding and added real round-trip regression | focused plus full 99/99 pass | guard, commit and repeat smoke |
+| 2026-07-28 | Corrected smoke A2 completed | quadratic checkpoint round-trip; 336 policies; select/test unread | production search |
