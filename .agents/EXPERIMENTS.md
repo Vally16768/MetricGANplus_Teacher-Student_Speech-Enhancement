@@ -331,14 +331,13 @@ train-only examples and calibrated on 128 disjoint train examples. It selected
 the T7 action for 75/128 examples and gained `+0.009197` PESQ with STOI
 `-0.000957` and SI-SDR `-0.145724` dB. Its exact oracle ceiling was only
 `+0.014197`, below the predeclared `+0.015` pre-validation gate, so validation
-and test remained unread. T9 is the active four-action routing successor.
+and test remained unread.
 
 `20260728-t9-router-wb-s3003-a1` raised the four-action calibration oracle to
 `+0.031116` PESQ. The PESQ-only router gained up to `+0.022907` but violated
 both auxiliary guards. Its conservative threshold `0.02` retained `+0.017368`
 PESQ and passed STOI (`-0.001773`), while SI-SDR (`-0.279120` dB) missed the
-unchanged limit by `0.029120` dB. It stopped before validation and test. T10
-is the active fresh-support conservative-margin successor.
+unchanged limit by `0.029120` dB. It stopped before validation and test.
 
 `20260728-t10-router-wb-s3003-a1` selected margin `0.025`. It gained
 `+0.008331` on `val_rank` and `+0.008015` PESQ on `val_select`, with STOI
@@ -349,4 +348,9 @@ unchanged PESQ gate failed; test remained unread.
 from fresh 72-example support. It gained `+0.010068` PESQ on `val_rank` but
 only `+0.008349` on `val_select`; STOI `-0.001395` and SI-SDR `-0.227965` dB
 remained within the guardrails. The PESQ gate failed and test remained unread.
-T12 is the active rank-selected risk-policy successor.
+
+`20260728-t12-router-wb-s3003-a1` ranked all 72 policies on `val_rank` and
+selected penalty `0.015`, margin `0.015`. Rank PESQ gained `+0.011176`; the
+single `val_select` evaluation gained only `+0.008425`, with STOI `-0.001635`
+and SI-SDR `-0.224316` dB. T13 is the active train-only multi-objective
+successor; test remained unread.

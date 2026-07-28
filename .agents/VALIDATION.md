@@ -136,6 +136,12 @@ metric/reference profile matches the run profile
 - T12 clean CUDA smoke `20260728-t12-router-smoke-wb-s3003-a1` completed ten
   rank examples, all 72 policies, guardrail-aware selection and checkpoint
   round-trip. It was verification-only and read neither `val_select` nor test.
+- T12 production `20260728-t12-router-wb-s3003-a1` selected penalty `0.015`
+  and margin `0.015`; rank gained `+0.011176`, but `val_select` gained only
+  `+0.008425` PESQ. Auxiliary guards passed and test remained unread.
+- T13 implementation full suite `98/98` and VoiceBank campaign split
+  validation pass; architecture hashes and project guard pass; CUDA smoke
+  remains.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

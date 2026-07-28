@@ -34,8 +34,10 @@ This directory is the canonical control plane for the research project.
 | [TEACHER_T10_TODO.md](TEACHER_T10_TODO.md) | Completed T10 board and below-gate evidence | T10 audit |
 | [TEACHER_T11_PLAN.md](TEACHER_T11_PLAN.md) | Executed risk-penalized multi-action successor | T11 audit |
 | [TEACHER_T11_TODO.md](TEACHER_T11_TODO.md) | Completed T11 board and below-gate evidence | T11 audit |
-| [TEACHER_T12_PLAN.md](TEACHER_T12_PLAN.md) | Active rank-selected risk-policy successor | all T12 work |
-| [TEACHER_T12_TODO.md](TEACHER_T12_TODO.md) | Active T12 dependency board and exit gates | every T12 iteration |
+| [TEACHER_T12_PLAN.md](TEACHER_T12_PLAN.md) | Executed rank-selected risk-policy successor | T12 audit |
+| [TEACHER_T12_TODO.md](TEACHER_T12_TODO.md) | Completed T12 board and below-gate evidence | T12 audit |
+| [TEACHER_T13_PLAN.md](TEACHER_T13_PLAN.md) | Active train-only multi-objective router successor | all T13 work |
+| [TEACHER_T13_TODO.md](TEACHER_T13_TODO.md) | Active T13 dependency board and exit gates | every T13 iteration |
 
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
@@ -51,13 +53,13 @@ only `+0.004931`. T8 learned a safe `+0.009197` calibration router, but its
 single-action oracle ceiling was only `+0.014197`. T9 raised the oracle to
 `+0.031116`, but its PESQ-only decisions over-consumed SI-SDR; threshold
 `0.02` retained `+0.017368` PESQ and missed SI-SDR by `0.029120` dB. T0
-remains selected. T10 gained `+0.008015`; T11 improved rank behavior but
-generalized to only `+0.008349` on `val_select`. T12 now uses `val_rank` for
-its declared purpose and freezes one policy before the final split**.
+remains selected. T10 gained `+0.008015`; T11 gained `+0.008349`; T12 used
+`val_rank` correctly but reached only `+0.008425` on `val_select`. T13 now
+models per-action PESQ/STOI/SI-SDR deltas from train-only support**.
 
 Open work:
 
-- implement and validate the predeclared T12 rank-selected risk policy;
-- rank the frozen policy family on `val_rank`, then read `val_select` once;
+- implement and validate the predeclared T13 multi-objective router;
+- fit train-only metric deltas, rank on `val_rank`, then read `val_select` once;
 - no cache, student or test evaluation may start before teacher promotion;
 - the TTS metric-critic hypothesis remains a separate future campaign.

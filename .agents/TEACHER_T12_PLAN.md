@@ -1,6 +1,6 @@
 # T12 rank-selected risk-policy plan
 
-Status: **predeclared — implementation validation**
+Status: **executed — final PESQ gate failed**
 
 ## Cause and hypothesis
 
@@ -46,3 +46,11 @@ independent final check, not another policy-selection surface.
 - shutdown is allowed only after that confirmation establishes a genuine
   improved teacher, or under the separate unplugged-and-battery-below-90%
   safety condition.
+
+## Outcome
+
+T12 selected penalty `0.015` and margin `0.015`. Exact `val_rank` deltas were
+PESQ `+0.011176`, STOI `-0.001808` and SI-SDR `-0.247109` dB. The single
+`val_select` evaluation produced PESQ `+0.008425`, STOI `-0.001635` and
+SI-SDR `-0.224316` dB. The PESQ gate failed; test/cache/students remained
+unread or unexecuted.

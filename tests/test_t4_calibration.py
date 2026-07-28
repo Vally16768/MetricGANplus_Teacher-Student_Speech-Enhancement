@@ -47,6 +47,9 @@ from sebench.t9_multi_router import (  # noqa: E402
 from sebench.t10_risk_router import prepare_t10_calibration_manifest  # noqa: E402
 from sebench.t11_penalty_router import penalize_ridges  # noqa: E402
 from sebench.t12_rank_router import rank_policy_grid  # noqa: E402
+from sebench.t13_multiobjective_router import (  # noqa: E402
+    fold_multiobjective_ridges,
+)
 
 
 class T4CalibrationTests(unittest.TestCase):
@@ -523,6 +526,30 @@ class T4CalibrationTests(unittest.TestCase):
         self.assertEqual(selected["penalty"], 0.05)
         self.assertGreaterEqual(selected["deltas"]["pesq_mean"], 0.01)
         self.assertGreaterEqual(selected["deltas"]["sisdr_mean"], -0.25)
+
+    def test_t13_multiobjective_utility_folds_exactly(self) -> None:
+        def ridge(weight: float, bias: float) -> dict:
+            return {
+                "feature_mean": [0.0] * 16,
+                "feature_scale": [1.0] * 16,
+                "weights": [weight] * 16,
+                "bias": bias,
+            }
+
+        metrics = {
+            "pesq": [ridge(1.0, 0.1) for _ in range(4)],
+            "stoi": [ridge(2.0, -0.2) for _ in range(4)],
+            "sisdr": [ridge(3.0, -0.3) for _ in range(4)],
+        }
+        folded = fold_multiobjective_ridges(
+            metrics,
+            stoi_weight=2.0,
+            sisdr_weight=0.5,
+            strength_penalty=0.1,
+        )
+        self.assertAlmostEqual(folded[0]["weights"][0], 6.5)
+        self.assertAlmostEqual(folded[0]["bias"], -0.454)
+        self.assertAlmostEqual(folded[3]["bias"], -0.514)
 
 
 if __name__ == "__main__":
