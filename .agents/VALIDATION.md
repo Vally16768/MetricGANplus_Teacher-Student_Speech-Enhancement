@@ -161,7 +161,10 @@ metric/reference profile matches the run profile
   policy with rank `+0.011275`; `val_select` reached the current best
   `+0.009365` PESQ, still `0.000635` below gate. Auxiliary guards passed and
   test remained unread.
-- T15 OOF-calibration implementation is pending.
+- T15 OOF-calibration implementation passed the complete suite (`101/101`)
+  and project guard (`0` issues). Nested 5x4 train-only OOF calibration has
+  exact affine-folding and deterministic-repeat coverage; CUDA smoke is the
+  next gate before production.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

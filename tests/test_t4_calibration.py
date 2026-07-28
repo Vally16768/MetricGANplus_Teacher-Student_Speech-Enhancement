@@ -51,6 +51,12 @@ from sebench.t13_multiobjective_router import (  # noqa: E402
     fold_multiobjective_ridges,
 )
 from sebench.t14_quadratic_router import quadratic_features  # noqa: E402
+from sebench.t15_oof_calibration import (  # noqa: E402
+    _ridge_predict,
+    apply_affine_to_ridge,
+    fit_affine_calibration,
+    fit_oof_calibrated_quadratic_ridge,
+)
 
 
 class T4CalibrationTests(unittest.TestCase):
@@ -598,6 +604,51 @@ class T4CalibrationTests(unittest.TestCase):
         )
         restored_scores = restored.multi_router_scores(features)
         self.assertTrue(torch.equal(restored_scores, scores))
+
+    def test_t15_affine_calibration_and_ridge_folding_are_exact(self) -> None:
+        predictions = np.linspace(-0.4, 0.6, 21)
+        labels = 0.5 * predictions + 0.2
+        calibration = fit_affine_calibration(predictions, labels)
+        self.assertAlmostEqual(calibration["slope"], 0.5, places=12)
+        self.assertAlmostEqual(calibration["intercept"], 0.2, places=12)
+        ridge = {
+            "feature_mean": [0.0, 0.0],
+            "feature_scale": [1.0, 2.0],
+            "weights": [0.4, -0.2],
+            "bias": 0.1,
+        }
+        features = np.asarray([[1.0, 2.0], [-2.0, 4.0]])
+        original = _ridge_predict(ridge, features)
+        folded = apply_affine_to_ridge(ridge, calibration)
+        observed = _ridge_predict(folded, features)
+        expected = calibration["slope"] * original + calibration["intercept"]
+        self.assertTrue(np.allclose(observed, expected, atol=1e-12, rtol=0.0))
+
+    def test_t15_nested_oof_fit_is_deterministic_and_serializable(self) -> None:
+        generator = np.random.default_rng(15)
+        features = generator.normal(size=(25, 16))
+        labels = (
+            0.03 * features[:, 0]
+            - 0.02 * features[:, 1] ** 2
+            + 0.01 * features[:, 2] * features[:, 3]
+        )
+        first, first_diagnostics = fit_oof_calibrated_quadratic_ridge(
+            features,
+            labels,
+            lambdas=(1.0, 10.0),
+        )
+        second, second_diagnostics = fit_oof_calibrated_quadratic_ridge(
+            features,
+            labels,
+            lambdas=(1.0, 10.0),
+        )
+        self.assertEqual(first, second)
+        self.assertEqual(first_diagnostics, second_diagnostics)
+        self.assertEqual(len(first["weights"]), 152)
+        self.assertLessEqual(
+            first_diagnostics["calibration"]["oof_mse_after"],
+            first_diagnostics["calibration"]["oof_mse_before"] + 1e-15,
+        )
 
 
 if __name__ == "__main__":

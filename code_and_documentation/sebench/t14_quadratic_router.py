@@ -149,6 +149,14 @@ def run_t14_quadratic_search(
     device: str = "cuda",
     max_eval_files: int | None = None,
     progress_callback: Callable[[str], None] | None = None,
+    metric_ridge_fitter: Callable[
+        [list[dict[str, Any]]],
+        dict[str, list[dict[str, Any]]]
+        | tuple[dict[str, list[dict[str, Any]]], dict[str, Any]],
+    ] = fit_quadratic_metric_ridges,
+    strategy: str = "T14-QUADRATIC-MULTIOBJECTIVE",
+    checkpoint_filename: str = "T14-QUADRATIC-ROUTED.pt",
+    prerequisite_name: str = "T13",
 ) -> dict[str, Any]:
     if not str(device).startswith("cuda") or not torch.cuda.is_available():
         raise RuntimeError("T14 quadratic router search is CUDA-only.")
@@ -166,7 +174,10 @@ def run_t14_quadratic_search(
         or not bool(t13["gate"]["checks"]["sisdr_drop_at_most_0_25"])
         or bool(t13.get("test_read"))
     ):
-        raise ValueError("T14 requires the auxiliary-safe below-PESQ T13 result.")
+        raise ValueError(
+            f"T14 search requires the auxiliary-safe below-PESQ "
+            f"{prerequisite_name} result."
+        )
     support = merge_train_support(
         (
             t9["support"]["fit"]["manifest"],
@@ -186,7 +197,11 @@ def run_t14_quadratic_search(
         max_files=max_eval_files,
         progress_callback=progress_callback,
     )
-    metric_ridges = fit_quadratic_metric_ridges(fit_records)
+    fitted = metric_ridge_fitter(fit_records)
+    if isinstance(fitted, tuple):
+        metric_ridges, fit_diagnostics = fitted
+    else:
+        metric_ridges, fit_diagnostics = fitted, {}
     rank_records = collect_multi_action_records(
         model,
         val_rank_manifest,
@@ -287,13 +302,13 @@ def run_t14_quadratic_search(
         threshold=float(selected["threshold"]),
         feature_transform="quadratic",
     )
-    checkpoint = root / "T14-QUADRATIC-ROUTED.pt"
+    checkpoint = root / checkpoint_filename
     save_checkpoint_package(
         checkpoint,
         model,
         model_family=str(package["model_family"]),
         variant=str(package.get("variant", "base")),
-        extra={"strategy": "T14-QUADRATIC-MULTIOBJECTIVE", "test_read": False},
+        extra={"strategy": strategy, "test_read": False},
     )
     reloaded, reloaded_package = load_model_from_checkpoint(checkpoint, device=device)
     target = reloaded.base_model if hasattr(reloaded, "base_model") else reloaded
@@ -340,13 +355,14 @@ def run_t14_quadratic_search(
     summary = {
         "schema_version": 1,
         "status": "passed" if all(checks.values()) else "failed",
-        "strategy": "T14-QUADRATIC-MULTIOBJECTIVE",
+        "strategy": strategy,
         "teacher_checkpoint_sha256": sha256_file(teacher_checkpoint),
         "source_t9_checkpoint_sha256": sha256_file(t9_checkpoint),
         "source_t13_summary_sha256": sha256_file(t13_summary_path),
         "support": support,
         "fit_count": len(fit_records),
         "metric_ridges": metric_ridges,
+        "fit_diagnostics": fit_diagnostics,
         "rank_count": len(rank_records),
         "policy_candidates": candidates,
         "selected_policy": selected,
