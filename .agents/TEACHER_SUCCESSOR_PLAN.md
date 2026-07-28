@@ -115,8 +115,12 @@ with all invariance/control-flow tests passing.
 
 Do not train G.
 
-Create speaker-disjoint train/calibration/audit partitions from the existing
-VoiceBank training support. The initial target sizes are:
+Create train/calibration/audit partitions from the existing VoiceBank training
+support. The canonical content-addressed staging did not retain the original
+VoiceBank speaker IDs, so exact speaker-disjointness cannot be reconstructed
+without inventing metadata. T2 therefore enforces strict pair/clean-utterance
+disjointness and records the missing speaker/noise metadata as a limitation.
+The initial target sizes are:
 
 | Partition | Current T0 utterances | Use |
 |---|---:|---|
@@ -129,9 +133,11 @@ enhanced speech. Store only regenerable candidates locally in FP16; retain
 source IDs, T0 hash, manifest hash, PESQ implementation/mode and waveform
 length. Never cache or rewrite source noisy/clean audio.
 
-Before training, plot the PESQ distribution by candidate type, speaker,
-training SNR and noise condition. Partitions must be disjoint by utterance and
-speaker, and the audit partition must not influence optimization.
+Before training, plot the PESQ distribution by candidate type, estimated input
+SNR and every condition retained by the source manifest. Partitions must be
+disjoint by pair and clean utterance, and the audit partition must not
+influence optimization. Speaker/noise-condition slices are reported only if
+their source identities are recoverable.
 
 ## Stage C — Fit and audit `D2-OFFICIAL`
 

@@ -35,6 +35,7 @@ from sebench.metric_proxy_training import (  # noqa: E402
     build_proxy_records,
     train_metric_proxy,
 )
+from sebench.metricgan_d2 import prepare_d2_support  # noqa: E402
 from sebench.runtime import require_shared_venv, require_training_cuda  # noqa: E402
 from sebench.teacher_cache import (  # noqa: E402
     TeacherCacheTarget,
@@ -150,6 +151,14 @@ def validate_campaign_config(config: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("runtime.run_root must be outside the manifest input root.")
     if str(config["runtime"].get("device", "")).lower() == "cpu":
         raise ValueError("Canonical campaign training is GPU-only.")
+    teacher_checkpoint_sha256 = str(
+        config.get("model", {}).get("teacher_checkpoint_sha256") or ""
+    )
+    if (
+        len(teacher_checkpoint_sha256) != 64
+        or any(character not in "0123456789abcdef" for character in teacher_checkpoint_sha256)
+    ):
+        raise ValueError("model.teacher_checkpoint_sha256 must be canonical SHA-256.")
     cache_root = Path(
         str(config.get("teacher_cache", {}).get("root") or "")
     ).expanduser().resolve()
@@ -186,6 +195,13 @@ def validate_campaign_config(config: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("Canonical teacher-only pilot ceiling must be 10 epochs.")
     if float(training.get("teacher_trial_lr", 0.0)) != 1e-6:
         raise ValueError("Canonical teacher-only pilot LR must be 1e-6.")
+    for key, minimum in (
+        ("d2_train_rows", 1000),
+        ("d2_calibration_rows", 200),
+        ("d2_audit_rows", 200),
+    ):
+        if int(training.get(key, 0)) < minimum:
+            raise ValueError(f"training.{key} must be at least {minimum}.")
     student_lr_patience = int(training.get("student_lr_patience", 0))
     student_early_stop_patience = int(
         training.get("student_early_stop_patience", 0)
@@ -3739,6 +3755,10 @@ def parse_args() -> argparse.Namespace:
     teacher_pilot = subparsers.add_parser("pilot-teacher")
     teacher_pilot.add_argument("--calibration-run-dir", required=True)
     teacher_pilot.add_argument("--run-id", required=True)
+    d2_support = subparsers.add_parser("prepare-d2-support")
+    d2_support.add_argument("--run-id", required=True)
+    d2_support.add_argument("--teacher-cache-manifest", required=True)
+    d2_support.add_argument("--teacher-cache-metadata", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -3770,6 +3790,76 @@ def main() -> None:
             source_run_dir=args.source_run_dir,
             run_id=args.run_id,
         )
+    elif args.command == "prepare-d2-support":
+        config = load_campaign_config(args.config)
+        dataset_audit = validate_campaign_config(config)
+        git = _git_state()
+        if git["dirty"]:
+            raise RuntimeError("D2 support preparation requires a clean snapshot.")
+        require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+        run_root = (
+            Path(str(config["runtime"]["run_root"])).expanduser().resolve()
+            / args.run_id
+        )
+        run_root.mkdir(parents=True, exist_ok=False)
+        provenance = {
+            "schema_version": 1,
+            "run_id": args.run_id,
+            "status": "running",
+            "campaign_scope": "t2_d2_fixed_support",
+            "git_commit": git["commit"],
+            "git_dirty": git["dirty"],
+            "dataset_audit": dataset_audit,
+            "teacher_cache_manifest_sha256": sha256(
+                args.teacher_cache_manifest
+            ),
+            "teacher_cache_metadata_sha256": sha256(
+                args.teacher_cache_metadata
+            ),
+        }
+        _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+        (run_root / "provenance" / "config_resolved.yaml").write_text(
+            yaml.safe_dump(config, sort_keys=False),
+            encoding="utf-8",
+        )
+        training = dict(config["training"])
+        support = prepare_d2_support(
+            train_manifest=config["dataset"]["train_fit"],
+            teacher_cache_manifest=args.teacher_cache_manifest,
+            teacher_cache_metadata=args.teacher_cache_metadata,
+            output_dir=run_root / "support",
+            expected_teacher_sha256=config["model"][
+                "teacher_checkpoint_sha256"
+            ],
+            train_rows=int(training["d2_train_rows"]),
+            calibration_rows=int(training["d2_calibration_rows"]),
+            audit_rows=int(training["d2_audit_rows"]),
+            seed=int(training["seed"]),
+            progress_callback=print,
+        )
+        provenance["status"] = "prepared"
+        provenance["support_path"] = support["support_path"]
+        provenance["support_counts"] = support["counts"]
+        _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+        _atomic_json(
+            run_root / "status.json",
+            {
+                "status": "prepared",
+                "campaign_scope": "t2_d2_fixed_support",
+                "valid_for_promotion": False,
+                "support_counts": support["counts"],
+            },
+        )
+        result = {
+            "run_root": run_root.as_posix(),
+            "support_path": support["support_path"],
+            "counts": support["counts"],
+            "coverage": support["coverage"],
+            "speaker_disjoint_verified": support[
+                "speaker_disjoint_verified"
+            ],
+            "speaker_limitation": support["speaker_limitation"],
+        }
     elif args.command in {
         "smoke-teacher-calibration",
         "calibrate-teacher",

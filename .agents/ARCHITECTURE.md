@@ -204,6 +204,15 @@ PESQ labels (clean is fixed to 1) and references the external clean/noisy paths 
 dataset audio. Noisy scores are reused from a local JSON cache. D optimizer,
 checkpoint and refresh history are part of the resumable T1 state.
 
+T2 reuses the complete content-addressed official T0 WB cache instead of
+regenerating identical outputs. `metricgan_d2.py` selects fixed
+train/calibration/audit identities, computes true PESQ-WB for noisy/T0
+candidates, estimates input SNR, verifies source hashes before/after and writes
+only local records/plots. It does not copy noisy or clean audio. Because source
+speaker/noise labels were not retained by content-addressed staging, the
+support is provably pair/clean-utterance disjoint but not claimed
+speaker-disjoint.
+
 The active T1 fidelity protocol draws two disjoint current-output partitions
 per refresh: at least 100 examples for D updates and at least 100 held out for
 calibration. The held-out partition reports raw/normalized MAE and RMSE,
@@ -235,6 +244,10 @@ publication.
 ```text
 validate
   -> immutable manifest/profile checks
+prepare-d2-support
+  -> bind canonical T0 cache hash
+  -> fixed 1000/200/200 train/calibration/audit identities
+  -> true PESQ-WB labels + coverage/source-mutation audit
 smoke-baseline / pilot-baseline / run-baseline
   -> T0-WB-OFFICIAL at epoch 0
   -> persistent dual-profile cache C0

@@ -306,3 +306,21 @@ Constraint: the D thresholds are not relaxed. Score-support widening is one
 conditional, predeclared train-only ablation and cannot use test data. No G,
 C2, S2-WB or S2-NB work begins after a failed parity or D2 gate. TTS remains a
 separate campaign.
+
+## D-025 — Keep D2 utterance-disjoint when source speaker IDs are unavailable
+
+Decision: the fixed D2 train/calibration/audit support is strictly disjoint by
+noisy-clean pair and clean utterance. Exact speaker-disjointness and
+noise-condition slicing are recorded as unavailable rather than inferred from
+content hashes.
+
+Cause: the canonical read-only manifests reference content-addressed staged
+audio and contain only `noisy,clean`; the original VoiceBank speaker-bearing
+filenames and a hash-to-source ledger are not present in the available
+dataset metadata. Searches of the staging manifests and prior cache ledgers
+recover the same hashed paths, not speaker identities.
+
+Constraint: this limitation applies only to the D2 internal support audit and
+must be stated in reports. Frozen `val_rank`, `val_select` and test identities
+remain disjoint from `train_fit` and retain their existing selection/reporting
+roles. No pseudo-speaker label may be presented as source metadata.

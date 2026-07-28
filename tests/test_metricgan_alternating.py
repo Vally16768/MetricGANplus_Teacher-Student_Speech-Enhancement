@@ -4,6 +4,7 @@ import json
 import sys
 import tempfile
 import unittest
+import csv
 from pathlib import Path
 from unittest import mock
 
@@ -26,6 +27,8 @@ from sebench.metricgan_alternating import (  # noqa: E402
     refresh_metricgan_discriminator,
 )
 from sebench.metric_proxy_training import build_proxy_records  # noqa: E402
+from sebench.metricgan_d2 import prepare_d2_support  # noqa: E402
+from sebench.audio import manifest_hash  # noqa: E402
 
 
 class IdentityTeacher(torch.nn.Module):
@@ -321,6 +324,95 @@ class AlternatingMetricGANTests(unittest.TestCase):
                     not parameter.requires_grad
                     for parameter in discriminator.parameters()
                 )
+            )
+
+    def test_d2_support_is_disjoint_resumable_and_does_not_copy_inputs(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            train_manifest = root / "train.csv"
+            train_manifest.write_text(
+                "noisy,clean\n"
+                + "".join(
+                    f"/external/noisy-{index}.wav,/external/clean-{index}.wav\n"
+                    for index in range(8)
+                ),
+                encoding="utf-8",
+            )
+            cache_manifest = root / "teacher-cache.csv"
+            teacher_paths = []
+            for index in range(8):
+                teacher_path = root / f"teacher-{index}.pt"
+                torch.save(torch.ones(4096, dtype=torch.float16), teacher_path)
+                teacher_paths.append(teacher_path)
+            with cache_manifest.open("w", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(
+                    handle,
+                    fieldnames=("noisy", "clean", "teacher_wav"),
+                )
+                writer.writeheader()
+                for index, teacher_path in enumerate(teacher_paths):
+                    writer.writerow(
+                        {
+                            "noisy": f"/external/noisy-{index}.wav",
+                            "clean": f"/external/clean-{index}.wav",
+                            "teacher_wav": teacher_path.as_posix(),
+                        }
+                    )
+            teacher_hash = "a" * 64
+            metadata = root / "cache-metadata.json"
+            metadata.write_text(
+                json.dumps(
+                    {
+                        "status": "complete",
+                        "cache_inputs": False,
+                        "storage_dtype": "float16",
+                        "teacher_checkpoint_sha256": teacher_hash,
+                        "train_manifest_sha256": manifest_hash(train_manifest),
+                    }
+                ),
+                encoding="utf-8",
+            )
+            waveform = torch.linspace(-0.2, 0.2, 4096)
+            with (
+                mock.patch(
+                    "sebench.metricgan_d2._load_aligned",
+                    return_value=(waveform, waveform * 0.9, waveform * 0.95),
+                ),
+                mock.patch(
+                    "sebench.metricgan_d2.pesq_score",
+                    side_effect=[
+                        value
+                        for index in range(8)
+                        for value in (2.0 + index * 0.1, 1.5 + index * 0.1)
+                    ],
+                ),
+            ):
+                payload = prepare_d2_support(
+                    train_manifest=train_manifest,
+                    teacher_cache_manifest=cache_manifest,
+                    teacher_cache_metadata=metadata,
+                    output_dir=root / "support",
+                    expected_teacher_sha256=teacher_hash,
+                    train_rows=4,
+                    calibration_rows=2,
+                    audit_rows=2,
+                    seed=7,
+                )
+            self.assertEqual(
+                payload["counts"],
+                {"train": 4, "calibration": 2, "audit": 2},
+            )
+            self.assertTrue(payload["utterance_disjoint"])
+            self.assertFalse(payload["speaker_disjoint_verified"])
+            self.assertEqual(len(payload["records"]), 8)
+            self.assertFalse((root / "support" / "noisy").exists())
+            self.assertFalse((root / "support" / "clean").exists())
+            self.assertTrue((root / "support" / "coverage.png").is_file())
+            self.assertEqual(
+                payload["source_hashes_before"],
+                payload["source_hashes_after"],
             )
 
 
