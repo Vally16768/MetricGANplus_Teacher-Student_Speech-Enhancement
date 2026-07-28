@@ -302,6 +302,13 @@ ordinary checkpoint; interpolation back toward T0 at the frozen alpha grid
 implements the trust-region line search. True WB `val_rank` selects at most
 one candidate and only that candidate reads `val_select`.
 
+T5 keeps the neural graph frozen and folds a smooth 257-bin mask-logit bias
+curve into the ordinary output-layer bias. Eight bounded frequency knots are
+optimized by deterministic true-PESQ coordinate search on a train-only fit
+support. A disjoint train-only calibration support is read only after complete
+sweeps; `val_rank` selects among T0, the uniform T4-A start and completed
+sweeps; only one candidate reads `val_select`.
+
 The earlier bounded frozen-proxy branch remains historical negative evidence,
 not the canonical T1 implementation. The alternating branch passed structural
 smoke but failed its clean pilot promotion gate: current-output D calibration
@@ -395,6 +402,11 @@ smoke-t4-microstep / train-t4-microstep
   -> PMSQE-primary update with supervised/anchor constraints
   -> checkpoint interpolation and true-WB val_rank backtracking
   -> one selected val_select evaluation; never test/cache/students
+smoke-t5-frequency / search-t5-frequency
+  -> freeze disjoint train-only fit/calibration support
+  -> optimize eight bounded frequency knots with true PESQ, no surrogate
+  -> hard STOI/SI-SDR constraints at fit/cal/rank/select
+  -> ordinary selected checkpoint; never test/cache/students
 promote-baseline
   -> accept only an audited/promotable converged S0 closure
   -> preserve corrective true-length evaluation provenance when present
@@ -431,6 +443,8 @@ Evidence:
 - T4 bounded calibration: `code_and_documentation/sebench/t4_calibration.py`;
 - T4 micro-step backtracking:
   `code_and_documentation/sebench/t4_microstep.py`;
+- T5 zeroth-order frequency curve:
+  `code_and_documentation/sebench/t5_zeroth_order.py`;
 - configuration: `configs/voicebank_campaign.yaml`;
 - post-cleanup GPU smoke:
   `20260727-postcleanup-smoke-wbnb-s0-a5` (six cells, audit zero issues).

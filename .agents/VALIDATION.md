@@ -208,6 +208,10 @@ metric/reference profile matches the run profile
   became unsafe; the selected H1/alpha-0.125 candidate had `val_select` PESQ
   delta `-0.00000119` and correctly failed the unchanged gate. Test, cache and
   students remained unread/unbuilt.
+- T5 pre-run implementation validation passes `87/87` tests, including
+  uniform-curve/scalar equivalence, coefficient bounds and pair/clean-disjoint
+  train-only fit/calibration manifests. Research-plan/campaign validation,
+  architecture hashes, project guard and diff check pass.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

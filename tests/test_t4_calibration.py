@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import sys
+import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -18,6 +20,11 @@ from sebench.t4_calibration import apply_uniform_mask_logit_bias  # noqa: E402
 from sebench.t4_microstep import (  # noqa: E402
     interpolate_state_dict,
     t4_microstep_loss,
+)
+from sebench.t5_zeroth_order import (  # noqa: E402
+    apply_frequency_logit_curve,
+    frequency_curve_from_knots,
+    prepare_t5_support_manifests,
 )
 
 
@@ -80,6 +87,65 @@ class T4CalibrationTests(unittest.TestCase):
         )
         expected = 0.1 * (2.0 + 0.1 * 3.0 + 0.5 * 4.0) + 0.2 * 5.0
         self.assertAlmostEqual(float(observed), expected, places=6)
+
+    def test_t5_uniform_curve_matches_scalar_bias_and_enforces_bounds(self) -> None:
+        curve = frequency_curve_from_knots([-0.1] * 8)
+        self.assertEqual(tuple(curve.shape), (257,))
+        self.assertTrue(torch.allclose(curve, torch.full((257,), -0.1)))
+        model = build_enhancer(
+            "metricgan_plus_teacher_official_wb",
+            "small",
+            initialize_from_official=False,
+            n_fft=512,
+            hop_length=256,
+            win_length=512,
+        )
+        before = model.mask_generator.linear2.bias.detach().clone()
+        observed = apply_frequency_logit_curve(model, [-0.1] * 8)
+        self.assertTrue(torch.allclose(observed, torch.full((257,), -0.1)))
+        self.assertTrue(
+            torch.allclose(
+                model.mask_generator.linear2.bias.detach() - before,
+                torch.full((257,), -0.1),
+                atol=3e-8,
+            )
+        )
+        with self.assertRaisesRegex(ValueError, "bounds"):
+            frequency_curve_from_knots([-0.21] + [-0.1] * 7)
+
+    def test_t5_support_is_train_only_and_disjoint(self) -> None:
+        records = []
+        for index in range(5):
+            records.append(
+                {
+                    "partition": "train" if index < 4 else "calibration",
+                    "token": f"pair-{index}",
+                    "clean_token": f"clean-{index}",
+                    "noisy": f"/dataset/noisy-{index}.wav",
+                    "clean": f"/dataset/clean-{index}.wav",
+                }
+            )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            identities = root / "identities.json"
+            identities.write_text(
+                json.dumps({"records": records}),
+                encoding="utf-8",
+            )
+            summary = prepare_t5_support_manifests(
+                identities,
+                root / "support",
+                fit_count=2,
+                calibration_count=2,
+            )
+            self.assertEqual(summary["fit"]["count"], 2)
+            self.assertEqual(summary["calibration"]["count"], 2)
+            self.assertFalse(
+                set(summary["fit"]["tokens"])
+                & set(summary["calibration"]["tokens"])
+            )
+            self.assertEqual(summary["pair_overlap"], 0)
+            self.assertEqual(summary["clean_overlap"], 0)
 
 
 if __name__ == "__main__":
