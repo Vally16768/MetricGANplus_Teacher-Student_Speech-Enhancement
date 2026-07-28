@@ -16,8 +16,10 @@ status. Historical experiment directories are evidence, not canonical docs.
 | `.agents/ACADEMIC.md` | publication contract | canonical |
 | `.agents/DECISIONS.md` | decision log | canonical |
 | `.agents/TODO.md` | ordered execution and gate status | canonical |
-| `.agents/EXECUTION_TODO.md` | detailed iterative P1–P6 execution board and evidence ledger | canonical active |
+| `.agents/EXECUTION_TODO.md` | completed iterative P1–P6 execution board and evidence ledger | canonical complete |
 | `.agents/TEACHER_IMPROVEMENT_PLAN.md` | executed failed T1 calibration protocol and separate TTS-transfer boundary | canonical negative outcome |
+| `.agents/TEACHER_SUCCESSOR_PLAN.md` | predeclared calibration- and local-gradient-gated T2 teacher successor | canonical planned |
+| `.agents/TEACHER_SUCCESSOR_TODO.md` | detailed iterative T2 execution board and evidence ledger | canonical active |
 | `docs/ARTIFACT_POLICY.md` | artifact policy | active, reconcile with this control plane |
 | `docs/FINAL_RESULTS.md` | canonical article-facing S0 table, negative T1 outcome and claim-to-artifact map | canonical reproduced |
 | `docs/audits/2026-07-26-initial-audit.md` | initial forensic audit | historical observed |

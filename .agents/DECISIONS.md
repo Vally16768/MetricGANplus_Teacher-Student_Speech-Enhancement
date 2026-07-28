@@ -282,3 +282,27 @@ three identical full E0 evaluations added cost without scientific evidence.
 
 Constraint: the retry does not relax thresholds, change the dataset, use test
 results, update G or authorize a broader hyperparameter search.
+
+## D-024 — Replace T1 with a separately gated T2 successor
+
+Decision: preserve T1 as final negative evidence and execute any further
+teacher work under the T2/D2 namespace defined by
+`.agents/TEACHER_SUCCESSOR_PLAN.md`. T2 first establishes numerical parity
+with the official SpeechBrain discriminator recipe, then fits a fresh
+batch-1 D to convergence on disjoint T0-output train/calibration/audit
+partitions. A teacher update requires both the existing scalar calibration
+gate and a new local directional gate around T0.
+
+Cause: the final permitted T1 retry reduced the discriminator's internal
+update loss but failed held-out fidelity with normalized MAE `0.2133`,
+Pearson `0.5545`, Spearman `0.5435` and out-of-range predictions. The official
+recipe trains D with batch size one, repeated current/history/current passes
+and a long alternating schedule; T1's padded-batch warm start and two refreshes
+did not establish a reliable current-output surrogate. A scalar predictor can
+also have acceptable global error while providing a harmful local generator
+gradient, so local PESQ-delta direction must be tested explicitly.
+
+Constraint: the D thresholds are not relaxed. Score-support widening is one
+conditional, predeclared train-only ablation and cannot use test data. No G,
+C2, S2-WB or S2-NB work begins after a failed parity or D2 gate. TTS remains a
+separate campaign.

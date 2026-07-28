@@ -8,7 +8,9 @@ or publication material.
 Before acting:
 
 1. Read `.agents/INDEX.md`.
-2. Read `.agents/EXECUTION_TODO.md` and reconcile its active item with evidence.
+2. Read `.agents/TEACHER_SUCCESSOR_TODO.md` and reconcile its active item with
+   evidence. Use `.agents/EXECUTION_TODO.md` only for completed P1–P6/T1
+   provenance.
 3. Read the task-specific canonical registers linked from the index.
 4. Inspect the worktree without cleaning, resetting, deleting, or normalizing it.
 5. Keep MetricGAN+ teacher–student in scope; MP-SENet is a separate project.

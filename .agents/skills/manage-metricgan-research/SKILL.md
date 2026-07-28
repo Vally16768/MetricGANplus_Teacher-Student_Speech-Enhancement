@@ -12,12 +12,14 @@ read-only input.
 
 1. Locate the repository root.
 2. Read `AGENTS.md` and `.agents/INDEX.md`.
-3. Read `.agents/EXECUTION_TODO.md`, then only the other task-specific
-   registers linked by the index.
+3. Read the active execution board named by `.agents/INDEX.md`
+   (`.agents/TEACHER_SUCCESSOR_TODO.md` for T2), then only the other
+   task-specific registers linked by the index. Read
+   `.agents/EXECUTION_TODO.md` when completed P1–P6/T1 provenance is needed.
 4. Inspect Git state, affected files and existing evidence without cleaning or
    normalizing the worktree.
 5. State the intended block, experiment or document and its cause.
-6. Reconcile the single active item in `.agents/EXECUTION_TODO.md` with
+6. Reconcile the single active item in the active execution board with
    processes and immutable evidence. Update it after every material iteration.
 7. Synchronize campaign-wide status in `.agents/TODO.md`. Never mark a gate
    passed from plans or code presence alone; attach the required evidence.
@@ -59,8 +61,10 @@ not as a cosmetic warning.
 
 ## Execute the iterative board
 
-- Treat `.agents/EXECUTION_TODO.md` as the detailed source of truth for the
-  active P1–P6 sequence; `.agents/TODO.md` remains the campaign summary.
+- Treat `.agents/TEACHER_SUCCESSOR_TODO.md` as the detailed source of truth
+  for the active T2 sequence. Treat `.agents/EXECUTION_TODO.md` as the
+  completed P1–P6/T1 evidence ledger; `.agents/TODO.md` remains the campaign
+  summary.
 - Keep at most one subtask `in-progress` and name one concrete `Next action`.
 - Execute the first unblocked dependency only. Do not start T1 before the S0
   baseline is audited, resume robustness passes and the baseline is promoted.
@@ -152,8 +156,9 @@ Use `campaign.py monitor-run --run-dir <run-dir>` throughout pilot/full
 execution. Reconcile the active campaign stage with the current cell epoch,
 metrics and generated files before allowing the next gate.
 
-For multi-stage campaign requests, maintain these gates in
-`.agents/EXECUTION_TODO.md` and synchronize the summary in `.agents/TODO.md`:
+For multi-stage campaign requests, maintain these gates in the active execution
+board named by `.agents/INDEX.md` and synchronize the summary in
+`.agents/TODO.md`:
 
 ```text
 audit -> local manifest binding -> canonical flow implementation

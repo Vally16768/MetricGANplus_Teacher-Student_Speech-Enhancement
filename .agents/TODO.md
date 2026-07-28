@@ -51,6 +51,12 @@ Update this register whenever a gate changes state.
 | C44 | Repair post-evaluation resume robustness | commit `5c48415`; 52/52 tests; real CUDA fault-injection A4 reconciled LR, patience, best state, selected hash and history | passed |
 | C45 | Make evaluation invariant to variable-length batch padding | per-utterance protocol regression-tested; corrected S0 v2 audited and pushed at `65b9a9c` | passed |
 | C46 | Close the ordered P1–P6 program | final S0 table and negative T1 evidence audited and pushed at `a485306`; conditional P5 work marked not applicable | passed |
+| C47 | Define a separate T2 teacher-successor protocol | indexed plan/TODO preserve T1, restore official batch-1 parity, fit D to convergence, add local directional gate and block students until teacher promotion | passed |
+| C48 | Establish exact official discriminator parity | pinned SpeechBrain revision; frontend/model/label/update/replay and padding-invariance tests | in-progress |
+| C49 | Fit and audit a trustworthy D2 on current T0 outputs | disjoint train/calibration/audit support; full scalar and local directional gates | blocked |
+| C50 | Run matched E1-control/E2-metric teacher pilots | same init/seed/schedule; true val metrics; rollback and resume verified | blocked |
+| C51 | Confirm and promote T2 across declared seeds | +0.01 PESQ-WB, STOI/SI-SDR guards, E2>E1, independent audit | blocked |
+| C52 | Transfer an accepted T2 to fresh S2-WB/S2-NB | C2 local cache; S0-matched students; bandwidth-correct evaluation and final report | blocked |
 
 ## Execution rule
 
