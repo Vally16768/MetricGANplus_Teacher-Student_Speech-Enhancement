@@ -36,6 +36,7 @@ ARCHITECTURE_SOURCES = (
     "code_and_documentation/sebench/t9_multi_router.py",
     "code_and_documentation/sebench/t10_risk_router.py",
     "code_and_documentation/sebench/t11_penalty_router.py",
+    "code_and_documentation/sebench/t12_rank_router.py",
     "code_and_documentation/sebench/teacher_cache.py",
     "code_and_documentation/sebench/training.py",
     "code_and_documentation/configs/research_plan_voicebank_wb_nb.yaml",

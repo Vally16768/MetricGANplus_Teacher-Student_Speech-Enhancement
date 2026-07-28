@@ -343,5 +343,10 @@ is the active fresh-support conservative-margin successor.
 `20260728-t10-router-wb-s3003-a1` selected margin `0.025`. It gained
 `+0.008331` on `val_rank` and `+0.008015` PESQ on `val_select`, with STOI
 `-0.001639` and SI-SDR `-0.207664` dB. Both auxiliary guards passed, but the
-unchanged PESQ gate failed; test remained unread. T11 is the active
-risk-penalized action-selection successor.
+unchanged PESQ gate failed; test remained unread.
+
+`20260728-t11-router-wb-s3003-a1` selected penalty `0.04` and margin `0.005`
+from fresh 72-example support. It gained `+0.010068` PESQ on `val_rank` but
+only `+0.008349` on `val_select`; STOI `-0.001395` and SI-SDR `-0.227965` dB
+remained within the guardrails. The PESQ gate failed and test remained unread.
+T12 is the active rank-selected risk-policy successor.

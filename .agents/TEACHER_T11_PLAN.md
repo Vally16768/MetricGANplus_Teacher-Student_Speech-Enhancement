@@ -1,6 +1,6 @@
 # T11 risk-penalized multi-action routing plan
 
-Status: **predeclared — implementation pending**
+Status: **executed — final PESQ gate failed**
 
 ## Cause and hypothesis
 
@@ -33,3 +33,12 @@ Select only an eligible fresh-calibration policy, then evaluate it once on
 `val_rank` and conditionally once on `val_select`. A single passing result is
 still only a candidate and requires independent recomputation, multiple
 declared support seeds, paired bootstrap and package audit before shutdown.
+
+## Outcome
+
+T11 selected penalty `0.04` and margin `0.005`. It gained `+0.014979` PESQ on
+fresh calibration and `+0.010068` on `val_rank`, with both auxiliary
+guardrails intact. The frozen checkpoint gained only `+0.008349` PESQ on
+`val_select` (STOI `-0.001395`, SI-SDR `-0.227965` dB), so the unchanged final
+gate failed. Test, cache generation and student training remained unread or
+unexecuted.

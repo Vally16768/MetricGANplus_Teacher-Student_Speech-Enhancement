@@ -46,6 +46,7 @@ from sebench.t9_multi_router import (  # noqa: E402
 )
 from sebench.t10_risk_router import prepare_t10_calibration_manifest  # noqa: E402
 from sebench.t11_penalty_router import penalize_ridges  # noqa: E402
+from sebench.t12_rank_router import rank_policy_grid  # noqa: E402
 
 
 class T4CalibrationTests(unittest.TestCase):
@@ -494,6 +495,34 @@ class T4CalibrationTests(unittest.TestCase):
         self.assertGreater(adjusted[0]["bias"], adjusted[3]["bias"])
         self.assertEqual(adjusted[2]["weights"], ridges[2]["weights"])
         self.assertEqual(ridges[3]["bias"], 0.02)
+
+    def test_t12_rank_grid_selects_only_guardrail_safe_policy(self) -> None:
+        records = []
+        for _ in range(2):
+            records.append(
+                {
+                    "base": {"pesq": 2.0, "stoi": 0.9, "sisdr": 5.0},
+                    "actions": [
+                        {"pesq": 2.02, "stoi": 0.899, "sisdr": 4.8},
+                        {"pesq": 2.02, "stoi": 0.899, "sisdr": 4.8},
+                        {"pesq": 2.025, "stoi": 0.898, "sisdr": 4.75},
+                        {"pesq": 2.04, "stoi": 0.897, "sisdr": 4.5},
+                    ],
+                }
+            )
+        predictions = np.asarray([[0.02, 0.02, 0.025, 0.04]] * 2)
+        candidates, selected = rank_policy_grid(
+            records,
+            predictions,
+            lows=(-0.2, -0.4, -0.6, -0.8),
+            penalties=(0.0, 0.05),
+            thresholds=(0.0,),
+        )
+        self.assertEqual(len(candidates), 2)
+        self.assertTrue(selected["eligible"])
+        self.assertEqual(selected["penalty"], 0.05)
+        self.assertGreaterEqual(selected["deltas"]["pesq_mean"], 0.01)
+        self.assertGreaterEqual(selected["deltas"]["sisdr_mean"], -0.25)
 
 
 if __name__ == "__main__":

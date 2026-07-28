@@ -68,7 +68,8 @@ Update this register whenever a gate changes state.
 | C61 | Execute T8 adaptive teacher routing | learned `+0.009197`; oracle `+0.014197` missed frozen `+0.015`; validation/test unread | failed |
 | C62 | Execute T9 multi-action teacher routing | oracle `+0.031116`; PESQ-only decisions violated auxiliary guards; validation/test unread | failed |
 | C63 | Execute T10 conservative-risk routing | select `+0.008015`; auxiliary guards passed; PESQ gate failed | failed |
-| C64 | Execute T11 risk-penalized routing | frozen T9 regressors, fresh remaining audit support, strength penalty | in-progress |
+| C64 | Execute T11 risk-penalized routing | rank `+0.010068`, select `+0.008349`; auxiliary guards pass but PESQ gate fails | failed |
+| C65 | Execute T12 rank-selected risk policy | rank 72 predeclared policies on `val_rank`; freeze one before `val_select` | in-progress |
 
 ## Execution rule
 

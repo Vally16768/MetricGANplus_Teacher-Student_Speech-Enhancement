@@ -126,6 +126,14 @@ metric/reference profile matches the run profile
   support, all 25 penalty/margin policies and checkpoint round-trip. The
   small-support PESQ gate caused the intended stop before validation; test was
   unread.
+- T11 production `20260728-t11-router-wb-s3003-a1` selected penalty `0.04`
+  and margin `0.005`; rank gained `+0.010068` PESQ with safe auxiliaries, but
+  `val_select` gained only `+0.008349`. The gate failed and test was unread.
+- T12 implementation adds one exact `val_rank` four-action pass, a predeclared
+  72-policy ranking surface, deterministic selection, checkpoint round-trip
+  and one conditional `val_select` evaluation. Full suite `97/97` and
+  VoiceBank campaign split validation and project guard pass; CUDA smoke
+  remains.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

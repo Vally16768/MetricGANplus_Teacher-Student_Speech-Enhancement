@@ -494,6 +494,8 @@ Evidence:
   `code_and_documentation/sebench/t10_risk_router.py`;
 - T11 risk-penalized action utility:
   `code_and_documentation/sebench/t11_penalty_router.py`;
+- T12 rank-selected risk-policy search:
+  `code_and_documentation/sebench/t12_rank_router.py`;
 - configuration: `configs/voicebank_campaign.yaml`;
 - post-cleanup GPU smoke:
   `20260727-postcleanup-smoke-wbnb-s0-a5` (six cells, audit zero issues).
