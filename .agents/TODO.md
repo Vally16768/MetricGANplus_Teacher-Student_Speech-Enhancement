@@ -58,8 +58,8 @@ Update this register whenever a gate changes state.
 | C51 | Confirm and promote T2 across declared seeds | +0.01 PESQ-WB, STOI/SI-SDR guards, E2>E1, independent audit | blocked |
 | C52 | Transfer an accepted T2 to fresh S2-WB/S2-NB | not run: no accepted T2 teacher or C2 cache exists | blocked |
 | C53 | Define the T3 teacher successor | direct PMSQE branch plus conditional pairwise local critic; strict teacher/student gates | passed |
-| C54 | Implement and audit T3 differentiable losses | pinned source, WB contracts, local-direction support and CUDA tests | blocked |
-| C55 | Run matched T3 teacher pilots | E1-SUP vs E2-PMSQE and conditional E3-RANK | blocked |
+| C54 | Implement and audit T3 differentiable losses | pinned source, WB contracts, untouched local-direction gate and CUDA tests passed | passed |
+| C55 | Run matched T3 teacher pilots | E1-SUP vs E2-PMSQE smoke passed; full clean pilot is active; E3 remains conditional | in-progress |
 | C56 | Confirm and transfer an accepted T3 | three seeds, C3, fresh S3-WB/S3-NB and final audit | blocked |
 
 ## Execution rule

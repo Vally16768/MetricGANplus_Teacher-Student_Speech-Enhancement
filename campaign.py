@@ -51,6 +51,7 @@ from sebench.t3_support import (  # noqa: E402
     generate_t3_mask_candidates,
     prepare_t3_identities,
 )
+from sebench.t3_training import run_t3_branch  # noqa: E402
 from sebench.teacher_cache import (  # noqa: E402
     TeacherCacheTarget,
     build_multi_target_teacher_cache,
@@ -58,6 +59,7 @@ from sebench.teacher_cache import (  # noqa: E402
 from sebench.training import (  # noqa: E402
     ExperimentConfig,
     PlannedTrainingInterruption,
+    evaluate_manifest,
     run_experiment,
 )
 
@@ -80,6 +82,7 @@ STUDENT_CONTINUATION_SCOPE = "official_student_training_continuation"
 CONVERGED_BASELINE_SCOPE = "official_teacher_students_converged_baseline"
 TEACHER_CALIBRATION_SCOPE = "teacher_current_output_calibration"
 TEACHER_TRIAL_SCOPE = "teacher_only_metric_improvement"
+T3_DIRECT_SCOPE = "t3_direct_perceptual_pilot"
 TEACHER_CALIBRATION_CELL_ORDER = ("E0-T0", "E0-D-CAL")
 TEACHER_TRIAL_CELL_ORDER = ("E0-T0", "E1-CONTROL", "E2-PESQ")
 
@@ -1926,6 +1929,238 @@ def run_teacher_trial(
         git=git,
         promotion_gate_passed=bool(gate["passed"]),
     )
+
+
+def run_t3_matched_pilot(
+    config: dict[str, Any],
+    *,
+    support_run_dir: str | Path,
+    teacher_checkpoint: str | Path,
+    teacher_cache_manifest: str | Path,
+    run_id: str,
+    mode: str,
+    allow_dirty_smoke: bool = False,
+    resume: bool = False,
+) -> dict[str, Any]:
+    """Run the matched T3 E1/E2 teacher branches; never read test."""
+    if resume:
+        validate_campaign_config(config)
+        git = _git_state()
+        if git["dirty"]:
+            raise RuntimeError("T3 production resume requires a clean worktree.")
+        require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+        config["runtime"]["device"] = require_training_cuda(
+            str(config["runtime"]["device"])
+        )
+        run_root = (
+            Path(str(config["runtime"]["run_root"])).expanduser().resolve()
+            / run_id
+        )
+        provenance_path = run_root / "provenance" / "provenance.json"
+        if not provenance_path.is_file():
+            raise FileNotFoundError("T3 resume provenance is missing.")
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+        if provenance.get("campaign_scope") != T3_DIRECT_SCOPE:
+            raise ValueError("T3 resume campaign scope mismatch.")
+        if provenance.get("git_commit") != git["commit"]:
+            raise ValueError("T3 resume requires the original committed code snapshot.")
+    else:
+        run_root, provenance, git, _ = _teacher_run_preflight(
+            config,
+            run_id=run_id,
+            mode=mode,
+            scope=T3_DIRECT_SCOPE,
+            allow_dirty_smoke=allow_dirty_smoke,
+        )
+    support_root = Path(support_run_dir).expanduser().resolve()
+    provenance["verification_only"] = mode != "full"
+    identities_path = support_root / "support" / "identities.json"
+    weights_path = support_root / "support" / "weights.json"
+    direction_path = support_root / "reports" / "direction_audit.json"
+    direction = json.loads(direction_path.read_text(encoding="utf-8"))
+    if not bool(direction.get("valid")) or not bool(direction.get("passed")):
+        raise ValueError("T3 E1/E2 requires a valid passed direction audit.")
+    expected_hash = str(config["model"]["teacher_checkpoint_sha256"])
+    if sha256(teacher_checkpoint) != expected_hash:
+        raise ValueError("T3 official teacher hash mismatch.")
+    identities = json.loads(identities_path.read_text(encoding="utf-8"))
+    if (
+        sha256(teacher_cache_manifest)
+        != str(identities["teacher_cache_manifest_sha256"])
+    ):
+        raise ValueError("T3 cache manifest does not match frozen identities.")
+    support_contract = {
+        "run_id": support_root.name,
+        "identities_sha256": sha256(identities_path),
+        "weights_sha256": sha256(weights_path),
+        "direction_audit_sha256": sha256(direction_path),
+        "teacher_checkpoint_sha256": expected_hash,
+        "teacher_cache_manifest_sha256": sha256(teacher_cache_manifest),
+    }
+    if resume and dict(provenance.get("support") or {}) != support_contract:
+        raise ValueError("T3 resume support contract mismatch.")
+    provenance["support"] = support_contract
+    _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+    device = str(config["runtime"]["device"])
+    dataset = dict(config["dataset"])
+    smoke = mode == "smoke"
+
+    def progress(message: str) -> None:
+        print(f"[T3] {message}", file=sys.stderr, flush=True)
+
+    baseline_path = run_root / "cells" / "E0-T0" / "summary.json"
+    if resume and baseline_path.is_file():
+        baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+        if baseline.get("checkpoint_sha256") != expected_hash:
+            raise ValueError("T3 resume E0 checkpoint mismatch.")
+    else:
+        _mark_stage(run_root, stage="E0-T0", status="running")
+        baseline_model, _ = load_model_from_checkpoint(
+            teacher_checkpoint, device=device
+        )
+        baseline_rank = evaluate_manifest(
+            baseline_model,
+            str(dataset["val_rank"]),
+            device,
+            sample_rate=16_000,
+            bandwidth="wb",
+            compute_dnsmos=False,
+            compute_composite=False,
+            max_files=2 if smoke else None,
+            batch_size=1,
+            progress_callback=progress,
+        )
+        baseline_select = evaluate_manifest(
+            baseline_model,
+            str(dataset["val_select"]),
+            device,
+            sample_rate=16_000,
+            bandwidth="wb",
+            compute_dnsmos=False,
+            compute_composite=False,
+            max_files=2 if smoke else None,
+            batch_size=1,
+            progress_callback=progress,
+        )
+        del baseline_model
+        torch.cuda.empty_cache()
+        baseline = {
+            "val_rank_metrics": {
+                key: float(baseline_rank[key])
+                for key in ("pesq_mean", "stoi_mean", "sisdr_mean")
+            },
+            "val_select_metrics": {
+                key: float(baseline_select[key])
+                for key in ("pesq_mean", "stoi_mean", "sisdr_mean")
+            },
+            "checkpoint_sha256": expected_hash,
+        }
+        _atomic_json(baseline_path, baseline)
+        _mark_stage(run_root, stage="E0-T0", status="completed", details=baseline)
+
+    branches: dict[str, dict[str, Any]] = {}
+    for branch in ("E1-SUP", "E2-PMSQE"):
+        branch_summary_path = run_root / "cells" / branch / "summary.json"
+        if resume and branch_summary_path.is_file():
+            branches[branch] = json.loads(
+                branch_summary_path.read_text(encoding="utf-8")
+            )
+            branch_contract = dict(branches[branch].get("provenance") or {})
+            checkpoint_path = Path(
+                str(branches[branch].get("selected_checkpoint") or "")
+            )
+            if (
+                branches[branch].get("status") != "complete"
+                or branches[branch].get("branch") != branch
+                or branch_contract.get("teacher_checkpoint_sha256")
+                != expected_hash
+                or branch_contract.get("identities_sha256")
+                != support_contract["identities_sha256"]
+                or not checkpoint_path.is_file()
+                or sha256(checkpoint_path)
+                != branches[branch].get("selected_checkpoint_sha256")
+            ):
+                raise ValueError(f"T3 resume completed-branch audit failed: {branch}")
+            continue
+        _mark_stage(run_root, stage=branch, status="running")
+        branches[branch] = run_t3_branch(
+            branch=branch,
+            teacher_checkpoint=teacher_checkpoint,
+            teacher_cache_manifest=teacher_cache_manifest,
+            identities_path=identities_path,
+            weights_path=weights_path,
+            val_rank_manifest=dataset["val_rank"],
+            val_select_manifest=dataset["val_select"],
+            output_dir=run_root / "cells" / branch,
+            baseline_rank_metrics=baseline["val_rank_metrics"],
+            device=device,
+            seed=int(config["training"]["t3_direction_seed"]),
+            max_accepted_epochs=1 if smoke else 10,
+            batch_size=1,
+            smoke=smoke,
+            resume=True,
+            progress_callback=progress,
+        )
+        _mark_stage(
+            run_root,
+            stage=branch,
+            status="completed",
+            details=branches[branch],
+        )
+        torch.cuda.empty_cache()
+
+    t0 = dict(baseline["val_select_metrics"])
+    e1 = dict(branches["E1-SUP"]["val_select_metrics"])
+    e2 = dict(branches["E2-PMSQE"]["val_select_metrics"])
+    deltas = {
+        key: float(e2[key]) - float(t0[key])
+        for key in ("pesq_mean", "stoi_mean", "sisdr_mean")
+    }
+    checks = {
+        "pesq_gain_at_least_0_01": deltas["pesq_mean"] >= 0.01,
+        "stoi_drop_at_most_0_002": deltas["stoi_mean"] >= -0.002,
+        "sisdr_drop_at_most_0_25": deltas["sisdr_mean"] >= -0.25,
+        "e2_beats_e1_pesq": float(e2["pesq_mean"]) > float(e1["pesq_mean"]),
+        "production_run": not smoke,
+    }
+    gate = {
+        "passed": all(checks.values()),
+        "checks": checks,
+        "e2_minus_t0": deltas,
+        "e2_minus_e1_pesq": float(e2["pesq_mean"]) - float(e1["pesq_mean"]),
+        "selected": "E2-PMSQE" if all(checks.values()) else "E0-T0",
+    }
+    summary = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "campaign_scope": T3_DIRECT_SCOPE,
+        "mode": mode,
+        "verification_only": smoke,
+        "test_read": False,
+        "baseline": baseline,
+        "branches": branches,
+        "teacher_gate": gate,
+        "teacher_improved_single_seed": bool(gate["passed"]),
+        "requires_three_seed_confirmation": bool(gate["passed"]),
+    }
+    _atomic_json(run_root / "metrics" / "campaign_summary.json", summary)
+    provenance["status"] = (
+        "single_seed_gate_passed" if gate["passed"] else "direct_pilot_complete"
+    )
+    provenance["teacher_gate"] = gate
+    _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+    _atomic_json(
+        run_root / "status.json",
+        {
+            "status": provenance["status"],
+            "campaign_mode": mode,
+            "campaign_scope": T3_DIRECT_SCOPE,
+            "valid_for_promotion": False,
+            "teacher_improved_single_seed": bool(gate["passed"]),
+            "test_read": False,
+        },
+    )
+    return {"run_root": run_root.as_posix(), **summary}
 
 
 def run_all(
@@ -3839,6 +4074,16 @@ def parse_args() -> argparse.Namespace:
     t3_candidates.add_argument("--teacher-checkpoint", required=True)
     t3_direction_audit = subparsers.add_parser("audit-t3-direction")
     t3_direction_audit.add_argument("--support-run-dir", required=True)
+    for command in ("smoke-t3-teacher", "train-t3-teacher"):
+        t3_teacher = subparsers.add_parser(command)
+        t3_teacher.add_argument("--support-run-dir", required=True)
+        t3_teacher.add_argument("--teacher-checkpoint", required=True)
+        t3_teacher.add_argument("--teacher-cache-manifest", required=True)
+        t3_teacher.add_argument("--run-id", required=True)
+        if command == "smoke-t3-teacher":
+            t3_teacher.add_argument("--allow-dirty-smoke", action="store_true")
+        else:
+            t3_teacher.add_argument("--resume", action="store_true")
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -4331,6 +4576,20 @@ def main() -> None:
                 getattr(args, "allow_dirty_smoke", False)
             ),
         )
+    elif args.command in {"smoke-t3-teacher", "train-t3-teacher"}:
+        config = load_campaign_config(args.config)
+        result = run_t3_matched_pilot(
+            config,
+            support_run_dir=args.support_run_dir,
+            teacher_checkpoint=args.teacher_checkpoint,
+            teacher_cache_manifest=args.teacher_cache_manifest,
+            run_id=args.run_id,
+            mode="smoke" if args.command == "smoke-t3-teacher" else "full",
+            allow_dirty_smoke=bool(
+                getattr(args, "allow_dirty_smoke", False)
+            ),
+            resume=bool(getattr(args, "resume", False)),
+        )
     else:
         config = load_campaign_config(args.config)
     if args.command == "validate":
@@ -4446,6 +4705,8 @@ def main() -> None:
         "calibrate-t3-weights",
         "generate-t3-candidates",
         "audit-t3-direction",
+        "smoke-t3-teacher",
+        "train-t3-teacher",
         "smoke-resume",
         "continue-students",
     }:

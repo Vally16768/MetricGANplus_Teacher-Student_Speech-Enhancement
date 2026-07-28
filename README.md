@@ -86,6 +86,13 @@ export METRICGAN_SHARED_VENV=/path/to/shared-venv
   --run-id <calibration-id>
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py pilot-teacher \
   --calibration-run-dir <passed-calibration-run> --run-id <teacher-pilot-id>
+
+# T3 direct-perceptual teacher pilot (requires passed T3 support)
+"$METRICGAN_SHARED_VENV/bin/python" campaign.py train-t3-teacher \
+  --support-run-dir <passed-t3-support-run> \
+  --teacher-checkpoint <official-t0-checkpoint> \
+  --teacher-cache-manifest <local-t0-wb-cache-manifest> \
+  --run-id <t3-matched-pilot-id>
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py pilot-all --run-id <pilot-id>
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py run-all --run-id <immutable-id>
 "$METRICGAN_SHARED_VENV/bin/python" campaign.py monitor-run --run-dir <run-dir>

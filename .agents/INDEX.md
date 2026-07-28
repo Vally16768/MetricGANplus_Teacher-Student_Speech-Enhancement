@@ -25,11 +25,14 @@ Operational skill:
 Current release state: **the corrected true-length S0 baseline v2 is promoted
 and canonical. S0-WB selected epoch 34/stop 42 and S0-NB selected 41/49.
 T1 failed calibration. T2 then restored exact official parity, but both
-D2-OFFICIAL and D2-RANGE failed scalar/local-direction gates, so there is no
-T1/T2 teacher, C1/C2 or S1/S2 result. T3 is planned but not implemented**.
+D2-OFFICIAL and D2-RANGE failed scalar/local-direction gates. T3 direct
+perceptual support passed its untouched direction gate; exact resume/rollback
+and the matched E1/E2 CUDA smoke now pass. No T3 teacher is promoted until the
+full true-metric pilot and three-seed confirmation pass**.
 
 Open work:
 
-- T3.1 must pin and validate the direct differentiable perceptual loss;
-- no E2/E3 teacher update may start before its local-direction gate passes;
+- run the clean, monitored matched E1/E2 pilot on the complete train/val
+  protocol;
+- no E3 or student update may start before its own gate and teacher promotion;
 - the TTS metric-critic hypothesis remains a separate future campaign.

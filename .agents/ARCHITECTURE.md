@@ -1,7 +1,7 @@
 # Architecture register
 
-Status: `teacher-successor-t2-parity`; converged S0 is published and E0
-freeze is active.
+Status: `teacher-successor-t3-pilot`; converged S0 is published, E0 remains
+frozen, and the matched direct-perceptual pilot is active.
 
 ## A0 — End-to-end research pipeline
 
@@ -274,6 +274,19 @@ It then creates four bounded mask-logit variants (`-0.04`, `-0.02`, `+0.02`,
 `+0.04`) per identity, stores only generated FP16 waveforms, labels them with
 true PESQ-WB and the direct surrogate, and applies the untouched audit gate.
 
+`t3_training.py` owns the isolated matched E1/E2 trainer. Both branches load
+the same official T0 hash and complete FP16 T0 cache, use Adam at `1e-6`,
+batch-size-one deterministic 32,000-sample segments and identical
+seed/order/crops. The cache dataset supplies the true unpadded segment length.
+Every proposed epoch is accepted only after true `val_rank` WB metrics and,
+for E2, a current-output local PMSQE/PESQ direction recheck. Rejection restores
+the complete pre-epoch model, optimizer, scheduler and RNG state before
+reducing LR. Durable state exists only at post-evaluation boundaries and
+contains the selected state, counters, history and source hashes.
+The root `train-t3-teacher --resume` command binds the original clean commit
+and support contract, reuses completed E0/branch summaries, and resumes an
+incomplete branch only from that atomic post-evaluation state.
+
 The earlier bounded frozen-proxy branch remains historical negative evidence,
 not the canonical T1 implementation. The alternating branch passed structural
 smoke but failed its clean pilot promotion gate: current-output D calibration
@@ -350,6 +363,13 @@ smoke-teacher / pilot-teacher
   -> E0 frozen + E1 control + E2 metric branch only
   -> skip every E2 G epoch whose current-output calibration fails
   -> true WB val_select teacher gate; never build C1 or train S1 here
+smoke-t3-teacher / train-t3-teacher
+  -> require the passed T3 untouched direction audit
+  -> evaluate immutable T0 once on val_rank and val_select
+  -> matched deterministic E1-SUP and E2-PMSQE from the same T0/cache/seed
+  -> per-proposal rollback, plateau LR, early stopping and exact resume state
+  -> E2 current-output local direction recheck on frozen calibration identities
+  -> true WB val_select gate; never read test or train students
 promote-baseline
   -> accept only an audited/promotable converged S0 closure
   -> preserve corrective true-length evaluation provenance when present
@@ -382,6 +402,7 @@ Evidence:
 - alternating current/history/current update and local replay:
   `code_and_documentation/sebench/metricgan_alternating.py`;
 - teacher cache: `code_and_documentation/sebench/teacher_cache.py`;
+- matched T3 pilot: `code_and_documentation/sebench/t3_training.py`;
 - configuration: `configs/voicebank_campaign.yaml`;
 - post-cleanup GPU smoke:
   `20260727-postcleanup-smoke-wbnb-s0-a5` (six cells, audit zero issues).

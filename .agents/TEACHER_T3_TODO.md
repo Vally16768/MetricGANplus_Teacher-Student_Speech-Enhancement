@@ -1,9 +1,9 @@
 # T3 teacher-improvement TODO
 
-Status: **active plan — T3.1 implementation in progress**
+Status: **active execution — clean full E1/E2 pilot pending**
 Last update: **2026-07-28**  
-Current phase: **T3.2 fixed local-direction support**
-Next action: **implement and test exact resume/rollback for matched E1/E2**
+Current phase: **T3.3 matched E1/E2 pilot**
+Next action: **commit the audited trainer, then run the clean full pilot**
 
 This board executes `TEACHER_T3_PLAN.md`. T1 and T2 remain immutable negative
 evidence.
@@ -44,9 +44,9 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T3.3.1 | Test rollback and exact resume | model/control state equivalence | in-progress |
-| T3.3.2 | Run E1/E2 CUDA smoke | production entry point; verification-only | blocked |
-| T3.3.3 | Run monitored E1/E2 pilot | matched init/seed/order; immutable histories | blocked |
+| T3.3.1 | Test rollback and exact resume | model/optimizer/scheduler/RNG equivalence; focused tests pass | passed |
+| T3.3.2 | Run E1/E2 CUDA smoke | `20260728-t3-e1-e2-smoke-a1`; both branches accepted one update; verification-only | passed |
+| T3.3.3 | Run monitored E1/E2 pilot | matched init/seed/order; immutable histories | in-progress |
 | T3.3.4 | Apply `val_select` teacher gate | PESQ/STOI/SI-SDR and E2−E1 | blocked |
 | T3.3.5 | Record direct-loss decision | pass, inconclusive or failed | blocked |
 
@@ -86,3 +86,5 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | 2026-07-28 | Completed all fixed mask candidates | 5,600 FP16 variants; zero-delta/cache MAE max `1.024e-05`; true PESQ-WB and PMSQE labels complete | bind parameter-gradient evidence |
 | 2026-07-28 | Parameter-gradient preflight stopped safely | cuDNN BLSTM backward requires train mode; no dropout, weights or model updates; fix isolated before audit | validate and retry gradient evidence |
 | 2026-07-28 | Passed the untouched PMSQE direction gate | audit 771 eligible; sign `0.9222`; rho `0.8982`; min quartile `0.8454`; 21/21 parameter gradients finite | implement matched E1/E2 resume/rollback |
+| 2026-07-28 | Implemented exact post-evaluation state and rollback | bit-exact model/optimizer/scheduler/RNG resume test; deterministic matched crops/order | run CUDA smoke |
+| 2026-07-28 | Passed matched E1/E2 CUDA smoke | both branches trained/evaluated/selected; E2 current-direction gate passed; two-file metrics explicitly non-promotable | commit clean trainer and start full pilot |

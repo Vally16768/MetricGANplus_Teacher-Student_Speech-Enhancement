@@ -162,6 +162,13 @@ metric/reference profile matches the run profile
   771 eligible pairs, sign agreement `0.9222`, delta Spearman `0.8982` and
   minimum SNR-quartile agreement `0.8454`. All direct-loss and artifact gates
   passed; E2 is eligible for the matched teacher pilot.
+- T3 matched trainer: focused `12/12` T3 tests pass, including bit-exact
+  post-evaluation resume for model, Adam, plateau scheduler and RNG.
+  Full repository suite `81/81` passes. `20260728-t3-e1-e2-smoke-a1`
+  completed E0/E1/E2 on CUDA from the exact
+  official/cache/support hashes; both branches accepted one update and E2
+  passed its current-output direction recheck. Its two-file PESQ delta
+  (`-0.000094`) is verification-only and is not a teacher claim.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

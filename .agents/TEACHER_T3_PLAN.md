@@ -1,6 +1,6 @@
 # T3 teacher-improvement plan
 
-Status: **planned — no T3 implementation or training started**  
+Status: **active — direction gate and E1/E2 CUDA smoke passed; full pilot pending**
 Owner: MetricGAN+ teacher–student campaign  
 Predecessor: T2/D2, closed as negative evidence  
 Execution board: `TEACHER_T3_TODO.md`
@@ -150,6 +150,7 @@ If this gate fails, E2 is not trained.
 Start E1 and E2 from the same T0 hash, seed and batch order.
 
 - learning rate `1e-6`;
+- Adam optimizer, batch size `1`, deterministic 32,000-sample cached segments;
 - maximum 10 accepted epochs;
 - ReduceLROnPlateau factor `0.5`, patience `2`, minimum `1e-7`;
 - early stopping patience `3`;
@@ -158,6 +159,13 @@ Start E1 and E2 from the same T0 hash, seed and batch order.
 - reject and roll back the entire epoch if PESQ-WB drops by more than `0.005`,
   STOI/SI-SDR guardrails are crossed, gradients become non-finite or the local
   perceptual-direction gate fails on the fixed calibration support.
+
+The current-output direction recheck uses the frozen 200 calibration
+identities and actual current-generator mask-logit variants at `-0.02`, `0`
+and `+0.02`. Smoke uses four identities only and is always non-promotable.
+Production state is written atomically only after a complete evaluation
+decision and binds model, optimizer, plateau scheduler, counters, best model,
+history, RNG and all source hashes.
 
 After stopping, compare the selected E1 and E2 checkpoints once on
 `val_select`. Test is not read.

@@ -784,6 +784,10 @@ class TeacherCacheDataset(Dataset):
             "clean": clean.contiguous().clone(),
             "teacher_wav": teacher_wav.contiguous().clone(),
             "teacher_mask_erb": teacher_mask.contiguous().clone(),
+            # T3 losses must ignore deterministic right-padding.  Keeping the
+            # true segment length in the shared cache dataset is backward
+            # compatible (older consumers simply ignore this field).
+            "length": torch.tensor(min(total, segment), dtype=torch.long),
         }
         if guidance is not None:
             sample["guidance_sg"] = guidance.contiguous().clone()
