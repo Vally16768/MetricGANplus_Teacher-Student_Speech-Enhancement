@@ -90,6 +90,23 @@ L_E2 = L_E1 + lambda_p * L_PMSQE(clean, G(x))
 norms: the anchor contributes at most 50% and PMSQE at most 10% of the total
 gradient norm at T0. They are recorded once and are not tuned on validation.
 
+The frozen implementation contract is:
+
+- `torch-pesq==0.1.2`, MIT, PyPI wheel
+  `6f3fa836...`, whose core sources match upstream revision `3aac3c8...`;
+- PMSQE frontend `512/256/512`, 49 Bark bands, factor `1`, WB/16 kHz only;
+- MR-STFT Hann resolutions `256/64/256`, `512/128/512` and
+  `1024/256/1024`, with equal magnitude/log-magnitude contribution;
+- T0 anchor Hamming frontend `512/256/512` with `log1p(abs(STFT))`;
+- true sample lengths for every loss; deterministic periodic extension only
+  for PMSQE inputs shorter than its 20-frame minimum; silent clean targets
+  contribute a neutral PMSQE term;
+- gradient weights are measured on train-only, non-zero teacher-manifold
+  perturbations around T0 because the exact T0 anchor gradient is zero.
+
+The source/license/hash record is
+`code_and_documentation/reference/torch_pesq_0.1.2.json`.
+
 ## Stage B — Local loss-direction audit
 
 Create a new T3 support from `train_fit`, strictly pair/clean-utterance

@@ -248,11 +248,13 @@ class MetricGANLikeMaskGenerator(nn.Module):
         nn.init.zeros_(self.linear2.bias)
         self.learnable_sigmoid = LearnableSigmoid(output_size)
 
-    def forward(self, features: torch.Tensor) -> torch.Tensor:
+    def forward_logits(self, features: torch.Tensor) -> torch.Tensor:
         encoded, _ = self.blstm(features)
         encoded = self.activation(self.linear1(encoded))
-        encoded = self.linear2(encoded)
-        return self.learnable_sigmoid(encoded)
+        return self.linear2(encoded)
+
+    def forward(self, features: torch.Tensor) -> torch.Tensor:
+        return self.learnable_sigmoid(self.forward_logits(features))
 
 
 class MetricGANCausalLiteMaskGenerator(nn.Module):
@@ -471,6 +473,56 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         enhanced_spec = torch.polar(enhanced_magnitude, torch.angle(spec))
         enhanced = self._istft(enhanced_spec, original_length)
         return enhanced[..., :original_length]
+
+    def forward_mask_logit_variants(
+        self,
+        input: torch.Tensor,
+        logit_deltas: tuple[float, ...],
+    ) -> torch.Tensor:
+        """Return teacher-manifold candidates from bounded mask-logit shifts.
+
+        The output shape is ``[variants, batch, 1, time]``. A zero delta is
+        exactly the ordinary forward path and provides a parity fixture.
+        """
+        if input.ndim != 3:
+            raise ValueError("Expected input tensor shaped (batch, 1, length).")
+        if not logit_deltas:
+            raise ValueError("At least one mask-logit delta is required.")
+        if any(abs(float(delta)) > 0.10 for delta in logit_deltas):
+            raise ValueError("T3 mask-logit perturbations are bounded to +/-0.10.")
+        original_length = input.shape[-1]
+        spec = self._stft(input)
+        magnitude = spec.abs().clamp_min(1e-8)
+        if self.feature_domain == "official_log_magnitude":
+            features_frequency_first = torch.log1p(magnitude)
+        else:
+            features_frequency_first = magnitude.pow(0.5)
+        features = features_frequency_first.transpose(1, 2)
+        logits = self.mask_generator.forward_logits(features)
+        outputs: list[torch.Tensor] = []
+        for delta in logit_deltas:
+            mask = self.mask_generator.learnable_sigmoid(
+                logits + float(delta)
+            ).transpose(1, 2).clamp_min(0.0)
+            masked = mask * features_frequency_first
+            if self.feature_domain == "official_log_magnitude":
+                enhanced_magnitude = torch.expm1(masked).clamp_min(0.0)
+            else:
+                enhanced_magnitude = masked.pow(2.0)
+            enhanced_spec = torch.polar(enhanced_magnitude, torch.angle(spec))
+            enhanced = self._istft(enhanced_spec, original_length)
+            outputs.append(enhanced[..., :original_length])
+        return torch.stack(outputs, dim=0)
+
+    def forward_with_mask_logit_delta(
+        self,
+        input: torch.Tensor,
+        logit_delta: float,
+    ) -> torch.Tensor:
+        return self.forward_mask_logit_variants(
+            input,
+            (float(logit_delta),),
+        )[0]
 
 
 class MetricGANCausalLiteEnhancer(WaveformEnhancer):

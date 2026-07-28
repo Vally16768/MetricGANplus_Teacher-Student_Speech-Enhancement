@@ -5,6 +5,9 @@ torch>=2.5
 torchaudio>=2.5
 pesq>=0.0.4
 pystoi>=0.4.1
+torch-pesq==0.1.2
+torchtyping==0.1.5
+typeguard==2.13.3
 mlflow>=2.20
 huggingface_hub>=0.28
 speechbrain>=1.0.0

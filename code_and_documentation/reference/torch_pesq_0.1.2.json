@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "project": "audiolabs/torch-pesq",
+  "source_url": "https://github.com/audiolabs/torch-pesq",
+  "release": "PyPI 0.1.2 (no matching upstream Git tag)",
+  "revision": "3aac3c8fde22672d83dd09a4a8ae12b93b7a87f6",
+  "revision_date": "2023-07-14T10:02:38+02:00",
+  "verified_utc": "2026-07-28",
+  "installed_version": "0.1.2",
+  "wheel": {
+    "filename": "torch_pesq-0.1.2-py3-none-any.whl",
+    "sha256": "6f3fa836f6517f86652332c67b653164c16a95867beb3095dd0392b814efda45"
+  },
+  "license": {
+    "spdx": "MIT",
+    "source_file": "LICENSE",
+    "source_sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+  },
+  "upstream_sources": {
+    "setup.py": "d9ff29c0e09945b8047e86a5a05d118f0efc5803c1395469025f924e8555b662",
+    "torch_pesq/loss.py": "e34f88258635bbf110170e774bc3aa8ec4ba93eb109a6b8d41f02d5931fd060c",
+    "torch_pesq/bark.py": "27e3764f07808a7a5e3d7f6e77705a06b7c761321800d417c03f18d2171af90e",
+    "torch_pesq/loudness.py": "d3615a3a6544cc3c3880c1f34acecccb6359c67d88ef35d6a61995876f28fedb"
+  },
+  "installed_core_sources": {
+    "torch_pesq/loss.py": "e34f88258635bbf110170e774bc3aa8ec4ba93eb109a6b8d41f02d5931fd060c",
+    "torch_pesq/bark.py": "27e3764f07808a7a5e3d7f6e77705a06b7c761321800d417c03f18d2171af90e",
+    "torch_pesq/loudness.py": "d3615a3a6544cc3c3880c1f34acecccb6359c67d88ef35d6a61995876f28fedb"
+  },
+  "dependency_pins": {
+    "torch-pesq": "0.1.2",
+    "torchtyping": "0.1.5",
+    "typeguard": "2.13.3"
+  },
+  "t3_contract": {
+    "name": "PESQ-inspired differentiable surrogate; not exact ITU-T P.862 PESQ",
+    "class": "torch_pesq.PesqLoss",
+    "factor": 1.0,
+    "sample_rate": 16000,
+    "nbarks": 49,
+    "n_fft": 512,
+    "win_length": 512,
+    "hop_length": 256,
+    "limitations": [
+      "No PESQ time alignment",
+      "IIR level normalization differs from the reference implementation",
+      "The implementation uses a Hann window despite the source comment mentioning Hamming",
+      "Must pass the T3 true-PESQ local-direction gate before generator updates"
+    ]
+  },
+  "audit_notes": [
+    "The published wheel core loss, Bark and loudness sources match the pinned upstream revision byte-for-byte.",
+    "The wheel __init__.py omits only the old torchaudio-version warning block present at the pinned revision; it does not change the loss implementation.",
+    "A finite forward/backward smoke passed on CPU and CUDA with torch 2.5.1+cu124 and torchaudio 2.5.1+cu124."
+  ]
+}

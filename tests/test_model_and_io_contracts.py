@@ -306,6 +306,30 @@ class OfficialTeacherTests(unittest.TestCase):
         self.assertFalse(restored.model_config["initialize_from_official"])
         self.assertEqual(restored.model_config["hop_length"], 256)
 
+    def test_mask_logit_candidate_zero_delta_has_forward_parity(self) -> None:
+        model = build_enhancer(
+            "metricgan_plus_teacher_official_wb",
+            "small",
+            sample_rate=16000,
+            n_fft=512,
+            hop_length=256,
+            win_length=512,
+            initialize_from_official=False,
+        ).eval()
+        waveform = torch.randn(1, 1, 4096)
+        with torch.no_grad():
+            ordinary = model(waveform)
+            variants = model.forward_mask_logit_variants(
+                waveform,
+                (-0.02, 0.0, 0.02),
+            )
+        self.assertEqual(tuple(variants.shape), (3, 1, 1, 4096))
+        self.assertTrue(torch.equal(ordinary, variants[1]))
+        self.assertGreater(float(torch.mean(torch.abs(variants[0] - ordinary))), 0.0)
+        self.assertGreater(float(torch.mean(torch.abs(variants[2] - ordinary))), 0.0)
+        with self.assertRaisesRegex(ValueError, "bounded"):
+            model.forward_with_mask_logit_delta(waveform, 0.2)
+
 
 if __name__ == "__main__":
     unittest.main()

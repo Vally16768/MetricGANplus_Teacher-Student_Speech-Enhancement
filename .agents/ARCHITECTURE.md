@@ -235,6 +235,38 @@ architecture, seed and schedule, so the changed teacher is the only intended
 experimental variable. A future direct student-metric ablation must restore
 distinct WB/NB proxies and cannot be mixed into this teacher-effect experiment.
 
+T3 is a separate, direct-perceptual teacher successor and does not reuse either
+failed T2 discriminator:
+
+```text
+VoiceBank noisy WB/16 kHz --------------------------> official T0 mask model
+             |                                                |
+             |                                                +--> frozen T0 output
+             |                                                |
+             +--> same initialized trainable model -----------+--> candidate
+                                                                  |
+clean WB/16 kHz --> MR-STFT + 0.10 SI-SDR ------------------------+
+frozen T0 output --> Hamming 512/256/512 logmag trust anchor -----+
+clean WB/16 kHz --> pinned torch-pesq 0.1.2 surrogate (E2 only) --+
+                                                                  |
+                                                calibrated E1/E2 total loss
+                                                                  |
+                              true PESQ-WB local-direction gate --+--> update or stop
+```
+
+`t3_perceptual.py` enforces true sample lengths, WB/16 kHz PMSQE input,
+multi-resolution `256/64/256`, `512/128/512`, `1024/256/1024` Hann STFTs,
+and the official T0 Hamming anchor frontend. The external surrogate is
+PESQ-inspired, not exact ITU PESQ, and is pinned with source/license hashes in
+`code_and_documentation/reference/torch_pesq_0.1.2.json`. Its weight and the
+anchor weight are frozen from train-only local gradient norms; validation does
+not tune them.
+
+The official teacher exposes bounded `+/-0.10` mask-logit candidate generation
+for the T3 local-direction audit. A zero perturbation is bit-identical to the
+ordinary forward path, the parameter/state-dict architecture is unchanged,
+and these candidates remain ignored FP16 local artifacts.
+
 The earlier bounded frozen-proxy branch remains historical negative evidence,
 not the canonical T1 implementation. The alternating branch passed structural
 smoke but failed its clean pilot promotion gate: current-output D calibration

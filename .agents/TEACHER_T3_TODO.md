@@ -1,9 +1,9 @@
 # T3 teacher-improvement TODO
 
-Status: **active plan — implementation and training not started**  
+Status: **active plan — T3.1 implementation in progress**
 Last update: **2026-07-28**  
 Current phase: **T3.1 differentiable-loss provenance and tests**  
-Next action: **pin and audit one PMSQE implementation before changing training**
+Next action: **freeze train-only gradient weights on fresh T3 identities**
 
 This board executes `TEACHER_T3_PLAN.md`. T1 and T2 remain immutable negative
 evidence.
@@ -24,10 +24,10 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T3.1.1 | Pin PMSQE source/revision/license | reviewed source record and hashes | pending |
-| T3.1.2 | Implement MR-STFT/SI-SDR/anchor/PMSQE losses | explicit WB/16 kHz contracts | blocked |
-| T3.1.3 | Add numerical/gradient/invariance tests | finite CPU/CUDA AMP and true-length fixtures | blocked |
-| T3.1.4 | Calibrate train-only gradient weights | frozen values; no validation tuning | blocked |
+| T3.1.1 | Pin PMSQE source/revision/license | torch-pesq 0.1.2; core hashes match `3aac3c8`; MIT; CPU/CUDA finite gradients | passed |
+| T3.1.2 | Implement MR-STFT/SI-SDR/anchor/PMSQE losses | isolated E1/E2 module; explicit WB/16 kHz and true-length contracts | passed |
+| T3.1.3 | Add numerical/gradient/invariance tests | 8 focused + 77 full tests; real VoiceBank CUDA waveform/21-tensor gradients finite | passed |
+| T3.1.4 | Calibrate train-only gradient weights | frozen values; no validation tuning | in-progress |
 | T3.1.5 | Run full tests, config validation and guard | all pass, zero issues | blocked |
 
 ## T3.2 — Fixed local-direction support
@@ -77,3 +77,6 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 |---|---|---|---|
 | 2026-07-28 | Opened T3 after final T2 discriminator failure | D2-OFFICIAL and D2-RANGE both failed local direction; no G/C2/S2 work | pin PMSQE implementation |
 | 2026-07-28 | Froze and indexed the T3 method | E0/E1/E2 and conditional D3/E3 matrix; skill valid; project guard and canonical plan validator pass | T3.1.1 source/license audit |
+| 2026-07-28 | Pinned and audited the direct perceptual dependency | torch-pesq 0.1.2 wheel/core hashes; upstream `3aac3c8`; MIT; shared-venv CPU/CUDA gradient smoke | implement E1/E2 loss stack |
+| 2026-07-28 | Implemented the isolated E1/E2 loss stack | MR-STFT, true-length SI-SDR, official-frontend T0 anchor, WB-only PMSQE, train-only gradient calibration | complete numerical/CUDA validation |
+| 2026-07-28 | Passed direct-loss numerical and model compatibility tests | 77/77 full suite; zero-delta mask parity; real VoiceBank CUDA PMSQE and all 21 parameter gradients finite | freeze train-only weights |

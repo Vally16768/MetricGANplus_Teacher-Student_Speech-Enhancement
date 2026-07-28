@@ -95,6 +95,14 @@ All training commands are GPU-only and must run from the shared project virtual
 environment identified by `METRICGAN_SHARED_VENV` or the repository-sibling
 `shared-venv`. CPU remains allowed for read-only preparation, tests and audits.
 
+For T3, treat `torch-pesq` strictly as a pinned PESQ-inspired surrogate. Require
+its source/license record, WB/16 kHz contract, finite CPU/CUDA gradients and the
+untouched true-PESQ local-direction gate before any E2 optimizer step. Freeze
+anchor/PMSQE weights from train-only non-zero teacher-manifold directions;
+never tune those weights on `val_rank`, `val_select` or test. A failed local
+gate blocks E2 but preserves its evidence and activates only the conditional
+D3 path declared by the T3 plan.
+
 ## Plan and run experiments
 
 Use `scripts/run_contract.py create` only after tests pass and the code snapshot

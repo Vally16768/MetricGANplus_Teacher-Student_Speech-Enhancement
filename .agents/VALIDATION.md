@@ -126,8 +126,13 @@ metric/reference profile matches the run profile
 - T3 plan/control-plane update: direct PMSQE plus MR-STFT/SI-SDR/trust-region
   branch, conditional pairwise critic and strict downstream teacher/student
   gates are indexed; project skill quick validation, canonical plan validator,
-  documentation diff check and project guard pass with zero issues. No T3
-  implementation, dependency installation or training has started.
+  documentation diff check and project guard pass with zero issues.
+- T3.1 direct-loss implementation: pinned `torch-pesq==0.1.2` and its MIT
+  source/core hashes; isolated true-length E1/E2 objective; short/silent/
+  padding/amplitude and CUDA AMP coverage; full suite `77/77` passed.
+  A real VoiceBank 32,000-sample CUDA smoke produced finite PMSQE `2.3363`,
+  waveform-gradient norm `67.7028` and finite gradients for all 21 official
+  teacher tensors (aggregate norm `1.1645`). No optimizer step was taken.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.
