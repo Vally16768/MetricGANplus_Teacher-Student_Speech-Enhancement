@@ -26,8 +26,10 @@ This directory is the canonical control plane for the research project.
 | [TEACHER_T6_TODO.md](TEACHER_T6_TODO.md) | Completed T6 board and below-gate evidence | T6 audit |
 | [TEACHER_T7_PLAN.md](TEACHER_T7_PLAN.md) | Executed confidence-conditioned successor | T7 audit |
 | [TEACHER_T7_TODO.md](TEACHER_T7_TODO.md) | Completed T7 board and below-gate evidence | T7 audit |
-| [TEACHER_T8_PLAN.md](TEACHER_T8_PLAN.md) | Active train-only adaptive-routing successor | all T8 work |
-| [TEACHER_T8_TODO.md](TEACHER_T8_TODO.md) | Active T8 dependency board and exit gates | every T8 iteration |
+| [TEACHER_T8_PLAN.md](TEACHER_T8_PLAN.md) | Executed train-only single-action adaptive-routing successor | T8 audit |
+| [TEACHER_T8_TODO.md](TEACHER_T8_TODO.md) | Completed T8 board and oracle-ceiling evidence | T8 audit |
+| [TEACHER_T9_PLAN.md](TEACHER_T9_PLAN.md) | Active train-only multi-action adaptive-routing successor | all T9 work |
+| [TEACHER_T9_TODO.md](TEACHER_T9_TODO.md) | Active T9 dependency board and exit gates | every T9 iteration |
 
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
@@ -38,14 +40,14 @@ T1 failed calibration. T2 then restored exact official parity, but both
 D2-OFFICIAL and D2-RANGE failed scalar/local-direction gates. T3 direct
 perceptual direction passed locally, but every full E1/E2 proposal was harmful.
 T4 found only `+0.002034`; T5 improved this to `+0.005075` but remained below
-the gate and nearly exhausted SI-SDR margin. T6 selected exact T5, showing
-global temperature adds no useful capacity. T7 gained only `+0.004931` while
-again exhausting SI-SDR. T0 remains selected; T8 now tests train-only
-per-utterance adaptive routing**.
+the gate and nearly exhausted SI-SDR margin. T6 selected exact T5. T7 gained
+only `+0.004931`. T8 learned a safe `+0.009197` calibration router, but its
+single-action oracle ceiling was only `+0.014197`, below its frozen gate. T0
+remains selected; T9 now tests train-only multi-action routing**.
 
 Open work:
 
-- implement and validate the predeclared T8 adaptive router;
-- run fit/cal/rank/select in order without reading test;
+- implement and validate the predeclared T9 multi-action router;
+- run fit/fresh-calibration/rank/select in order without reading test;
 - no cache, student or test evaluation may start before teacher promotion;
 - the TTS metric-critic hypothesis remains a separate future campaign.

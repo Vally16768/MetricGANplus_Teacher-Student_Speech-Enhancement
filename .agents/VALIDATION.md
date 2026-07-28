@@ -93,6 +93,13 @@ metric/reference profile matches the run profile
 - T8 clean CUDA smoke `20260728-t8-router-smoke-wb-s3003-a1` completed 10/10
   fit/cal labels, ridge, threshold selection, round-trip and the intended
   pre-validation stop; verification-only and no validation/test read.
+- T8 production `20260728-t8-router-wb-s3003-a1` learned `+0.009197` PESQ
+  with safe calibration guardrails, but its exact `+0.014197` oracle ceiling
+  missed the frozen `+0.015` gate; it stopped before validation and test.
+- T9 implementation: 94/94 unit/integration tests pass, including exact
+  multi-action selection, checkpoint round-trip and fresh calibration
+  partition/clean disjointness; campaign split validation and project guard
+  pass. Clean CUDA smoke remains pending.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

@@ -40,6 +40,10 @@ from sebench.t8_router import (  # noqa: E402
     configure_adaptive_router,
     fit_ridge_router,
 )
+from sebench.t9_multi_router import (  # noqa: E402
+    configure_multi_action_router,
+    prepare_t9_support_manifests,
+)
 
 
 class T4CalibrationTests(unittest.TestCase):
@@ -333,6 +337,95 @@ class T4CalibrationTests(unittest.TestCase):
                 roundtrip = reloaded(noisy)
         self.assertTrue(torch.allclose(roundtrip, observed_base, atol=2e-6, rtol=1e-5))
         self.assertTrue(package["model_config"]["adaptive_router_enabled"])
+
+    def test_t9_router_selects_exact_action_and_roundtrips(self) -> None:
+        model = build_enhancer(
+            "metricgan_plus_teacher_official_wb",
+            "small",
+            initialize_from_official=False,
+            n_fft=512,
+            hop_length=256,
+            win_length=512,
+        )
+        noisy = 0.02 * torch.randn(1, 1, 4_000)
+        configure_confidence_calibration(
+            model,
+            enabled=True,
+            low=-0.6,
+            high=0.0,
+            threshold=0.0,
+            temperature=1.5,
+        )
+        with torch.no_grad():
+            expected = model(noisy)
+        ridges = []
+        for bias in (-1.0, -0.5, 1.0, 0.0):
+            ridges.append(
+                {
+                    "feature_mean": [0.0] * 16,
+                    "feature_scale": [1.0] * 16,
+                    "weights": [0.0] * 16,
+                    "bias": bias,
+                }
+            )
+        configure_multi_action_router(
+            model,
+            ridges=ridges,
+            threshold=0.0,
+        )
+        with torch.no_grad():
+            observed = model(noisy)
+        self.assertTrue(torch.allclose(observed, expected, atol=2e-6, rtol=1e-5))
+        with tempfile.TemporaryDirectory() as temporary:
+            checkpoint = Path(temporary) / "t9.pt"
+            save_checkpoint_package(
+                checkpoint,
+                model,
+                model_family="metricgan_plus_teacher_official_wb",
+                variant="small",
+            )
+            reloaded, package = load_model_from_checkpoint(checkpoint)
+            with torch.no_grad():
+                roundtrip = reloaded(noisy)
+        self.assertTrue(torch.allclose(roundtrip, observed, atol=2e-6, rtol=1e-5))
+        self.assertTrue(package["model_config"]["multi_router_enabled"])
+        self.assertEqual(
+            package["model_config"]["multi_router_lows"],
+            [-0.2, -0.4, -0.6, -0.8],
+        )
+
+    def test_t9_support_is_partition_and_clean_disjoint(self) -> None:
+        records = []
+        for partition, count, offset in (
+            ("train", 840, 0),
+            ("calibration", 130, 10_000),
+        ):
+            for index in range(count):
+                token = f"{partition}-{index}"
+                records.append(
+                    {
+                        "partition": partition,
+                        "token": token,
+                        "clean_token": f"clean-{offset + index}",
+                        "noisy": f"/dataset/{token}.wav",
+                        "clean": f"/dataset/clean-{offset + index}.wav",
+                    }
+                )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            identities = root / "identities.json"
+            identities.write_text(
+                json.dumps({"records": records}),
+                encoding="utf-8",
+            )
+            support = prepare_t9_support_manifests(
+                identities,
+                root / "support",
+            )
+        self.assertEqual(support["fit"]["count"], 256)
+        self.assertEqual(support["calibration"]["count"], 128)
+        self.assertEqual(support["pair_overlap"], 0)
+        self.assertEqual(support["clean_overlap"], 0)
 
 
 if __name__ == "__main__":

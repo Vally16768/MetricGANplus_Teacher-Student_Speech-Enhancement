@@ -488,6 +488,8 @@ Evidence:
   `code_and_documentation/sebench/t7_confidence.py`;
 - T8 train-only adaptive router:
   `code_and_documentation/sebench/t8_router.py`;
+- T9 train-only multi-action adaptive router:
+  `code_and_documentation/sebench/t9_multi_router.py`;
 - configuration: `configs/voicebank_campaign.yaml`;
 - post-cleanup GPU smoke:
   `20260727-postcleanup-smoke-wbnb-s0-a5` (six cells, audit zero issues).

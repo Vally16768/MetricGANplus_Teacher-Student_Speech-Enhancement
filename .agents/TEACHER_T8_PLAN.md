@@ -1,6 +1,6 @@
 # T8 train-only adaptive teacher-routing plan
 
-Status: **predeclared — implementation pending**
+Status: **complete negative outcome — oracle ceiling gate**
 
 ## Cause and hypothesis
 
@@ -72,3 +72,12 @@ The final teacher gate is unchanged:
 A passing single search still requires independent recomputation, three
 declared support seeds, a paired bootstrap PESQ interval excluding zero,
 checkpoint/hash audit and package audit before promotion and shutdown.
+
+## Observed outcome
+
+`20260728-t8-router-wb-s3003-a1` trained on 256 and calibrated on 128
+train-only examples. The learned threshold selected T7 for 75/128 utterances
+and gained `+0.009197` PESQ, with STOI `-0.000957` and SI-SDR `-0.145724` dB.
+The exact oracle gained only `+0.014197`, below the frozen `+0.015` gate, so
+T8 correctly stopped before `val_rank`; validation and test were unread. T9
+expands routing to four suppression actions.

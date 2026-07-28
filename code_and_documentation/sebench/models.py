@@ -344,6 +344,13 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         adaptive_router_weights: list[float] | tuple[float, ...] | None = None,
         adaptive_router_bias: float = 0.0,
         adaptive_router_threshold: float = 0.0,
+        multi_router_enabled: bool = False,
+        multi_router_lows: list[float] | tuple[float, ...] | None = None,
+        multi_router_feature_means: list[list[float]] | tuple[tuple[float, ...], ...] | None = None,
+        multi_router_feature_scales: list[list[float]] | tuple[tuple[float, ...], ...] | None = None,
+        multi_router_weights: list[list[float]] | tuple[tuple[float, ...], ...] | None = None,
+        multi_router_biases: list[float] | tuple[float, ...] | None = None,
+        multi_router_threshold: float = 0.0,
     ) -> None:
         super().__init__()
         feature_bins = n_fft // 2 + 1
@@ -379,6 +386,24 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         )
         self.adaptive_router_bias = float(adaptive_router_bias)
         self.adaptive_router_threshold = float(adaptive_router_threshold)
+        self.multi_router_enabled = bool(multi_router_enabled)
+        self.multi_router_lows = tuple(float(value) for value in (multi_router_lows or ()))
+        self.multi_router_feature_means = tuple(
+            tuple(float(value) for value in row)
+            for row in (multi_router_feature_means or ())
+        )
+        self.multi_router_feature_scales = tuple(
+            tuple(float(value) for value in row)
+            for row in (multi_router_feature_scales or ())
+        )
+        self.multi_router_weights = tuple(
+            tuple(float(value) for value in row)
+            for row in (multi_router_weights or ())
+        )
+        self.multi_router_biases = tuple(
+            float(value) for value in (multi_router_biases or ())
+        )
+        self.multi_router_threshold = float(multi_router_threshold)
         if self.confidence_calibration_temperature <= 0.0:
             raise ValueError(
                 "Confidence-calibration temperature must be positive."
@@ -392,6 +417,7 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
             raise ValueError("Adaptive T8 router requires exactly 16 features.")
         if any(value <= 0.0 for value in self.adaptive_router_feature_scale):
             raise ValueError("Adaptive T8 router feature scales must be positive.")
+        self._validate_multi_router()
         if self.feature_domain not in {
             "sqrt_magnitude",
             "official_log_magnitude",
@@ -442,6 +468,17 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
             "adaptive_router_weights": list(self.adaptive_router_weights),
             "adaptive_router_bias": self.adaptive_router_bias,
             "adaptive_router_threshold": self.adaptive_router_threshold,
+            "multi_router_enabled": self.multi_router_enabled,
+            "multi_router_lows": list(self.multi_router_lows),
+            "multi_router_feature_means": [
+                list(row) for row in self.multi_router_feature_means
+            ],
+            "multi_router_feature_scales": [
+                list(row) for row in self.multi_router_feature_scales
+            ],
+            "multi_router_weights": [list(row) for row in self.multi_router_weights],
+            "multi_router_biases": list(self.multi_router_biases),
+            "multi_router_threshold": self.multi_router_threshold,
         }
         if official_checkpoint_sha256:
             self.model_config["official_checkpoint_sha256"] = str(
@@ -550,15 +587,99 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
     def _confidence_candidate_logits(
         self, logits: torch.Tensor
     ) -> torch.Tensor:
-        gate = torch.sigmoid(
-            (logits - self.confidence_calibration_threshold)
-            / self.confidence_calibration_temperature
+        return self._confidence_candidate_logits_for(
+            logits,
+            low=self.confidence_calibration_low,
+            high=self.confidence_calibration_high,
+            threshold=self.confidence_calibration_threshold,
+            temperature=self.confidence_calibration_temperature,
         )
-        correction = self.confidence_calibration_low + (
-            self.confidence_calibration_high
-            - self.confidence_calibration_low
-        ) * gate
+
+    @staticmethod
+    def _confidence_candidate_logits_for(
+        logits: torch.Tensor,
+        *,
+        low: float,
+        high: float,
+        threshold: float,
+        temperature: float,
+    ) -> torch.Tensor:
+        if float(temperature) <= 0.0:
+            raise ValueError("Confidence-calibration temperature must be positive.")
+        gate = torch.sigmoid(
+            (logits - float(threshold)) / float(temperature)
+        )
+        correction = float(low) + (float(high) - float(low)) * gate
         return logits + correction
+
+    def _validate_multi_router(self) -> None:
+        action_count = len(self.multi_router_lows)
+        collections = (
+            self.multi_router_feature_means,
+            self.multi_router_feature_scales,
+            self.multi_router_weights,
+            self.multi_router_biases,
+        )
+        if self.multi_router_enabled and (
+            action_count < 2 or any(len(values) != action_count for values in collections)
+        ):
+            raise ValueError("T9 multi-action router requires at least two aligned actions.")
+        for rows in (
+            self.multi_router_feature_means,
+            self.multi_router_feature_scales,
+            self.multi_router_weights,
+        ):
+            if any(len(row) != 16 for row in rows):
+                raise ValueError("T9 multi-action router requires 16 features per action.")
+        if any(
+            value <= 0.0
+            for row in self.multi_router_feature_scales
+            for value in row
+        ):
+            raise ValueError("T9 multi-action router feature scales must be positive.")
+
+    def configure_multi_action_router(
+        self,
+        *,
+        enabled: bool,
+        lows: list[float] | tuple[float, ...],
+        feature_means: list[list[float]] | tuple[tuple[float, ...], ...],
+        feature_scales: list[list[float]] | tuple[tuple[float, ...], ...],
+        weights: list[list[float]] | tuple[tuple[float, ...], ...],
+        biases: list[float] | tuple[float, ...],
+        threshold: float,
+    ) -> None:
+        self.multi_router_enabled = bool(enabled)
+        self.multi_router_lows = tuple(float(value) for value in lows)
+        self.multi_router_feature_means = tuple(
+            tuple(float(value) for value in row) for row in feature_means
+        )
+        self.multi_router_feature_scales = tuple(
+            tuple(float(value) for value in row) for row in feature_scales
+        )
+        self.multi_router_weights = tuple(
+            tuple(float(value) for value in row) for row in weights
+        )
+        self.multi_router_biases = tuple(float(value) for value in biases)
+        self.multi_router_threshold = float(threshold)
+        self._validate_multi_router()
+        self.model_config.update(
+            {
+                "multi_router_enabled": self.multi_router_enabled,
+                "multi_router_lows": list(self.multi_router_lows),
+                "multi_router_feature_means": [
+                    list(row) for row in self.multi_router_feature_means
+                ],
+                "multi_router_feature_scales": [
+                    list(row) for row in self.multi_router_feature_scales
+                ],
+                "multi_router_weights": [
+                    list(row) for row in self.multi_router_weights
+                ],
+                "multi_router_biases": list(self.multi_router_biases),
+                "multi_router_threshold": self.multi_router_threshold,
+            }
+        )
 
     def configure_adaptive_router(
         self,
@@ -670,6 +791,22 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         normalized = (features - mean) / scale
         return normalized.matmul(weights) + self.adaptive_router_bias
 
+    def multi_router_scores(
+        self, features: list[torch.Tensor] | tuple[torch.Tensor, ...]
+    ) -> torch.Tensor:
+        if not self.multi_router_enabled or len(features) != len(self.multi_router_lows):
+            raise RuntimeError("T9 multi-action router is not enabled or is incomplete.")
+        scores = []
+        for index, action_features in enumerate(features):
+            mean = action_features.new_tensor(self.multi_router_feature_means[index])
+            scale = action_features.new_tensor(self.multi_router_feature_scales[index])
+            weights = action_features.new_tensor(self.multi_router_weights[index])
+            normalized = (action_features - mean) / scale
+            scores.append(
+                normalized.matmul(weights) + self.multi_router_biases[index]
+            )
+        return torch.stack(scores, dim=1)
+
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         if input.ndim != 3:
             raise ValueError("Expected input tensor shaped (batch, 1, length).")
@@ -681,7 +818,41 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         else:
             features = magnitude.pow(0.5)
         features = features.transpose(1, 2)
-        if self.adaptive_router_enabled:
+        if self.multi_router_enabled:
+            logits = self.mask_generator.forward_logits(features)
+            base_mask = self.mask_generator.learnable_sigmoid(logits)
+            action_masks: list[torch.Tensor] = []
+            action_features: list[torch.Tensor] = []
+            for low in self.multi_router_lows:
+                candidate_logits = self._confidence_candidate_logits_for(
+                    logits,
+                    low=low,
+                    high=0.0,
+                    threshold=0.0,
+                    temperature=1.5,
+                )
+                candidate_mask = self.mask_generator.learnable_sigmoid(candidate_logits)
+                action_masks.append(candidate_mask)
+                action_features.append(
+                    self.confidence_router_features(
+                        input,
+                        magnitude,
+                        logits,
+                        base_mask,
+                        candidate_logits,
+                        candidate_mask,
+                    )
+                )
+            scores = self.multi_router_scores(action_features)
+            best_scores, best_actions = scores.max(dim=1)
+            stacked_masks = torch.stack(action_masks, dim=1)
+            gather_index = best_actions.reshape(-1, 1, 1, 1).expand(
+                -1, 1, stacked_masks.shape[2], stacked_masks.shape[3]
+            )
+            selected_mask = stacked_masks.gather(1, gather_index).squeeze(1)
+            use_action = (best_scores >= self.multi_router_threshold).reshape(-1, 1, 1)
+            mask = torch.where(use_action, selected_mask, base_mask)
+        elif self.adaptive_router_enabled:
             logits = self.mask_generator.forward_logits(features)
             base_mask = self.mask_generator.learnable_sigmoid(logits)
             candidate_logits = self._confidence_candidate_logits(logits)
@@ -894,6 +1065,13 @@ def build_metricgan_standalone(
     adaptive_router_weights: list[float] | tuple[float, ...] | None = None,
     adaptive_router_bias: float = 0.0,
     adaptive_router_threshold: float = 0.0,
+    multi_router_enabled: bool = False,
+    multi_router_lows: list[float] | tuple[float, ...] | None = None,
+    multi_router_feature_means: list[list[float]] | tuple[tuple[float, ...], ...] | None = None,
+    multi_router_feature_scales: list[list[float]] | tuple[tuple[float, ...], ...] | None = None,
+    multi_router_weights: list[list[float]] | tuple[tuple[float, ...], ...] | None = None,
+    multi_router_biases: list[float] | tuple[float, ...] | None = None,
+    multi_router_threshold: float = 0.0,
 ) -> MetricGANLikeEnhancer:
     if variant == "small":
         hidden_size = 200
@@ -929,6 +1107,13 @@ def build_metricgan_standalone(
         adaptive_router_weights=adaptive_router_weights,
         adaptive_router_bias=adaptive_router_bias,
         adaptive_router_threshold=adaptive_router_threshold,
+        multi_router_enabled=multi_router_enabled,
+        multi_router_lows=multi_router_lows,
+        multi_router_feature_means=multi_router_feature_means,
+        multi_router_feature_scales=multi_router_feature_scales,
+        multi_router_weights=multi_router_weights,
+        multi_router_biases=multi_router_biases,
+        multi_router_threshold=multi_router_threshold,
     )
 
 
@@ -1014,6 +1199,13 @@ def build_model(
     adaptive_router_weights: list[float] | tuple[float, ...] | None = None,
     adaptive_router_bias: float = 0.0,
     adaptive_router_threshold: float = 0.0,
+    multi_router_enabled: bool = False,
+    multi_router_lows: list[float] | tuple[float, ...] | None = None,
+    multi_router_feature_means: list[list[float]] | tuple[tuple[float, ...], ...] | None = None,
+    multi_router_feature_scales: list[list[float]] | tuple[tuple[float, ...], ...] | None = None,
+    multi_router_weights: list[list[float]] | tuple[tuple[float, ...], ...] | None = None,
+    multi_router_biases: list[float] | tuple[float, ...] | None = None,
+    multi_router_threshold: float = 0.0,
 ) -> nn.Module:
     if variant not in MODEL_VARIANTS:
         raise ValueError(f"Unsupported model variant: {variant}")
@@ -1080,6 +1272,13 @@ def build_model(
             adaptive_router_weights=adaptive_router_weights,
             adaptive_router_bias=adaptive_router_bias,
             adaptive_router_threshold=adaptive_router_threshold,
+            multi_router_enabled=multi_router_enabled,
+            multi_router_lows=multi_router_lows,
+            multi_router_feature_means=multi_router_feature_means,
+            multi_router_feature_scales=multi_router_feature_scales,
+            multi_router_weights=multi_router_weights,
+            multi_router_biases=multi_router_biases,
+            multi_router_threshold=multi_router_threshold,
         )
     if model_family == "metricgan_plus_native8k":
         if spectral_native_gate:
@@ -1155,6 +1354,13 @@ def build_enhancer(
     adaptive_router_weights: list[float] | tuple[float, ...] | None = None,
     adaptive_router_bias: float = 0.0,
     adaptive_router_threshold: float = 0.0,
+    multi_router_enabled: bool = False,
+    multi_router_lows: list[float] | tuple[float, ...] | None = None,
+    multi_router_feature_means: list[list[float]] | tuple[tuple[float, ...], ...] | None = None,
+    multi_router_feature_scales: list[list[float]] | tuple[tuple[float, ...], ...] | None = None,
+    multi_router_weights: list[list[float]] | tuple[tuple[float, ...], ...] | None = None,
+    multi_router_biases: list[float] | tuple[float, ...] | None = None,
+    multi_router_threshold: float = 0.0,
 ) -> nn.Module:
     base_model = build_model(
         model_family,
@@ -1181,6 +1387,13 @@ def build_enhancer(
         adaptive_router_weights=adaptive_router_weights,
         adaptive_router_bias=adaptive_router_bias,
         adaptive_router_threshold=adaptive_router_threshold,
+        multi_router_enabled=multi_router_enabled,
+        multi_router_lows=multi_router_lows,
+        multi_router_feature_means=multi_router_feature_means,
+        multi_router_feature_scales=multi_router_feature_scales,
+        multi_router_weights=multi_router_weights,
+        multi_router_biases=multi_router_biases,
+        multi_router_threshold=multi_router_threshold,
     )
     postfilter_config = resolve_postfilter_config(postfilter_mode, postfilter_preset)
     if not postfilter_config.enabled:

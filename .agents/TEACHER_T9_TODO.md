@@ -1,0 +1,28 @@
+# T9 teacher-improvement TODO
+
+Status: **in progress — clean CUDA smoke**
+Last update: **2026-07-28**
+Next action: **commit the validated snapshot and run clean CUDA smoke**
+
+| ID | Item | Evidence | Status |
+|---|---|---|---|
+| T9.0.1 | Close T8 at oracle gate | oracle `+0.014197`; learned `+0.009197` | passed |
+| T9.0.2 | Freeze fit/fresh calibration support | 256 train + 128 T3 calibration | passed |
+| T9.0.3 | Predeclare actions/ridge/thresholds/gates | `.agents/TEACHER_T9_PLAN.md` | passed |
+| T9.1.1 | Implement deployable multi-action router | checkpoint config; no clean inference input | passed |
+| T9.1.2 | Add action-selection and round-trip tests | exact action, round-trip, partition/clean disjointness | passed |
+| T9.1.3 | Run full suite, guard and clean CUDA smoke | 94/94, campaign validation and guard pass; smoke pending | in-progress |
+| T9.2.1 | Generate action labels and apply pre-validation gates | stop before validation on failure | blocked |
+| T9.2.2 | Evaluate frozen router on rank/select | no test | blocked |
+| T9.2.3 | Apply final teacher gate | unchanged thresholds | blocked |
+| T9.2.4 | Independently confirm/promote/shutdown | 3 seeds + bootstrap + audit | blocked |
+| T9.2.5 | Predeclare successor if failed | preserve evidence; no relaxed gate | blocked |
+
+## Progress log
+
+| Date | Change | Evidence | Next action |
+|---|---|---|---|
+| 2026-07-28 | Closed T8 and opened T9 | learned router generalized but single-action oracle ceiling was insufficient | implement four-action router |
+| 2026-07-28 | Implemented T9 model/support/search/CLI | exact four-action selection, portable checkpoint and fresh calibration partition | full validation |
+| 2026-07-28 | Passed complete CPU/unit and split validation | 94/94 tests; VoiceBank split audit zero overlap | refresh hashes and guard |
+| 2026-07-28 | Passed architecture/privacy/project guard | refreshed source hashes; zero issues | commit and CUDA smoke |

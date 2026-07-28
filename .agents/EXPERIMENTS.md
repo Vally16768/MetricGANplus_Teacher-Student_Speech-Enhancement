@@ -324,4 +324,11 @@ confidence-conditioned successor.
 low/high/threshold configurations on fresh disjoint 96/96 support. It selected
 `low=-0.30/high=0/threshold=0/temperature=1.5`; `val_select` PESQ changed
 `+0.004931`, STOI `-0.001245` and SI-SDR `-0.246202` dB. The gate failed and
-test remained unread. T8 is the active per-utterance routing successor.
+test remained unread.
+
+`20260728-t8-router-wb-s3003-a1` fitted a clean-free ridge router on 256
+train-only examples and calibrated on 128 disjoint train examples. It selected
+the T7 action for 75/128 examples and gained `+0.009197` PESQ with STOI
+`-0.000957` and SI-SDR `-0.145724` dB. Its exact oracle ceiling was only
+`+0.014197`, below the predeclared `+0.015` pre-validation gate, so validation
+and test remained unread. T9 is the active four-action routing successor.
