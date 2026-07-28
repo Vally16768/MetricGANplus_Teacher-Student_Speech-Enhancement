@@ -106,6 +106,13 @@ metric/reference profile matches the run profile
   current/history/current passes, true normalized labels, selected checkpoint,
   complete state and calibration/directional plots. Its two-record relaxed
   gate is verification-only and not scientific D2 evidence.
+- strict D2-OFFICIAL `20260728-t2-d2-official-s0-a1` stopped at epoch 6
+  (best epoch 1) and failed safely: audit nMAE `0.2895`, Pearson `0.7626`,
+  Spearman `0.7768`; local sign agreement `0.5291`, delta Spearman `-0.4929`;
+  zero teacher updates.
+- D2-RANGE train-only support/fitting implementation: `68/68` tests, including
+  fixed-audit isolation, FP16-only derived candidates and balanced PESQ-bin
+  sampling; CUDA smoke remains the next gate.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

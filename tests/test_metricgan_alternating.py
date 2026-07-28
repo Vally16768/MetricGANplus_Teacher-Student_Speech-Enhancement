@@ -30,8 +30,11 @@ from sebench.metricgan_alternating import (  # noqa: E402
 from sebench.metric_proxy_training import build_proxy_records  # noqa: E402
 from sebench.metricgan_d2 import (  # noqa: E402
     PlannedD2Interruption,
+    _balanced_range_sample,
+    audit_d2_range_support,
     audit_d2_support,
     fit_d2_official,
+    prepare_d2_range_support,
     prepare_d2_support,
 )
 
@@ -550,6 +553,71 @@ class AlternatingMetricGANTests(unittest.TestCase):
                     rtol=0.0,
                     atol=0.0,
                 )
+
+    def test_d2_range_support_is_train_only_and_balanced(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            records = []
+            for index in range(5):
+                partition = "train" if index < 3 else "calibration" if index == 3 else "audit"
+                records.append(
+                    {
+                        "token": f"token-{index}",
+                        "partition": partition,
+                        "noisy": f"/external/noisy-{index}.wav",
+                        "clean": f"/external/clean-{index}.wav",
+                        "enhanced": f"/local/enhanced-{index}.pt",
+                        "enhanced_pesq": 2.0 + index * 0.1,
+                        "enhanced_target": normalize_pesq(2.0 + index * 0.1),
+                        "noisy_pesq": 1.5 + index * 0.1,
+                        "noisy_target": normalize_pesq(1.5 + index * 0.1),
+                        "estimated_input_snr_db": float(index),
+                    }
+                )
+            base = root / "base.json"
+            base.write_text(
+                json.dumps(
+                    {
+                        "status": "complete",
+                        "records": records,
+                        "sizes": {"train": 3, "calibration": 1, "audit": 1},
+                    }
+                ),
+                encoding="utf-8",
+            )
+            waveform = torch.linspace(-0.2, 0.2, 4096)
+            with (
+                mock.patch(
+                    "sebench.metricgan_d2._load_support_record",
+                    return_value=(waveform, waveform * 0.9, waveform * 0.95),
+                ),
+                mock.patch(
+                    "sebench.metricgan_d2.pesq_score",
+                    side_effect=[
+                        1.1 + (index % 7) * 0.5 for index in range(18)
+                    ],
+                ),
+            ):
+                support = prepare_d2_range_support(
+                    base_support_path=base,
+                    output_dir=root / "run" / "support",
+                )
+            self.assertEqual(support["range_candidate_count"], 21)
+            self.assertEqual(
+                {row["parent_token"] for row in support["range_candidates"]},
+                {"token-0", "token-1", "token-2"},
+            )
+            audit = audit_d2_range_support(root / "run")
+            self.assertTrue(audit["valid"], audit)
+            sample = _balanced_range_sample(
+                support["range_candidates"],
+                14,
+                __import__("random").Random(7),
+            )
+            counts = {}
+            for row in sample:
+                counts[row["pesq_bin"]] = counts.get(row["pesq_bin"], 0) + 1
+            self.assertLessEqual(max(counts.values()) - min(counts.values()), 1)
 
 
 if __name__ == "__main__":

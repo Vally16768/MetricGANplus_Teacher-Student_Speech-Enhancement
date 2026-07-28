@@ -37,8 +37,10 @@ from sebench.metric_proxy_training import (  # noqa: E402
 )
 from sebench.metricgan_d2 import (  # noqa: E402
     PlannedD2Interruption,
+    audit_d2_range_support,
     audit_d2_support,
     fit_d2_official,
+    prepare_d2_range_support,
     prepare_d2_support,
 )
 from sebench.runtime import require_shared_venv, require_training_cuda  # noqa: E402
@@ -3784,6 +3786,17 @@ def parse_args() -> argparse.Namespace:
     d2_train = subparsers.add_parser("train-d2")
     d2_train.add_argument("--support-run-dir", required=True)
     d2_train.add_argument("--run-id", required=True)
+    d2_range_support = subparsers.add_parser("prepare-d2-range-support")
+    d2_range_support.add_argument("--base-support-run-dir", required=True)
+    d2_range_support.add_argument("--run-id", required=True)
+    d2_range_support_audit = subparsers.add_parser("audit-d2-range-support")
+    d2_range_support_audit.add_argument("--run-dir", required=True)
+    d2_range_smoke = subparsers.add_parser("smoke-d2-range")
+    d2_range_smoke.add_argument("--support-run-dir", required=True)
+    d2_range_smoke.add_argument("--run-id", required=True)
+    d2_range_train = subparsers.add_parser("train-d2-range")
+    d2_range_train.add_argument("--support-run-dir", required=True)
+    d2_range_train.add_argument("--run-id", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -3797,6 +3810,8 @@ def main() -> None:
         result = audit_campaign_run(args.run_dir)
     elif args.command == "audit-d2-support":
         result = audit_d2_support(args.run_dir)
+    elif args.command == "audit-d2-range-support":
+        result = audit_d2_range_support(args.run_dir)
     elif args.command == "monitor-run":
         result = monitor_campaign_run(args.run_dir)
     elif args.command == "close-baseline":
@@ -3887,7 +3902,78 @@ def main() -> None:
             ],
             "speaker_limitation": support["speaker_limitation"],
         }
-    elif args.command in {"smoke-d2", "train-d2"}:
+    elif args.command == "prepare-d2-range-support":
+        config = load_campaign_config(args.config)
+        dataset_audit = validate_campaign_config(config)
+        git = _git_state()
+        if git["dirty"]:
+            raise RuntimeError(
+                "D2-RANGE support preparation requires a clean snapshot."
+            )
+        require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+        base_root = Path(args.base_support_run_dir).expanduser().resolve()
+        base_audit = audit_d2_support(base_root)
+        if not base_audit["valid"]:
+            raise ValueError(f"Base D2 support failed audit: {base_audit['issues']}")
+        base_path = base_root / "support" / "support.json"
+        run_root = (
+            Path(str(config["runtime"]["run_root"])).expanduser().resolve()
+            / args.run_id
+        )
+        run_root.mkdir(parents=True, exist_ok=False)
+        provenance = {
+            "schema_version": 1,
+            "run_id": args.run_id,
+            "status": "running",
+            "campaign_scope": "t2_d2_range_support",
+            "git_commit": git["commit"],
+            "git_dirty": git["dirty"],
+            "dataset_audit": dataset_audit,
+            "base_support": {
+                "run_id": base_root.name,
+                "support_sha256": sha256(base_path),
+                "audit": base_audit,
+            },
+        }
+        _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+        (run_root / "provenance" / "config_resolved.yaml").write_text(
+            yaml.safe_dump(config, sort_keys=False),
+            encoding="utf-8",
+        )
+        support = prepare_d2_range_support(
+            base_support_path=base_path,
+            output_dir=run_root / "support",
+            progress_callback=print,
+        )
+        support_audit = audit_d2_range_support(run_root)
+        provenance["status"] = "prepared" if support_audit["valid"] else "failed"
+        provenance["support_sha256"] = sha256(
+            run_root / "support" / "support.json"
+        )
+        provenance["support_audit"] = support_audit
+        _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+        _atomic_json(
+            run_root / "status.json",
+            {
+                "status": provenance["status"],
+                "campaign_scope": "t2_d2_range_support",
+                "valid_for_promotion": False,
+                "candidate_count": support["range_candidate_count"],
+            },
+        )
+        result = {
+            "run_root": run_root.as_posix(),
+            "support_path": support["support_path"],
+            "candidate_count": support["range_candidate_count"],
+            "coverage": support["range_coverage"],
+            "audit": support_audit,
+        }
+    elif args.command in {
+        "smoke-d2",
+        "train-d2",
+        "smoke-d2-range",
+        "train-d2-range",
+    }:
         config = load_campaign_config(args.config)
         dataset_audit = validate_campaign_config(config)
         git = _git_state()
@@ -3896,7 +3982,12 @@ def main() -> None:
         require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
         device = require_training_cuda(str(config["runtime"]["device"]))
         support_root = Path(args.support_run_dir).expanduser().resolve()
-        support_audit = audit_d2_support(support_root)
+        range_mode = args.command in {"smoke-d2-range", "train-d2-range"}
+        support_audit = (
+            audit_d2_range_support(support_root)
+            if range_mode
+            else audit_d2_support(support_root)
+        )
         if not support_audit["valid"]:
             raise ValueError(f"D2 support audit failed: {support_audit['issues']}")
         support_path = support_root / "support" / "support.json"
@@ -3905,12 +3996,16 @@ def main() -> None:
             / args.run_id
         )
         run_root.mkdir(parents=True, exist_ok=False)
-        mode = "smoke" if args.command == "smoke-d2" else "full"
+        mode = "smoke" if args.command.startswith("smoke-") else "full"
+        strategy = "D2-RANGE" if range_mode else "D2-OFFICIAL"
         provenance = {
             "schema_version": 1,
             "run_id": args.run_id,
             "status": "running",
-            "campaign_scope": "t2_d2_official",
+            "campaign_scope": (
+                "t2_d2_range" if range_mode else "t2_d2_official"
+            ),
+            "strategy": strategy,
             "mode": mode,
             "verification_only": mode == "smoke",
             "git_commit": git["commit"],
@@ -3952,6 +4047,7 @@ def main() -> None:
                 evaluation_limit=(2 if mode == "smoke" else None),
                 run_directional_audit=True,
                 strict_gate=mode == "full",
+                strategy=strategy,
                 progress_callback=print,
             )
         except BaseException as exc:
@@ -3969,7 +4065,7 @@ def main() -> None:
                 run_root / "status.json",
                 {
                     "status": "failed",
-                    "campaign_scope": "t2_d2_official",
+                    "campaign_scope": provenance["campaign_scope"],
                     "valid_for_promotion": False,
                 },
             )
@@ -3984,7 +4080,7 @@ def main() -> None:
             run_root / "status.json",
             {
                 "status": result["status"],
-                "campaign_scope": "t2_d2_official",
+                "campaign_scope": provenance["campaign_scope"],
                 "valid_for_promotion": False,
                 "verification_only": mode == "smoke",
                 "gate_passed": result["passed"],
@@ -4124,12 +4220,20 @@ def main() -> None:
         "audit-d2-support",
         "smoke-d2",
         "train-d2",
+        "prepare-d2-range-support",
+        "audit-d2-range-support",
+        "smoke-d2-range",
+        "train-d2-range",
         "smoke-resume",
         "continue-students",
     }:
         raise ValueError(args.command)
     print(json.dumps(result, indent=2, sort_keys=True))
-    if args.command in {"audit-run", "audit-d2-support"} and not result["valid"]:
+    if args.command in {
+        "audit-run",
+        "audit-d2-support",
+        "audit-d2-range-support",
+    } and not result["valid"]:
         raise SystemExit(1)
 
 

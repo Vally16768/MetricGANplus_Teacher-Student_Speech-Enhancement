@@ -324,3 +324,23 @@ Constraint: this limitation applies only to the D2 internal support audit and
 must be stated in reports. Frozen `val_rank`, `val_select` and test identities
 remain disjoint from `train_fit` and retain their existing selection/reporting
 roles. No pseudo-speaker label may be presented as source metadata.
+
+## D-026 — Reject D2-OFFICIAL and activate only the declared D2-RANGE ablation
+
+Decision: preserve `20260728-t2-d2-official-s0-a1` as negative evidence and
+activate D2-RANGE. The widened support contains only deterministic candidates
+derived from the fixed train partition: noisy–T0 and T0–clean interpolation,
+local five-percent directions and a bounded five-percent sinusoidal output
+mask. Derived waveforms are local FP16 artifacts and fitting samples
+near-equally from populated raw-PESQ bins.
+
+Cause: strict D2-OFFICIAL selected epoch 1 and stopped at epoch 6, but failed
+the untouched audit at normalized MAE `0.2895`, Pearson `0.7626` and Spearman
+`0.7768`. Its local sign agreement was `0.5291` and delta Spearman `-0.4929`.
+Using current-batch BatchNorm statistics reduced scale error but also reduced
+correlations, so evaluation mode alone cannot repair the critic.
+
+Constraint: D2-RANGE cannot change architecture, optimizer, stopping,
+calibration/audit identities or thresholds. It cannot use validation/test
+outputs. A second discriminator-gate failure stops all teacher updates and
+fresh student training.

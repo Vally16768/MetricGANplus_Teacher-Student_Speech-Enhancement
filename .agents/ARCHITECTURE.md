@@ -256,6 +256,15 @@ prepare-d2-support
   -> bind canonical T0 cache hash
   -> fixed 1000/200/200 train/calibration/audit identities
   -> true PESQ-WB labels + coverage/source-mutation audit
+prepare-d2-range-support
+  -> preserve the fixed D2 calibration/audit identities
+  -> derive train-only noisy/T0/clean interpolations and bounded output masks
+  -> cache only derived FP16 candidates outside Git/dataset
+  -> balance fitting candidates across raw PESQ-WB bins
+smoke-d2[-range] / train-d2[-range]
+  -> batch-1 current/history/current D fitting
+  -> calibration-only checkpoint selection and stopping
+  -> one-shot fixed scalar and local-directional audit
 smoke-baseline / pilot-baseline / run-baseline
   -> T0-WB-OFFICIAL at epoch 0
   -> persistent dual-profile cache C0

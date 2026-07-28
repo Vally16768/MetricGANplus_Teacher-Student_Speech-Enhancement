@@ -39,6 +39,7 @@ status. Historical experiment directories are evidence, not canonical docs.
 | `docs/audits/2026-07-27-converged-s0-baseline-v1.md` | original converged S0 promotion audit; metrics superseded by true-length v2 | historical superseded |
 | `docs/audits/2026-07-27-converged-s0-baseline-v2.md` | corrective true-length evaluation and canonical S0 promotion audit | active reproduced |
 | `docs/audits/2026-07-27-teacher-calibration-t1-negative.md` | final calibrated-discriminator failure, stop decision and downstream non-execution | active reproduced negative evidence |
+| `docs/audits/2026-07-28-d2-official-negative.md` | strict D2-OFFICIAL scalar/local gate failure and conditional D2-RANGE activation | active observed negative evidence |
 | `experiments/README.md` | experiment directory explanation | active, consolidate later |
 | `experiments/runs/20260727-converged-s0-baseline-v1/reports/report.md` | padding-sensitive historical metric table | immutable superseded evidence |
 | `experiments/runs/20260727-converged-s0-baseline-v2/reports/report.md` | canonical true-length S0 metric table and correction statement | immutable reproduced evidence |

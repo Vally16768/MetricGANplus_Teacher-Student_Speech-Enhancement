@@ -1,9 +1,9 @@
 # T2 teacher successor TODO
 
-Status: **active — no training started**  
+Status: **active — D2-OFFICIAL failed; D2-RANGE implementation under validation**
 Last update: **2026-07-28**  
-Current phase: **T2.3 D2-OFFICIAL**
-Next action: **fit D2-OFFICIAL to the declared stopping rule**
+Current phase: **T2.4 D2-RANGE**
+Next action: **commit the tested implementation, then run the CUDA smoke**
 
 This board owns the iterative execution of
 `TEACHER_SUCCESSOR_PLAN.md`. The completed P1–P6 board and failed T1 evidence
@@ -85,10 +85,10 @@ Unblock: T2.1 passes.
 | T2.3.1 | Implement resumable D-only fitting | D/optimizer/scheduler/patience/replay state | passed |
 | T2.3.2 | Add interrupted/resumed equivalence test | selected hash and control state match | passed |
 | T2.3.3 | Run clean CUDA smoke | batch 1, three passes, true labels observed | passed |
-| T2.3.4 | Fit D2 to declared stopping rule | immutable history and selected checkpoint | in-progress |
-| T2.3.5 | Apply untouched audit fidelity gate | MAE/correlation/range/subgroups | pending |
-| T2.3.6 | Apply local directional gate | sign agreement and delta-rank report | pending |
-| T2.3.7 | Record D2 decision | pass or exact failure cause | pending |
+| T2.3.4 | Fit D2 to declared stopping rule | A1 stopped at epoch 6; best epoch 1; checkpoint `34112ac7...` | passed |
+| T2.3.5 | Apply untouched audit fidelity gate | nMAE 0.2895; Pearson 0.7626; Spearman 0.7768; range fail | failed |
+| T2.3.6 | Apply local directional gate | 395 eligible; sign 0.5291; delta Spearman -0.4929 | failed |
+| T2.3.7 | Record D2 decision | eligible score-support/local-rank failure; no G update | passed |
 
 Unblock: T2.2 passes.
 
@@ -96,8 +96,8 @@ Unblock: T2.2 passes.
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T2.4.1 | Confirm eligible D2 failure mode | coverage/local-rank failure; parity intact | blocked |
-| T2.4.2 | Build declared train-only score widening | interpolation/perturbation manifest | blocked |
+| T2.4.1 | Confirm eligible D2 failure mode | parity intact; eval/train-BN diagnostic cannot satisfy scalar/local gates | passed |
+| T2.4.2 | Build declared train-only score widening | deterministic interpolation/output-mask candidates; balanced PESQ bins | in-progress |
 | T2.4.3 | Refit with identical audit/stopping protocol | immutable run and checkpoint | blocked |
 | T2.4.4 | Reapply full and local gates | independent audit report | blocked |
 | T2.4.5 | Record final discriminator decision | accepted D2 or downstream stop | blocked |
@@ -167,3 +167,5 @@ Unblock: T2.7 passes. If an upstream gate fails, replace downstream items with
 | 2026-07-28 | Passed exact SpeechBrain v1.1.0 D parity | pinned `36c180c`; corrected magnitude/constant-pad/time-first frontend; 65/65 tests; CUDA D/G-gradient smoke; plan/campaign/guard pass | freeze D2 support IDs |
 | 2026-07-28 | Prepared and independently audited fixed D2 support A3 | 1000/200/200; 1400 unique; support `545ac1bf`; source hashes unchanged; no missing/non-FP16/nonfinite records; T0 PESQ mean 2.861 | implement resumable D-only fitting |
 | 2026-07-28 | Passed resumable D2 code and clean CUDA smoke A1 | 67/67 tests; exact interrupted/resumed state; batch-1 current/history/current; checkpoint/state/plots; verification-only relaxed gate | run strict D2-OFFICIAL fit |
+| 2026-07-28 | Rejected strict D2-OFFICIAL A1 at both mandatory gates | best epoch 1/stop 6; audit nMAE 0.2895, r 0.7626, rho 0.7768; directional sign 0.5291, rho -0.4929; checkpoint `34112ac7...`; no G update | activate the predeclared D2-RANGE branch |
+| 2026-07-28 | Implemented train-only D2-RANGE support and balanced fitting path | fixed audit unchanged; six deterministic variants plus T0; FP16 derived cache; 68/68 tests | clean commit then CUDA smoke |

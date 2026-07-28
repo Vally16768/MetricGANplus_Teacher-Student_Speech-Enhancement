@@ -512,6 +512,314 @@ def audit_d2_support(run_dir: str | Path) -> dict[str, Any]:
     }
 
 
+def _range_candidate_waveforms(
+    noisy: torch.Tensor,
+    clean: torch.Tensor,
+    enhanced: torch.Tensor,
+) -> dict[str, torch.Tensor]:
+    """Predeclared train-only score-widening candidates around T0."""
+    phase = torch.linspace(
+        0.0,
+        2.0 * math.pi,
+        enhanced.numel(),
+        dtype=enhanced.dtype,
+    )
+    bounded_mask = 1.0 + 0.05 * torch.sin(phase)
+    return {
+        "noisy_to_enhanced_050": 0.50 * noisy + 0.50 * enhanced,
+        "enhanced_to_noisy_005": 0.95 * enhanced + 0.05 * noisy,
+        "enhanced_to_clean_005": 0.95 * enhanced + 0.05 * clean,
+        "enhanced_to_clean_025": 0.75 * enhanced + 0.25 * clean,
+        "enhanced_to_clean_050": 0.50 * enhanced + 0.50 * clean,
+        "output_mask_sine_005": enhanced * bounded_mask,
+    }
+
+
+def _pesq_bin(score: float, edges: tuple[float, ...]) -> int:
+    return int(np.digitize([float(score)], np.asarray(edges)[1:-1])[0])
+
+
+def _write_range_coverage(
+    candidates: list[dict[str, Any]],
+    *,
+    edges: tuple[float, ...],
+    json_path: Path,
+    plot_path: Path,
+) -> dict[str, Any]:
+    by_type: dict[str, Any] = {}
+    by_bin: dict[str, int] = {}
+    for row in candidates:
+        kind = str(row["candidate_type"])
+        by_type.setdefault(kind, []).append(float(row["pesq"]))
+        key = str(row["pesq_bin"])
+        by_bin[key] = by_bin.get(key, 0) + 1
+    coverage = {
+        "candidate_count": len(candidates),
+        "pesq_edges": list(edges),
+        "by_type": {
+            key: _distribution(values) for key, values in sorted(by_type.items())
+        },
+        "by_bin": by_bin,
+        "pesq": _distribution([float(row["pesq"]) for row in candidates]),
+    }
+    _atomic_json(json_path, coverage)
+    figure, axes = plt.subplots(1, 2, figsize=(11, 4))
+    for kind, values in sorted(by_type.items()):
+        axes[0].hist(values, bins=list(edges), alpha=0.35, label=kind)
+    axes[0].set_title("D2-RANGE train-only PESQ-WB")
+    axes[0].set_xlabel("PESQ-WB")
+    axes[0].set_ylabel("candidates")
+    axes[0].legend(fontsize=7)
+    indices = list(range(len(edges) - 1))
+    axes[1].bar(indices, [by_bin.get(str(index), 0) for index in indices])
+    axes[1].set_xticks(
+        indices,
+        [f"{edges[index]:.1f}–{edges[index + 1]:.1f}" for index in indices],
+        rotation=35,
+        ha="right",
+    )
+    axes[1].set_title("Raw candidate availability by PESQ bin")
+    axes[1].set_ylabel("candidates")
+    figure.tight_layout()
+    plot_path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(plot_path, dpi=160)
+    plt.close(figure)
+    return coverage
+
+
+def prepare_d2_range_support(
+    *,
+    base_support_path: str | Path,
+    output_dir: str | Path,
+    progress_callback: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
+    """Add deterministic train-only variants without touching the fixed audit."""
+    base_path = Path(base_support_path).expanduser().resolve()
+    base = json.loads(base_path.read_text(encoding="utf-8"))
+    if base.get("status") != "complete":
+        raise ValueError("D2-RANGE requires a complete fixed D2 support.")
+    records = list(base.get("records") or [])
+    train_records = [row for row in records if row.get("partition") == "train"]
+    if not train_records:
+        raise ValueError("D2-RANGE requires non-empty train support.")
+    output_root = Path(output_dir)
+    output_root.mkdir(parents=True, exist_ok=True)
+    candidates_root = output_root / "candidates"
+    candidates_root.mkdir(parents=True, exist_ok=True)
+    support_path = output_root / "support.json"
+    progress_path = output_root / "progress.json"
+    coverage_path = output_root / "coverage.json"
+    plot_path = output_root / "coverage.png"
+    edges = (1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5)
+
+    existing: dict[str, dict[str, Any]] = {}
+    if progress_path.is_file():
+        progress = json.loads(progress_path.read_text(encoding="utf-8"))
+        if progress.get("base_support_sha256") == _sha256(base_path):
+            existing = {
+                str(row["candidate_token"]): row
+                for row in progress.get("range_candidates") or []
+            }
+
+    expected = len(train_records) * (1 + len(_range_candidate_waveforms(
+        torch.zeros(512), torch.zeros(512), torch.zeros(512)
+    )))
+    completed_parents = 0
+    for parent in train_records:
+        noisy, clean, enhanced = _load_support_record(parent)
+        variants: dict[str, torch.Tensor | None] = {
+            "t0_enhanced": None,
+            **_range_candidate_waveforms(noisy, clean, enhanced),
+        }
+        for kind, waveform in variants.items():
+            candidate_token = hashlib.sha256(
+                f"{parent['token']}|{kind}".encode("utf-8")
+            ).hexdigest()[:24]
+            if candidate_token in existing:
+                continue
+            if waveform is None:
+                candidate_path = str(parent["enhanced"])
+                score = float(parent["enhanced_pesq"])
+                storage = "base_t0_fp16_reference"
+            else:
+                waveform = waveform.contiguous()
+                candidate_path_obj = candidates_root / f"{candidate_token}.pt"
+                _atomic_torch(candidate_path_obj, waveform.half().cpu())
+                candidate_path = candidate_path_obj.as_posix()
+                score = float(
+                    pesq_score(
+                        clean.numpy(),
+                        waveform.numpy(),
+                        16_000,
+                        bandwidth="wb",
+                    )
+                )
+                storage = "derived_fp16"
+            if not math.isfinite(score):
+                raise RuntimeError(
+                    f"Non-finite D2-RANGE PESQ for {candidate_token}."
+                )
+            existing[candidate_token] = {
+                "candidate_token": candidate_token,
+                "parent_token": parent["token"],
+                "candidate_type": kind,
+                "candidate": candidate_path,
+                "storage": storage,
+                "sample_count": int(enhanced.numel()),
+                "pesq": score,
+                "target": normalize_pesq(score),
+                "pesq_bin": _pesq_bin(score, edges),
+            }
+        completed_parents += 1
+        if (
+            completed_parents == 1
+            or completed_parents == len(train_records)
+            or completed_parents % 25 == 0
+        ):
+            _atomic_json(
+                progress_path,
+                {
+                    "schema_version": 1,
+                    "status": "running",
+                    "base_support_sha256": _sha256(base_path),
+                    "completed_parents": completed_parents,
+                    "expected_candidates": expected,
+                    "range_candidates": list(existing.values()),
+                },
+            )
+            if progress_callback:
+                progress_callback(
+                    "D2-RANGE support "
+                    f"{completed_parents}/{len(train_records)} parents, "
+                    f"{len(existing)}/{expected} candidates"
+                )
+    candidates = sorted(
+        existing.values(),
+        key=lambda row: (str(row["parent_token"]), str(row["candidate_type"])),
+    )
+    if len(candidates) != expected:
+        raise RuntimeError(
+            f"D2-RANGE candidate count {len(candidates)} != {expected}."
+        )
+    coverage = _write_range_coverage(
+        candidates,
+        edges=edges,
+        json_path=coverage_path,
+        plot_path=plot_path,
+    )
+    audit_tokens = sorted(
+        str(row["token"]) for row in records if row["partition"] == "audit"
+    )
+    payload = {
+        **base,
+        "schema_version": 2,
+        "strategy": "D2-RANGE",
+        "base_support_path": base_path.as_posix(),
+        "base_support_sha256": _sha256(base_path),
+        "range_train_only": True,
+        "range_candidate_storage_dtype": "float16",
+        "range_candidate_count": len(candidates),
+        "range_candidate_types": sorted(
+            {str(row["candidate_type"]) for row in candidates}
+        ),
+        "range_pesq_edges": list(edges),
+        "range_coverage": coverage,
+        "range_coverage_json": coverage_path.as_posix(),
+        "range_coverage_plot": plot_path.as_posix(),
+        "fixed_audit_tokens_sha256": hashlib.sha256(
+            "\n".join(audit_tokens).encode("utf-8")
+        ).hexdigest(),
+        "range_candidates": candidates,
+    }
+    _atomic_json(support_path, payload)
+    _atomic_json(
+        progress_path,
+        {
+            "schema_version": 1,
+            "status": "complete",
+            "base_support_sha256": _sha256(base_path),
+            "completed_parents": len(train_records),
+            "candidate_count": len(candidates),
+            "support": support_path.as_posix(),
+        },
+    )
+    return {**payload, "support_path": support_path.as_posix()}
+
+
+def audit_d2_range_support(run_dir: str | Path) -> dict[str, Any]:
+    """Verify that D2-RANGE widens train only and preserves the fixed audit."""
+    root = Path(run_dir).expanduser().resolve()
+    path = root / "support" / "support.json"
+    issues: list[str] = []
+    if not path.is_file():
+        return {"schema_version": 1, "valid": False, "issues": ["missing support"]}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    candidates = list(payload.get("range_candidates") or [])
+    records = list(payload.get("records") or [])
+    train_tokens = {
+        str(row["token"]) for row in records if row.get("partition") == "train"
+    }
+    audit_tokens = sorted(
+        str(row["token"]) for row in records if row.get("partition") == "audit"
+    )
+    if payload.get("strategy") != "D2-RANGE":
+        issues.append("support strategy is not D2-RANGE")
+    if not bool(payload.get("range_train_only")):
+        issues.append("range support is not declared train-only")
+    if not candidates:
+        issues.append("range candidate list is empty")
+    if any(str(row.get("parent_token")) not in train_tokens for row in candidates):
+        issues.append("a range candidate is not derived from train")
+    if len({str(row.get("candidate_token")) for row in candidates}) != len(candidates):
+        issues.append("range candidate tokens are duplicated")
+    expected_audit_hash = hashlib.sha256(
+        "\n".join(audit_tokens).encode("utf-8")
+    ).hexdigest()
+    if payload.get("fixed_audit_tokens_sha256") != expected_audit_hash:
+        issues.append("fixed audit identity mismatch")
+    wrong_dtype = 0
+    missing = 0
+    nonfinite = 0
+    for row in candidates:
+        if not math.isfinite(float(row.get("pesq", float("nan")))):
+            nonfinite += 1
+        if row.get("storage") != "derived_fp16":
+            continue
+        candidate_path = Path(str(row.get("candidate") or ""))
+        if not candidate_path.is_file():
+            missing += 1
+            continue
+        tensor = torch.load(candidate_path, map_location="cpu", weights_only=True)
+        if not isinstance(tensor, torch.Tensor) or tensor.dtype != torch.float16:
+            wrong_dtype += 1
+    if missing:
+        issues.append(f"missing derived candidates: {missing}")
+    if wrong_dtype:
+        issues.append(f"non-FP16 derived candidates: {wrong_dtype}")
+    if nonfinite:
+        issues.append(f"non-finite range labels: {nonfinite}")
+    for directory in (root / "support" / "noisy", root / "support" / "clean"):
+        if directory.exists():
+            issues.append(f"unexpected copied-input directory: {directory.name}")
+    return {
+        "schema_version": 1,
+        "valid": not issues,
+        "issues": issues,
+        "support_sha256": _sha256(path),
+        "candidate_count": len(candidates),
+        "candidate_types": sorted(
+            {str(row.get("candidate_type")) for row in candidates}
+        ),
+        "train_parent_count": len(
+            {str(row.get("parent_token")) for row in candidates}
+        ),
+        "fixed_audit_count": len(audit_tokens),
+        "missing_candidates": missing,
+        "wrong_dtype": wrong_dtype,
+        "nonfinite_labels": nonfinite,
+    }
+
+
 def _load_support_record(
     record: dict[str, Any],
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
@@ -573,6 +881,104 @@ def _d2_current_pass(
                 )
             )
     return losses
+
+
+def _load_range_candidate(
+    candidate_record: dict[str, Any],
+    parent_records: dict[str, dict[str, Any]],
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, float]:
+    parent = parent_records[str(candidate_record["parent_token"])]
+    noisy, clean, enhanced = _load_support_record(parent)
+    if candidate_record["candidate_type"] == "t0_enhanced":
+        candidate = enhanced
+    else:
+        stored = torch.load(
+            Path(candidate_record["candidate"]),
+            map_location="cpu",
+            weights_only=True,
+        )
+        if not isinstance(stored, torch.Tensor) or stored.dtype != torch.float16:
+            raise TypeError("D2-RANGE candidate must be a FP16 tensor.")
+        candidate = stored.float().reshape(-1)
+        length = min(noisy.numel(), clean.numel(), candidate.numel())
+        noisy = noisy[:length]
+        clean = clean[:length]
+        candidate = candidate[:length]
+    return noisy, clean, candidate, float(candidate_record["target"])
+
+
+def _d2_range_pass(
+    discriminator: SpeechBrainMetricDiscriminator,
+    optimizer: torch.optim.Optimizer,
+    candidates: list[dict[str, Any]],
+    parent_records: dict[str, dict[str, Any]],
+    *,
+    device: str,
+    grad_clip: float,
+) -> list[float]:
+    losses: list[float] = []
+    for record in candidates:
+        noisy, clean, candidate, target = _load_range_candidate(
+            record,
+            parent_records,
+        )
+        parent = parent_records[str(record["parent_token"])]
+        for waveform, normalized_target in (
+            (clean, 1.0),
+            (candidate, target),
+            (noisy, float(parent["noisy_target"])),
+        ):
+            losses.append(
+                _d2_update(
+                    discriminator,
+                    optimizer,
+                    waveform,
+                    clean,
+                    normalized_target,
+                    device=device,
+                    grad_clip=grad_clip,
+                )
+            )
+    return losses
+
+
+def _balanced_range_sample(
+    candidates: list[dict[str, Any]],
+    count: int,
+    rng: random.Random,
+) -> list[dict[str, Any]]:
+    """Deterministically sample near-equally from every non-empty PESQ bin."""
+    by_bin: dict[int, list[dict[str, Any]]] = {}
+    for row in candidates:
+        by_bin.setdefault(int(row["pesq_bin"]), []).append(row)
+    for rows in by_bin.values():
+        rng.shuffle(rows)
+    bins = sorted(by_bin)
+    if not bins:
+        raise ValueError("D2-RANGE has no populated PESQ bins.")
+    selected: list[dict[str, Any]] = []
+    offsets = {key: 0 for key in bins}
+    while len(selected) < int(count):
+        progressed = False
+        for key in bins:
+            rows = by_bin[key]
+            offset = offsets[key]
+            if offset >= len(rows):
+                continue
+            selected.append(rows[offset])
+            offsets[key] += 1
+            progressed = True
+            if len(selected) == int(count):
+                break
+        if not progressed:
+            break
+    if len(selected) != int(count):
+        raise ValueError(
+            f"D2-RANGE requested {count} balanced candidates, found "
+            f"{len(selected)}."
+        )
+    rng.shuffle(selected)
+    return selected
 
 
 @torch.inference_mode()
@@ -936,9 +1342,12 @@ def fit_d2_official(
     evaluation_limit: int | None = None,
     run_directional_audit: bool = True,
     strict_gate: bool = True,
+    strategy: str = "D2-OFFICIAL",
     progress_callback: Callable[[str], None] | None = None,
 ) -> dict[str, Any]:
     """Fit D2 with official batch-1 passes and select without reading audit."""
+    if strategy not in {"D2-OFFICIAL", "D2-RANGE"}:
+        raise ValueError(f"Unsupported D2 strategy: {strategy}")
     output_root = Path(output_dir)
     output_root.mkdir(parents=True, exist_ok=True)
     payload = json.loads(Path(support_path).read_text(encoding="utf-8"))
@@ -948,12 +1357,18 @@ def fit_d2_official(
         row for row in records if row["partition"] == "calibration"
     ]
     audit_records = [row for row in records if row["partition"] == "audit"]
+    range_candidates = list(payload.get("range_candidates") or [])
+    if strategy == "D2-RANGE" and not range_candidates:
+        raise ValueError("D2-RANGE fitting requires range candidates.")
     if evaluation_limit is not None:
         calibration_records = calibration_records[: int(evaluation_limit)]
         audit_records = audit_records[: int(evaluation_limit)]
     if not train_records or not calibration_records or not audit_records:
         raise ValueError("D2 requires non-empty train/calibration/audit support.")
-    if int(current_rows) > len(train_records):
+    available_current = (
+        len(range_candidates) if strategy == "D2-RANGE" else len(train_records)
+    )
+    if int(current_rows) > available_current:
         raise ValueError("D2 current_rows exceeds the fixed train support.")
 
     torch.manual_seed(int(seed))
@@ -971,7 +1386,7 @@ def fit_d2_official(
         min_lr=float(min_lr),
     )
     state_path = output_root / "training_state.pt"
-    selected_checkpoint = output_root / "models" / "D2-OFFICIAL.pt"
+    selected_checkpoint = output_root / "models" / f"{strategy}.pt"
     history_path = output_root / "metrics" / "history.json"
     history: list[dict[str, Any]] = []
     seen_tokens: list[str] = []
@@ -986,6 +1401,8 @@ def fit_d2_official(
         state = torch.load(state_path, map_location="cpu", weights_only=True)
         if state.get("support_sha256") != _sha256(support_path):
             raise ValueError("D2 resume support identity mismatch.")
+        if state.get("strategy", "D2-OFFICIAL") != strategy:
+            raise ValueError("D2 resume strategy mismatch.")
         discriminator.load_state_dict(state["model_state"], strict=True)
         optimizer.load_state_dict(state["optimizer_state"])
         for optimizer_state in optimizer.state.values():
@@ -1001,17 +1418,32 @@ def fit_d2_official(
         start_epoch = int(state["epoch"]) + 1
 
     records_by_token = {str(row["token"]): row for row in train_records}
+    range_by_token = {
+        str(row["candidate_token"]): row for row in range_candidates
+    }
     stopped_early = False
     for epoch in range(start_epoch, int(max_epochs) + 1):
         rng = random.Random(int(seed) + epoch * 1009)
-        current = rng.sample(train_records, int(current_rows))
-        current_tokens = [str(row["token"]) for row in current]
+        if strategy == "D2-RANGE":
+            current = _balanced_range_sample(
+                range_candidates,
+                int(current_rows),
+                rng,
+            )
+            current_tokens = [str(row["candidate_token"]) for row in current]
+        else:
+            current = rng.sample(train_records, int(current_rows))
+            current_tokens = [str(row["token"]) for row in current]
         seen_tokens = list(dict.fromkeys([*seen_tokens, *current_tokens]))
         history_count = max(1, round(len(seen_tokens) * float(history_portion)))
         historical_tokens = list(seen_tokens)
         rng.shuffle(historical_tokens)
         historical = [
-            records_by_token[token]
+            (
+                range_by_token[token]
+                if strategy == "D2-RANGE"
+                else records_by_token[token]
+            )
             for token in historical_tokens[:history_count]
         ]
 
@@ -1021,13 +1453,23 @@ def fit_d2_official(
                 f"D2 epoch {epoch}/{max_epochs} pass 1/3 current "
                 f"({len(current)} records)"
             )
-        current_first = _d2_current_pass(
-            discriminator,
-            optimizer,
-            current,
-            device=device,
-            grad_clip=grad_clip,
-        )
+        if strategy == "D2-RANGE":
+            current_first = _d2_range_pass(
+                discriminator,
+                optimizer,
+                current,
+                records_by_token,
+                device=device,
+                grad_clip=grad_clip,
+            )
+        else:
+            current_first = _d2_current_pass(
+                discriminator,
+                optimizer,
+                current,
+                device=device,
+                grad_clip=grad_clip,
+            )
         if progress_callback:
             progress_callback(
                 f"D2 epoch {epoch}/{max_epochs} pass 2/3 historical "
@@ -1035,14 +1477,21 @@ def fit_d2_official(
             )
         historical_losses = []
         for record in historical:
-            _, clean, enhanced = _load_support_record(record)
+            if strategy == "D2-RANGE":
+                _, clean, candidate, target = _load_range_candidate(
+                    record,
+                    records_by_token,
+                )
+            else:
+                _, clean, candidate = _load_support_record(record)
+                target = float(record["enhanced_target"])
             historical_losses.append(
                 _d2_update(
                     discriminator,
                     optimizer,
-                    enhanced,
+                    candidate,
                     clean,
-                    float(record["enhanced_target"]),
+                    target,
                     device=device,
                     grad_clip=grad_clip,
                 )
@@ -1051,13 +1500,23 @@ def fit_d2_official(
             progress_callback(
                 f"D2 epoch {epoch}/{max_epochs} pass 3/3 current"
             )
-        current_second = _d2_current_pass(
-            discriminator,
-            optimizer,
-            current,
-            device=device,
-            grad_clip=grad_clip,
-        )
+        if strategy == "D2-RANGE":
+            current_second = _d2_range_pass(
+                discriminator,
+                optimizer,
+                current,
+                records_by_token,
+                device=device,
+                grad_clip=grad_clip,
+            )
+        else:
+            current_second = _d2_current_pass(
+                discriminator,
+                optimizer,
+                current,
+                device=device,
+                grad_clip=grad_clip,
+            )
         calibration = _evaluate_d2(
             discriminator,
             calibration_records,
@@ -1092,6 +1551,7 @@ def fit_d2_official(
         _atomic_json(history_path, history)
         state = {
             "schema_version": 1,
+            "strategy": strategy,
             "epoch": epoch,
             "support_sha256": _sha256(support_path),
             "model_state": {
@@ -1176,7 +1636,7 @@ def fit_d2_official(
     result = {
         "schema_version": 1,
         "status": "passed" if passed else "failed",
-        "strategy": "D2-OFFICIAL",
+        "strategy": strategy,
         "support_path": str(Path(support_path)),
         "support_sha256": _sha256(support_path),
         "max_epochs": int(max_epochs),
