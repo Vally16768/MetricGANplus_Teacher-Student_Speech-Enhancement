@@ -13,7 +13,7 @@ read-only input.
 1. Locate the repository root.
 2. Read `AGENTS.md` and `.agents/INDEX.md`.
 3. Read the active execution board named by `.agents/INDEX.md`
-   (`.agents/TEACHER_SUCCESSOR_TODO.md` for T2), then only the other
+   (`.agents/TEACHER_T3_TODO.md` for T3), then only the other
    task-specific registers linked by the index. Read
    `.agents/EXECUTION_TODO.md` when completed P1–P6/T1 provenance is needed.
 4. Inspect Git state, affected files and existing evidence without cleaning or
@@ -61,10 +61,10 @@ not as a cosmetic warning.
 
 ## Execute the iterative board
 
-- Treat `.agents/TEACHER_SUCCESSOR_TODO.md` as the detailed source of truth
-  for the active T2 sequence. Treat `.agents/EXECUTION_TODO.md` as the
-  completed P1–P6/T1 evidence ledger; `.agents/TODO.md` remains the campaign
-  summary.
+- Treat `.agents/TEACHER_T3_TODO.md` as the detailed source of truth for the
+  active T3 sequence. Treat `.agents/TEACHER_SUCCESSOR_TODO.md` as completed
+  T2 negative evidence and `.agents/EXECUTION_TODO.md` as the completed
+  P1–P6/T1 evidence ledger; `.agents/TODO.md` remains the campaign summary.
 - Keep at most one subtask `in-progress` and name one concrete `Next action`.
 - Execute the first unblocked dependency only. Do not start T1 before the S0
   baseline is audited, resume robustness passes and the baseline is promoted.

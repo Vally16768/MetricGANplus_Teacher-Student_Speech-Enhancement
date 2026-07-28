@@ -344,3 +344,22 @@ Constraint: D2-RANGE cannot change architecture, optimizer, stopping,
 calibration/audit identities or thresholds. It cannot use validation/test
 outputs. A second discriminator-gate failure stops all teacher updates and
 fresh student training.
+
+## D-027 — Replace absolute critic-first T2 with a direct-loss-first T3
+
+Decision: T3 first tests a differentiable PESQ-inspired loss combined with
+MR-STFT, SI-SDR and a T0 trust region. A learned critic is conditional and must
+optimize pairwise local ordering on candidates produced by the teacher
+manifold, not only absolute PESQ regression on waveform mixtures.
+
+Cause: D2-OFFICIAL and D2-RANGE both failed scalar fidelity, while their local
+delta correlations were negative. Wider raw score support therefore did not
+produce a useful generator gradient. PMSQE offers a direct differentiable
+psychoacoustic objective; pairwise ranking explicitly targets relative quality
+instead of treating samples independently.
+
+Constraint: PMSQE is not called exact PESQ and must pass a new true-PESQ local
+direction audit before updating G. D3/E3 is permitted only under the declared
+conditional rule and must pass local and finite-difference gates. T0, dataset,
+split roles, teacher/student bandwidths and the `+0.01` teacher promotion gate
+remain unchanged.

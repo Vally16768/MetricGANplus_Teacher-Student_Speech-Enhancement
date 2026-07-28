@@ -123,6 +123,11 @@ metric/reference profile matches the run profile
   hashes and sizes reconcile, no private path in text/checkpoints, no file
   above 100 MiB; final `68/68` tests, plan/config validation and project guard
   pass.
+- T3 plan/control-plane update: direct PMSQE plus MR-STFT/SI-SDR/trust-region
+  branch, conditional pairwise critic and strict downstream teacher/student
+  gates are indexed; project skill quick validation, canonical plan validator,
+  documentation diff check and project guard pass with zero issues. No T3
+  implementation, dependency installation or training has started.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.
