@@ -16,7 +16,7 @@ import numpy as np
 import torch
 
 from metrics.pesq import pesq_score
-from sebench.audio import load_mono_audio, manifest_hash
+from sebench.audio import load_mono_audio
 from sebench.metricgan_alternating import normalize_pesq
 
 
@@ -221,9 +221,9 @@ def prepare_d2_support(
     observed_teacher_hash = str(metadata.get("teacher_checkpoint_sha256") or "")
     if observed_teacher_hash != str(expected_teacher_sha256):
         raise ValueError("Teacher cache does not belong to the canonical T0 hash.")
-    if str(metadata.get("train_manifest_sha256") or "") != manifest_hash(
-        train_manifest
-    ):
+    if str(metadata.get("train_manifest_sha256") or "") != source_hashes_before[
+        "train_manifest"
+    ]:
         raise ValueError("Teacher cache/train manifest identity mismatch.")
 
     with source_paths["teacher_cache_manifest"].open(
@@ -356,7 +356,7 @@ def prepare_d2_support(
         "sample_rate": 16_000,
         "pesq_mode": "wb",
         "teacher_checkpoint_sha256": observed_teacher_hash,
-        "train_manifest_sha256": manifest_hash(train_manifest),
+        "train_manifest_sha256": source_hashes_before["train_manifest"],
         "teacher_cache_manifest_sha256": source_hashes_before[
             "teacher_cache_manifest"
         ],

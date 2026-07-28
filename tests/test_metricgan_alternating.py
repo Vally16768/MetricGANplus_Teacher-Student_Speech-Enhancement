@@ -5,6 +5,7 @@ import sys
 import tempfile
 import unittest
 import csv
+import hashlib
 from pathlib import Path
 from unittest import mock
 
@@ -28,7 +29,6 @@ from sebench.metricgan_alternating import (  # noqa: E402
 )
 from sebench.metric_proxy_training import build_proxy_records  # noqa: E402
 from sebench.metricgan_d2 import prepare_d2_support  # noqa: E402
-from sebench.audio import manifest_hash  # noqa: E402
 
 
 class IdentityTeacher(torch.nn.Module):
@@ -369,7 +369,9 @@ class AlternatingMetricGANTests(unittest.TestCase):
                         "cache_inputs": False,
                         "storage_dtype": "float16",
                         "teacher_checkpoint_sha256": teacher_hash,
-                        "train_manifest_sha256": manifest_hash(train_manifest),
+                        "train_manifest_sha256": hashlib.sha256(
+                            train_manifest.read_bytes()
+                        ).hexdigest(),
                     }
                 ),
                 encoding="utf-8",
