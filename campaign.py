@@ -3864,6 +3864,7 @@ def main() -> None:
         run_root = Path(args.support_run_dir).expanduser().resolve()
         result = audit_t3_direction(
             candidates_path=run_root / "support" / "candidates" / "candidates.json",
+            weights_path=run_root / "support" / "weights.json",
             output_dir=run_root / "reports",
         )
     elif args.command == "monitor-run":

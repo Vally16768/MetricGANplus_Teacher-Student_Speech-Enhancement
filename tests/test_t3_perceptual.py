@@ -174,8 +174,29 @@ class T3PerceptualLossTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
+            weights = root / "weights.json"
+            weights.write_text(
+                json.dumps(
+                    {
+                        "status": "weights_frozen",
+                        "median_gradient_norms": {
+                            "supervised": 1.0,
+                            "anchor": 1.0,
+                            "pmsqe": 1.0,
+                        },
+                        "parameter_gradient_evidence": {
+                            "all_finite": True,
+                            "parameter_tensors_total": 21,
+                            "parameter_tensors_with_gradient": 21,
+                            "aggregate_l2_norm": 1.0,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
             result = audit_t3_direction(
                 candidates_path=source,
+                weights_path=weights,
                 output_dir=root / "report",
             )
             self.assertTrue(result["valid"])

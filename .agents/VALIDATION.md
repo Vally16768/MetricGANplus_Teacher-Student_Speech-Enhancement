@@ -153,6 +153,10 @@ metric/reference profile matches the run profile
   untouched audit gate. Synthetic perfect-direction fixture passes all gate
   components; focused suite `10/10`, full suite `79/79`, campaign validation
   and project guard pass.
+- The scientific T3 direction gate additionally binds finite, non-vanishing
+  waveform-component gradients and a surrogate gradient reaching every
+  trainable official-teacher tensor. The audit cannot pass on correlation
+  alone.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

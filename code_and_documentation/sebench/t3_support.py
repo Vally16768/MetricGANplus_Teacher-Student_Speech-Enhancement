@@ -295,6 +295,7 @@ def calibrate_t3_weights(
     model, package = load_model_from_checkpoint(checkpoint_path, device=device)
     model.eval()
     observed: list[dict[str, float | str | int]] = []
+    parameter_gradient_evidence: dict[str, Any] | None = None
     for row in selected:
         noisy, _ = load_mono_audio(str(row["noisy"]), 16_000)
         clean, _ = load_mono_audio(str(row["clean"]), 16_000)
@@ -313,6 +314,34 @@ def calibrate_t3_weights(
             clean=clean_batch,
             teacher_t0=teacher_t0,
         )
+        if parameter_gradient_evidence is None:
+            surrogate = DifferentiablePESQInspiredLoss().to(device)(
+                candidate,
+                clean_batch,
+            )
+            parameters = tuple(
+                parameter for parameter in model.parameters() if parameter.requires_grad
+            )
+            gradients = torch.autograd.grad(
+                surrogate,
+                parameters,
+                retain_graph=True,
+                allow_unused=True,
+            )
+            present = [gradient for gradient in gradients if gradient is not None]
+            aggregate = torch.sqrt(
+                sum(gradient.detach().float().square().sum() for gradient in present)
+            )
+            parameter_gradient_evidence = {
+                "token": str(row["token"]),
+                "parameter_tensors_total": len(parameters),
+                "parameter_tensors_with_gradient": len(present),
+                "all_finite": bool(
+                    present
+                    and all(torch.isfinite(gradient).all() for gradient in present)
+                ),
+                "aggregate_l2_norm": float(aggregate.item()),
+            }
         observed.append(
             {
                 "token": str(row["token"]),
@@ -361,6 +390,7 @@ def calibrate_t3_weights(
             "anchor": 0.50,
             "pmsqe": 0.10,
         },
+        "parameter_gradient_evidence": parameter_gradient_evidence,
         "records": observed,
     }
     _atomic_json(Path(output_path).expanduser().resolve(), result)
@@ -550,12 +580,16 @@ def generate_t3_mask_candidates(
 def audit_t3_direction(
     *,
     candidates_path: str | Path,
+    weights_path: str | Path,
     output_dir: str | Path,
 ) -> dict[str, Any]:
     """Apply the one-shot true-PESQ local direction gate."""
 
     path = Path(candidates_path).expanduser().resolve()
     payload = json.loads(path.read_text(encoding="utf-8"))
+    weights = json.loads(
+        Path(weights_path).expanduser().resolve().read_text(encoding="utf-8")
+    )
     parents = list(payload.get("parents") or [])
     issues: list[str] = []
     if payload.get("status") != "candidates_complete":
@@ -633,6 +667,35 @@ def audit_t3_direction(
         "sign_agreement_at_least_0_70": float(audit["sign_agreement"]) >= 0.70,
         "delta_spearman_at_least_0_60": float(audit["delta_spearman"]) >= 0.60,
         "every_snr_quartile_at_least_0_55": min_quartile >= 0.55,
+        "finite_nonvanishing_waveform_and_parameter_gradients": bool(
+            weights.get("status") == "weights_frozen"
+            and all(
+                np.isfinite(float(value)) and float(value) > 0.0
+                for value in dict(weights.get("median_gradient_norms") or {}).values()
+            )
+            and dict(weights.get("parameter_gradient_evidence") or {}).get(
+                "all_finite"
+            )
+            and int(
+                dict(weights.get("parameter_gradient_evidence") or {}).get(
+                    "parameter_tensors_with_gradient",
+                    0,
+                )
+            )
+            == int(
+                dict(weights.get("parameter_gradient_evidence") or {}).get(
+                    "parameter_tensors_total",
+                    -1,
+                )
+            )
+            and float(
+                dict(weights.get("parameter_gradient_evidence") or {}).get(
+                    "aggregate_l2_norm",
+                    0.0,
+                )
+            )
+            > 0.0
+        ),
         "candidate_artifacts_valid": not issues,
     }
     passed = all(gate_checks.values())
@@ -662,6 +725,7 @@ def audit_t3_direction(
         "passed": passed,
         "eligible_threshold": 1e-4,
         "candidates_sha256": _sha256(path),
+        "weights_sha256": _sha256(weights_path),
         "summaries": summaries,
         "audit_min_snr_quartile_sign_agreement": min_quartile,
         "gate_checks": gate_checks,
