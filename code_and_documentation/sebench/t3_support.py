@@ -293,7 +293,9 @@ def calibrate_t3_weights(
     if checkpoint_hash != str(expected_teacher_sha256):
         raise ValueError("T3 calibration checkpoint SHA-256 mismatch.")
     model, package = load_model_from_checkpoint(checkpoint_path, device=device)
-    model.eval()
+    # cuDNN RNN backward requires training mode. The official architecture has
+    # no dropout, so this does not introduce stochastic calibration behavior.
+    model.train()
     observed: list[dict[str, float | str | int]] = []
     parameter_gradient_evidence: dict[str, Any] | None = None
     for row in selected:

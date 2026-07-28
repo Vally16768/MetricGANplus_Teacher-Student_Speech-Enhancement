@@ -83,3 +83,5 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | 2026-07-28 | Froze fresh T3 support identities | 1,000/200/200; hash `04022b77...`; pair/clean disjoint from both T2 supports; audit zero issues | calibrate weights |
 | 2026-07-28 | Calibration preflight stopped safely on a device mismatch | internal torch-pesq module stayed on CPU while candidate was CUDA; zero weights/model updates; CUDA regression added | validate and retry from clean fix |
 | 2026-07-28 | Froze E1/E2 gradient weights on train only | 16 T3-train directions; anchor `4.30122085`, PMSQE `0.00186623`; hash `e9edaae1...`; 0 val/test rows | generate mask candidates |
+| 2026-07-28 | Completed all fixed mask candidates | 5,600 FP16 variants; zero-delta/cache MAE max `1.024e-05`; true PESQ-WB and PMSQE labels complete | bind parameter-gradient evidence |
+| 2026-07-28 | Parameter-gradient preflight stopped safely | cuDNN BLSTM backward requires train mode; no dropout, weights or model updates; fix isolated before audit | validate and retry gradient evidence |
