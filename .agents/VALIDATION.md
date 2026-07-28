@@ -157,6 +157,11 @@ metric/reference profile matches the run profile
   waveform-component gradients and a surrogate gradient reaching every
   trainable official-teacher tensor. The audit cannot pass on correlation
   alone.
+- Completed T3 direct-loss direction evidence: 5,600 fixed FP16 mask-logit
+  candidates; zero-delta/cache MAE maximum `1.024e-05`; untouched audit has
+  771 eligible pairs, sign agreement `0.9222`, delta Spearman `0.8982` and
+  minimum SNR-quartile agreement `0.8454`. All direct-loss and artifact gates
+  passed; E2 is eligible for the matched teacher pilot.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

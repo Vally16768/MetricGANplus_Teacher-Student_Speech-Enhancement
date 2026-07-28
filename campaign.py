@@ -3867,6 +3867,25 @@ def main() -> None:
             weights_path=run_root / "support" / "weights.json",
             output_dir=run_root / "reports",
         )
+        provenance_path = run_root / "provenance" / "provenance.json"
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+        provenance["status"] = (
+            "direction_gate_passed" if result["passed"] else "direction_gate_failed"
+        )
+        provenance["direction_audit_sha256"] = sha256(
+            run_root / "reports" / "direction_audit.json"
+        )
+        provenance["direction_gate_passed"] = result["passed"]
+        _atomic_json(provenance_path, provenance)
+        _atomic_json(
+            run_root / "status.json",
+            {
+                "status": provenance["status"],
+                "campaign_scope": "t3_direction_support",
+                "valid_for_promotion": False,
+                "direction_gate_passed": result["passed"],
+            },
+        )
     elif args.command == "monitor-run":
         result = monitor_campaign_run(args.run_dir)
     elif args.command == "close-baseline":

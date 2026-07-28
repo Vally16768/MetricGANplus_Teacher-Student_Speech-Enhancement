@@ -3,7 +3,7 @@
 Status: **active plan — T3.1 implementation in progress**
 Last update: **2026-07-28**  
 Current phase: **T3.2 fixed local-direction support**
-Next action: **generate bounded T0 mask-logit candidates for the frozen identities**
+Next action: **implement and test exact resume/rollback for matched E1/E2**
 
 This board executes `TEACHER_T3_PLAN.md`. T1 and T2 remain immutable negative
 evidence.
@@ -27,7 +27,7 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | T3.1.1 | Pin PMSQE source/revision/license | torch-pesq 0.1.2; core hashes match `3aac3c8`; MIT; CPU/CUDA finite gradients | passed |
 | T3.1.2 | Implement MR-STFT/SI-SDR/anchor/PMSQE losses | isolated E1/E2 module; explicit WB/16 kHz and true-length contracts | passed |
 | T3.1.3 | Add numerical/gradient/invariance tests | 8 focused + 77 full tests; real VoiceBank CUDA waveform/21-tensor gradients finite | passed |
-| T3.1.4 | Calibrate train-only gradient weights | 16 train rows; anchor `4.30122085`; PMSQE `0.00186623`; weights hash `e9edaae1...` | passed |
+| T3.1.4 | Calibrate train-only gradient weights | 16 train rows; anchor `4.30122085`; PMSQE `0.00186623`; final weights hash `41a47ff7...`; 21/21 parameter gradients | passed |
 | T3.1.5 | Run full tests, config validation and guard | 78/78; plan/campaign valid; project guard zero issues | passed |
 
 ## T3.2 — Fixed local-direction support
@@ -35,16 +35,16 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | ID | Item | Evidence | Status |
 |---|---|---|---|
 | T3.2.1 | Freeze 1000/200/200 T3 identities | hash `04022b77...`; pair/clean disjoint from both T2 supports; audit zero issues | passed |
-| T3.2.2 | Generate teacher-manifold candidates | T0 masks and train-only micro-trajectories | in-progress |
-| T3.2.3 | Label candidates with true PESQ-WB | local FP16 cache; finite labels | blocked |
-| T3.2.4 | Audit PMSQE local direction | sign/rank/SNR/gradient gate | blocked |
-| T3.2.5 | Record E2 eligibility | pass or exact stop cause | blocked |
+| T3.2.2 | Generate teacher-manifold candidates | 5,600 bounded mask-logit variants; zero-delta/cache MAE max `1.024e-05` | passed |
+| T3.2.3 | Label candidates with true PESQ-WB | 5,600 FP16 local outputs with finite true PESQ-WB/PMSQE labels | passed |
+| T3.2.4 | Audit PMSQE local direction | 771 eligible; sign `0.9222`; rho `0.8982`; min SNR quartile `0.8454`; gradients 21/21 | passed |
+| T3.2.5 | Record E2 eligibility | every predeclared direct-loss gate passed | passed |
 
 ## T3.3 — Matched E1/E2 pilot
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T3.3.1 | Test rollback and exact resume | model/control state equivalence | blocked |
+| T3.3.1 | Test rollback and exact resume | model/control state equivalence | in-progress |
 | T3.3.2 | Run E1/E2 CUDA smoke | production entry point; verification-only | blocked |
 | T3.3.3 | Run monitored E1/E2 pilot | matched init/seed/order; immutable histories | blocked |
 | T3.3.4 | Apply `val_select` teacher gate | PESQ/STOI/SI-SDR and E2−E1 | blocked |
@@ -85,3 +85,4 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | 2026-07-28 | Froze E1/E2 gradient weights on train only | 16 T3-train directions; anchor `4.30122085`, PMSQE `0.00186623`; hash `e9edaae1...`; 0 val/test rows | generate mask candidates |
 | 2026-07-28 | Completed all fixed mask candidates | 5,600 FP16 variants; zero-delta/cache MAE max `1.024e-05`; true PESQ-WB and PMSQE labels complete | bind parameter-gradient evidence |
 | 2026-07-28 | Parameter-gradient preflight stopped safely | cuDNN BLSTM backward requires train mode; no dropout, weights or model updates; fix isolated before audit | validate and retry gradient evidence |
+| 2026-07-28 | Passed the untouched PMSQE direction gate | audit 771 eligible; sign `0.9222`; rho `0.8982`; min quartile `0.8454`; 21/21 parameter gradients finite | implement matched E1/E2 resume/rollback |

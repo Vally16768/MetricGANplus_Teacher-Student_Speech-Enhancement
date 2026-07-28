@@ -576,7 +576,16 @@ def generate_t3_mask_candidates(
             "candidates_sha256": _sha256(output_path),
         },
     )
-    return {**payload, "candidates_path": output_path.as_posix()}
+    return {
+        "schema_version": 1,
+        "status": "candidates_complete",
+        "candidates_path": output_path.as_posix(),
+        "identities_sha256": payload["identities_sha256"],
+        "teacher_checkpoint_sha256": checkpoint_hash,
+        "parent_count": len(ordered),
+        "candidate_count": len(ordered) * len(deltas),
+        "zero_delta_cache_mae_max": payload["zero_delta_cache_mae_max"],
+    }
 
 
 def audit_t3_direction(
