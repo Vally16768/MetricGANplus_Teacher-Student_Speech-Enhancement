@@ -176,6 +176,10 @@ metric/reference profile matches the run profile
   The corrected entry point sets determinism before E0 and propagates
   unexpected runtime failures instead of classifying them as scientific
   rollback decisions.
+- Corrected contract-adoption smoke
+  `20260728-t3-e1-e2-contract-smoke-a2` passed the complete E0/E1/E2 CUDA
+  path on the clean fix commit: both deterministic updates were accepted,
+  E2 current-direction passed, and the run stayed verification-only.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.
