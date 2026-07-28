@@ -44,6 +44,11 @@ from sebench.metricgan_d2 import (  # noqa: E402
     prepare_d2_support,
 )
 from sebench.runtime import require_shared_venv, require_training_cuda  # noqa: E402
+from sebench.t3_support import (  # noqa: E402
+    audit_t3_identities,
+    calibrate_t3_weights,
+    prepare_t3_identities,
+)
 from sebench.teacher_cache import (  # noqa: E402
     TeacherCacheTarget,
     build_multi_target_teacher_cache,
@@ -221,6 +226,21 @@ def validate_campaign_config(config: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("training.d2_lr_factor must be 0.5.")
     if float(training.get("d2_min_lr", 0.0)) != 1e-6:
         raise ValueError("training.d2_min_lr must be 1e-6.")
+    for key, minimum in (
+        ("t3_direction_train_rows", 1000),
+        ("t3_direction_calibration_rows", 200),
+        ("t3_direction_audit_rows", 200),
+    ):
+        if int(training.get(key, 0)) < minimum:
+            raise ValueError(f"training.{key} must be at least {minimum}.")
+    if int(training.get("t3_direction_seed", -1)) != 3003:
+        raise ValueError("training.t3_direction_seed must be the frozen seed 3003.")
+    if int(training.get("t3_weight_calibration_rows", 0)) != 16:
+        raise ValueError("T3 gradient calibration must use 16 train identities.")
+    if int(training.get("t3_weight_segment_samples", 0)) != 32000:
+        raise ValueError("T3 gradient calibration segments must be 32000 samples.")
+    if float(training.get("t3_weight_mask_logit_delta", 0.0)) != 0.02:
+        raise ValueError("T3 gradient calibration mask-logit delta must be 0.02.")
     student_lr_patience = int(training.get("student_lr_patience", 0))
     student_early_stop_patience = int(
         training.get("student_early_stop_patience", 0)
@@ -3797,6 +3817,21 @@ def parse_args() -> argparse.Namespace:
     d2_range_train = subparsers.add_parser("train-d2-range")
     d2_range_train.add_argument("--support-run-dir", required=True)
     d2_range_train.add_argument("--run-id", required=True)
+    t3_support = subparsers.add_parser("prepare-t3-support")
+    t3_support.add_argument("--run-id", required=True)
+    t3_support.add_argument("--teacher-cache-manifest", required=True)
+    t3_support.add_argument("--teacher-cache-metadata", required=True)
+    t3_support.add_argument(
+        "--t2-support-path",
+        action="append",
+        required=True,
+        help="Repeat for every distinct T2 base support to exclude.",
+    )
+    t3_support_audit = subparsers.add_parser("audit-t3-support")
+    t3_support_audit.add_argument("--run-dir", required=True)
+    t3_weights = subparsers.add_parser("calibrate-t3-weights")
+    t3_weights.add_argument("--support-run-dir", required=True)
+    t3_weights.add_argument("--teacher-checkpoint", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -3812,6 +3847,12 @@ def main() -> None:
         result = audit_d2_support(args.run_dir)
     elif args.command == "audit-d2-range-support":
         result = audit_d2_range_support(args.run_dir)
+    elif args.command == "audit-t3-support":
+        result = audit_t3_identities(
+            Path(args.run_dir).expanduser().resolve()
+            / "support"
+            / "identities.json"
+        )
     elif args.command == "monitor-run":
         result = monitor_campaign_run(args.run_dir)
     elif args.command == "close-baseline":
@@ -3902,6 +3943,112 @@ def main() -> None:
             ],
             "speaker_limitation": support["speaker_limitation"],
         }
+    elif args.command == "prepare-t3-support":
+        config = load_campaign_config(args.config)
+        dataset_audit = validate_campaign_config(config)
+        git = _git_state()
+        if git["dirty"]:
+            raise RuntimeError(
+                "T3 identity selection requires a clean committed snapshot."
+            )
+        require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+        training = dict(config["training"])
+        run_root = (
+            Path(str(config["runtime"]["run_root"])).expanduser().resolve()
+            / args.run_id
+        )
+        run_root.mkdir(parents=True, exist_ok=False)
+        support = prepare_t3_identities(
+            train_manifest=config["dataset"]["train_fit"],
+            teacher_cache_manifest=args.teacher_cache_manifest,
+            teacher_cache_metadata=args.teacher_cache_metadata,
+            t2_support_paths=args.t2_support_path,
+            output_dir=run_root / "support",
+            expected_teacher_sha256=config["model"][
+                "teacher_checkpoint_sha256"
+            ],
+            train_rows=int(training["t3_direction_train_rows"]),
+            calibration_rows=int(training["t3_direction_calibration_rows"]),
+            audit_rows=int(training["t3_direction_audit_rows"]),
+            seed=int(training["t3_direction_seed"]),
+        )
+        support_audit = audit_t3_identities(support["identities_path"])
+        provenance = {
+            "schema_version": 1,
+            "run_id": args.run_id,
+            "status": "identities_frozen",
+            "campaign_scope": "t3_direction_support",
+            "git_commit": git["commit"],
+            "git_dirty": git["dirty"],
+            "dataset_audit": dataset_audit,
+            "identity_sha256": support_audit["identity_sha256"],
+            "support_counts": support_audit["counts"],
+        }
+        _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+        (run_root / "provenance" / "config_resolved.yaml").write_text(
+            yaml.safe_dump(config, sort_keys=False),
+            encoding="utf-8",
+        )
+        _atomic_json(
+            run_root / "status.json",
+            {
+                "status": "identities_frozen",
+                "campaign_scope": "t3_direction_support",
+                "valid_for_promotion": False,
+                "audit_valid": support_audit["valid"],
+            },
+        )
+        result = {
+            "run_root": run_root.as_posix(),
+            "identities_path": support["identities_path"],
+            "counts": support["counts"],
+            "audit": support_audit,
+        }
+    elif args.command == "calibrate-t3-weights":
+        config = load_campaign_config(args.config)
+        validate_campaign_config(config)
+        git = _git_state()
+        if git["dirty"]:
+            raise RuntimeError("T3 gradient calibration requires a clean snapshot.")
+        require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+        device = require_training_cuda(str(config["runtime"]["device"]))
+        training = dict(config["training"])
+        run_root = Path(args.support_run_dir).expanduser().resolve()
+        identities_path = run_root / "support" / "identities.json"
+        identity_audit = audit_t3_identities(identities_path)
+        if not identity_audit["valid"]:
+            raise ValueError(
+                f"T3 identity audit failed: {identity_audit['issues']}"
+            )
+        result = calibrate_t3_weights(
+            identities_path=identities_path,
+            teacher_checkpoint=args.teacher_checkpoint,
+            expected_teacher_sha256=config["model"][
+                "teacher_checkpoint_sha256"
+            ],
+            output_path=run_root / "support" / "weights.json",
+            device=device,
+            rows=int(training["t3_weight_calibration_rows"]),
+            segment_samples=int(training["t3_weight_segment_samples"]),
+            logit_delta=float(training["t3_weight_mask_logit_delta"]),
+        )
+        provenance_path = run_root / "provenance" / "provenance.json"
+        provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+        provenance["status"] = "weights_frozen"
+        provenance["weight_calibration_commit"] = git["commit"]
+        provenance["weights_sha256"] = sha256(
+            run_root / "support" / "weights.json"
+        )
+        _atomic_json(provenance_path, provenance)
+        _atomic_json(
+            run_root / "status.json",
+            {
+                "status": "weights_frozen",
+                "campaign_scope": "t3_direction_support",
+                "valid_for_promotion": False,
+                "audit_valid": True,
+            },
+        )
     elif args.command == "prepare-d2-range-support":
         config = load_campaign_config(args.config)
         dataset_audit = validate_campaign_config(config)
@@ -4224,6 +4371,9 @@ def main() -> None:
         "audit-d2-range-support",
         "smoke-d2-range",
         "train-d2-range",
+        "prepare-t3-support",
+        "audit-t3-support",
+        "calibrate-t3-weights",
         "smoke-resume",
         "continue-students",
     }:
@@ -4233,6 +4383,7 @@ def main() -> None:
         "audit-run",
         "audit-d2-support",
         "audit-d2-range-support",
+        "audit-t3-support",
     } and not result["valid"]:
         raise SystemExit(1)
 

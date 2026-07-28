@@ -1,6 +1,10 @@
 from __future__ import annotations
 
 import sys
+import csv
+import hashlib
+import json
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -20,6 +24,7 @@ from sebench.t3_perceptual import (  # noqa: E402
     TrueLengthSISDRLoss,
     calibrate_t3_gradient_weights,
 )
+from sebench.t3_support import audit_t3_identities, prepare_t3_identities  # noqa: E402
 
 
 def _fixture(
@@ -57,6 +62,80 @@ class T3PerceptualLossTests(unittest.TestCase):
         self.assertIsNotNone(candidate.grad)
         self.assertTrue(torch.isfinite(candidate.grad).all())
         self.assertGreater(float(candidate.grad.norm()), 0.0)
+
+    def test_t3_identities_are_pair_and_clean_disjoint_from_t2(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            train_manifest = root / "train.csv"
+            teacher_manifest = root / "teacher.csv"
+            metadata = root / "metadata.json"
+            t2_support = root / "t2.json"
+            train_rows = []
+            teacher_rows = []
+            for index in range(10):
+                noisy = root / f"noisy-{index}.wav"
+                clean = root / f"clean-{index}.wav"
+                teacher = root / f"teacher-{index}.pt"
+                noisy.write_bytes(b"fixture")
+                clean.write_bytes(b"fixture")
+                torch.save(torch.zeros(512, dtype=torch.float16), teacher)
+                train_rows.append({"noisy": noisy.as_posix(), "clean": clean.as_posix()})
+                teacher_rows.append(
+                    {
+                        "noisy": noisy.as_posix(),
+                        "clean": clean.as_posix(),
+                        "teacher_wav": teacher.as_posix(),
+                    }
+                )
+            for path, fieldnames, rows in (
+                (train_manifest, ["noisy", "clean"], train_rows),
+                (
+                    teacher_manifest,
+                    ["noisy", "clean", "teacher_wav"],
+                    teacher_rows,
+                ),
+            ):
+                with path.open("w", newline="", encoding="utf-8") as handle:
+                    writer = csv.DictWriter(handle, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(rows)
+            train_hash = hashlib.sha256(train_manifest.read_bytes()).hexdigest()
+            metadata.write_text(
+                json.dumps(
+                    {
+                        "status": "complete",
+                        "cache_inputs": False,
+                        "storage_dtype": "float16",
+                        "teacher_checkpoint_sha256": "a" * 64,
+                        "train_manifest_sha256": train_hash,
+                    }
+                ),
+                encoding="utf-8",
+            )
+            t2_support.write_text(
+                json.dumps({"records": train_rows[:2]}),
+                encoding="utf-8",
+            )
+            result = prepare_t3_identities(
+                train_manifest=train_manifest,
+                teacher_cache_manifest=teacher_manifest,
+                teacher_cache_metadata=metadata,
+                t2_support_paths=[t2_support],
+                output_dir=root / "support",
+                expected_teacher_sha256="a" * 64,
+                train_rows=2,
+                calibration_rows=2,
+                audit_rows=2,
+                seed=17,
+            )
+            audit = audit_t3_identities(result["identities_path"])
+            self.assertTrue(audit["valid"], audit["issues"])
+            self.assertEqual(result["counts"], {"train": 2, "calibration": 2, "audit": 2})
+            excluded_clean = {row["clean"] for row in train_rows[:2]}
+            self.assertFalse(
+                excluded_clean
+                & {str(row["clean"]) for row in result["records"]}
+            )
 
     def test_pmsqe_silent_reference_is_safe_and_neutral(self) -> None:
         clean = torch.zeros(1, 6_000)

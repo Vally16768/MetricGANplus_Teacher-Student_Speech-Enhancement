@@ -266,6 +266,10 @@ The official teacher exposes bounded `+/-0.10` mask-logit candidate generation
 for the T3 local-direction audit. A zero perturbation is bit-identical to the
 ordinary forward path, the parameter/state-dict architecture is unchanged,
 and these candidates remain ignored FP16 local artifacts.
+`t3_support.py` freezes 1,000/200/200 train-only identities with both pair and
+clean-utterance exclusion against all supplied T2 supports. The root campaign
+entry point owns selection, independent reconciliation and 16-row CUDA
+gradient-weight calibration; neither validation nor test is read.
 
 The earlier bounded frozen-proxy branch remains historical negative evidence,
 not the canonical T1 implementation. The alternating branch passed structural

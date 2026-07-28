@@ -103,6 +103,9 @@ The frozen implementation contract is:
   contribute a neutral PMSQE term;
 - gradient weights are measured on train-only, non-zero teacher-manifold
   perturbations around T0 because the exact T0 anchor gradient is zero.
+- the direction support uses seed `3003`; weight calibration uses the first
+  16 frozen direction-train identities, 32,000-sample segments and mask-logit
+  delta `+0.02`, aggregating component waveform-gradient norms by their median.
 
 The source/license/hash record is
 `code_and_documentation/reference/torch_pesq_0.1.2.json`.

@@ -71,6 +71,13 @@ training:
   d2_lr_patience: 2
   d2_lr_factor: 0.5
   d2_min_lr: 0.000001
+  t3_direction_train_rows: 1000
+  t3_direction_calibration_rows: 200
+  t3_direction_audit_rows: 200
+  t3_direction_seed: 3003
+  t3_weight_calibration_rows: 16
+  t3_weight_segment_samples: 32000
+  t3_weight_mask_logit_delta: 0.02
   metric_proxy_weight: 0.25
   teacher_anchor_weight: 0.75
   teacher_min_pesq_gain: 0.01

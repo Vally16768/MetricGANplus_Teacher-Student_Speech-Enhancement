@@ -133,6 +133,11 @@ metric/reference profile matches the run profile
   A real VoiceBank 32,000-sample CUDA smoke produced finite PMSQE `2.3363`,
   waveform-gradient norm `67.7028` and finite gradients for all 21 official
   teacher tensors (aggregate norm `1.1645`). No optimizer step was taken.
+- T3 support/control implementation: root-entry-point commands freeze and
+  independently audit pair/clean-disjoint train identities, exclude supplied
+  T2 supports, and calibrate weights only on 16 frozen train directions under
+  CUDA. Full suite `78/78` and campaign validation pass; scientific support
+  generation remains pending on a clean commit.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.
