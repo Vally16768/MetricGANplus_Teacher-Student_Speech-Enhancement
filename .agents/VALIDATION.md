@@ -99,6 +99,13 @@ metric/reference profile matches the run profile
 - the source manifests do not retain VoiceBank speaker/noise identities;
   exact speaker-disjointness is not claimed for D2 support. Dataset-level
   frozen split overlap remains zero.
+- D2 interrupted/resumed unit control matches the uninterrupted model,
+  scheduler, history, best epoch and best score exactly; complete suite
+  `67/67`, config/plan/campaign validation and project guard pass.
+- clean CUDA smoke `20260728-t2-d2-official-smoke-s0-a1` observed batch-1
+  current/history/current passes, true normalized labels, selected checkpoint,
+  complete state and calibration/directional plots. Its two-record relaxed
+  gate is verification-only and not scientific D2 evidence.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

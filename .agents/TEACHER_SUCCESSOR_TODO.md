@@ -3,7 +3,7 @@
 Status: **active — no training started**  
 Last update: **2026-07-28**  
 Current phase: **T2.3 D2-OFFICIAL**
-Next action: **implement resumable D-only fitting and gates**
+Next action: **fit D2-OFFICIAL to the declared stopping rule**
 
 This board owns the iterative execution of
 `TEACHER_SUCCESSOR_PLAN.md`. The completed P1–P6 board and failed T1 evidence
@@ -82,10 +82,10 @@ Unblock: T2.1 passes.
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T2.3.1 | Implement resumable D-only fitting | D/optimizer/scheduler/patience/replay state | in-progress |
-| T2.3.2 | Add interrupted/resumed equivalence test | selected hash and control state match | pending |
-| T2.3.3 | Run clean CUDA smoke | batch 1, three passes, true labels observed | pending |
-| T2.3.4 | Fit D2 to declared stopping rule | immutable history and selected checkpoint | pending |
+| T2.3.1 | Implement resumable D-only fitting | D/optimizer/scheduler/patience/replay state | passed |
+| T2.3.2 | Add interrupted/resumed equivalence test | selected hash and control state match | passed |
+| T2.3.3 | Run clean CUDA smoke | batch 1, three passes, true labels observed | passed |
+| T2.3.4 | Fit D2 to declared stopping rule | immutable history and selected checkpoint | in-progress |
 | T2.3.5 | Apply untouched audit fidelity gate | MAE/correlation/range/subgroups | pending |
 | T2.3.6 | Apply local directional gate | sign agreement and delta-rank report | pending |
 | T2.3.7 | Record D2 decision | pass or exact failure cause | pending |
@@ -166,3 +166,4 @@ Unblock: T2.7 passes. If an upstream gate fails, replace downstream items with
 | 2026-07-28 | Activated the clean T2 successor sequence | one worktree/main; no active training; GPU available; plan/guard valid | pin official SpeechBrain revision |
 | 2026-07-28 | Passed exact SpeechBrain v1.1.0 D parity | pinned `36c180c`; corrected magnitude/constant-pad/time-first frontend; 65/65 tests; CUDA D/G-gradient smoke; plan/campaign/guard pass | freeze D2 support IDs |
 | 2026-07-28 | Prepared and independently audited fixed D2 support A3 | 1000/200/200; 1400 unique; support `545ac1bf`; source hashes unchanged; no missing/non-FP16/nonfinite records; T0 PESQ mean 2.861 | implement resumable D-only fitting |
+| 2026-07-28 | Passed resumable D2 code and clean CUDA smoke A1 | 67/67 tests; exact interrupted/resumed state; batch-1 current/history/current; checkpoint/state/plots; verification-only relaxed gate | run strict D2-OFFICIAL fit |
