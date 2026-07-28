@@ -28,7 +28,12 @@ from sebench.metricgan_alternating import (  # noqa: E402
     refresh_metricgan_discriminator,
 )
 from sebench.metric_proxy_training import build_proxy_records  # noqa: E402
-from sebench.metricgan_d2 import audit_d2_support, prepare_d2_support  # noqa: E402
+from sebench.metricgan_d2 import (  # noqa: E402
+    PlannedD2Interruption,
+    audit_d2_support,
+    fit_d2_official,
+    prepare_d2_support,
+)
 
 
 class IdentityTeacher(torch.nn.Module):
@@ -431,6 +436,120 @@ class AlternatingMetricGANTests(unittest.TestCase):
             audit = audit_d2_support(run_root)
             self.assertTrue(audit["valid"], audit)
             self.assertEqual(audit["record_count"], 8)
+
+    def test_d2_interrupted_resume_matches_uninterrupted_control(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            records = []
+            for index in range(8):
+                partition = (
+                    "train"
+                    if index < 4
+                    else "calibration"
+                    if index < 6
+                    else "audit"
+                )
+                records.append(
+                    {
+                        "token": f"token-{index}",
+                        "partition": partition,
+                        "noisy": f"/external/noisy-{index}.wav",
+                        "clean": f"/external/clean-{index}.wav",
+                        "enhanced": f"/local/enhanced-{index}.pt",
+                        "enhanced_pesq": 2.0 + index * 0.05,
+                        "enhanced_target": normalize_pesq(
+                            2.0 + index * 0.05
+                        ),
+                        "noisy_pesq": 1.5 + index * 0.03,
+                        "noisy_target": normalize_pesq(
+                            1.5 + index * 0.03
+                        ),
+                        "estimated_input_snr_db": float(index),
+                    }
+                )
+            support = root / "support.json"
+            support.write_text(
+                json.dumps({"records": records}),
+                encoding="utf-8",
+            )
+            waveform = torch.linspace(-0.2, 0.2, 4096)
+            aligned = (waveform, waveform * 0.9, waveform * 0.95)
+            with mock.patch(
+                "sebench.metricgan_d2._load_support_record",
+                return_value=aligned,
+            ):
+                control = fit_d2_official(
+                    support_path=support,
+                    output_dir=root / "control",
+                    device="cpu",
+                    max_epochs=2,
+                    current_rows=2,
+                    early_stop_patience=5,
+                    seed=41,
+                    base_channels=2,
+                    evaluation_limit=2,
+                    run_directional_audit=False,
+                    strict_gate=False,
+                )
+                with self.assertRaises(PlannedD2Interruption):
+                    fit_d2_official(
+                        support_path=support,
+                        output_dir=root / "resumed",
+                        device="cpu",
+                        max_epochs=2,
+                        current_rows=2,
+                        early_stop_patience=5,
+                        seed=41,
+                        base_channels=2,
+                        evaluation_limit=2,
+                        run_directional_audit=False,
+                        strict_gate=False,
+                        interrupt_after_epoch=1,
+                    )
+                resumed = fit_d2_official(
+                    support_path=support,
+                    output_dir=root / "resumed",
+                    device="cpu",
+                    max_epochs=2,
+                    current_rows=2,
+                    early_stop_patience=5,
+                    seed=41,
+                    base_channels=2,
+                    evaluation_limit=2,
+                    run_directional_audit=False,
+                    strict_gate=False,
+                    resume=True,
+                )
+            self.assertEqual(control["best_epoch"], resumed["best_epoch"])
+            self.assertEqual(
+                control["best_selection_score"],
+                resumed["best_selection_score"],
+            )
+            control_state = torch.load(
+                root / "control" / "training_state.pt",
+                map_location="cpu",
+                weights_only=True,
+            )
+            resumed_state = torch.load(
+                root / "resumed" / "training_state.pt",
+                map_location="cpu",
+                weights_only=True,
+            )
+            self.assertEqual(
+                control_state["scheduler_state"],
+                resumed_state["scheduler_state"],
+            )
+            self.assertEqual(
+                json.dumps(control_state["history"], sort_keys=True),
+                json.dumps(resumed_state["history"], sort_keys=True),
+            )
+            for key, value in control_state["model_state"].items():
+                torch.testing.assert_close(
+                    value,
+                    resumed_state["model_state"][key],
+                    rtol=0.0,
+                    atol=0.0,
+                )
 
 
 if __name__ == "__main__":

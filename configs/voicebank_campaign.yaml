@@ -65,6 +65,12 @@ training:
   d2_train_rows: 1000
   d2_calibration_rows: 200
   d2_audit_rows: 200
+  d2_max_epochs: 20
+  d2_current_rows: 100
+  d2_early_stop_patience: 5
+  d2_lr_patience: 2
+  d2_lr_factor: 0.5
+  d2_min_lr: 0.000001
   metric_proxy_weight: 0.25
   teacher_anchor_weight: 0.75
   teacher_min_pesq_gain: 0.01

@@ -35,7 +35,12 @@ from sebench.metric_proxy_training import (  # noqa: E402
     build_proxy_records,
     train_metric_proxy,
 )
-from sebench.metricgan_d2 import audit_d2_support, prepare_d2_support  # noqa: E402
+from sebench.metricgan_d2 import (  # noqa: E402
+    PlannedD2Interruption,
+    audit_d2_support,
+    fit_d2_official,
+    prepare_d2_support,
+)
 from sebench.runtime import require_shared_venv, require_training_cuda  # noqa: E402
 from sebench.teacher_cache import (  # noqa: E402
     TeacherCacheTarget,
@@ -202,6 +207,18 @@ def validate_campaign_config(config: dict[str, Any]) -> dict[str, Any]:
     ):
         if int(training.get(key, 0)) < minimum:
             raise ValueError(f"training.{key} must be at least {minimum}.")
+    if int(training.get("d2_max_epochs", 0)) != 20:
+        raise ValueError("training.d2_max_epochs must be 20.")
+    if int(training.get("d2_current_rows", 0)) != 100:
+        raise ValueError("training.d2_current_rows must be 100.")
+    if int(training.get("d2_early_stop_patience", 0)) != 5:
+        raise ValueError("training.d2_early_stop_patience must be 5.")
+    if int(training.get("d2_lr_patience", 0)) != 2:
+        raise ValueError("training.d2_lr_patience must be 2.")
+    if float(training.get("d2_lr_factor", 0.0)) != 0.5:
+        raise ValueError("training.d2_lr_factor must be 0.5.")
+    if float(training.get("d2_min_lr", 0.0)) != 1e-6:
+        raise ValueError("training.d2_min_lr must be 1e-6.")
     student_lr_patience = int(training.get("student_lr_patience", 0))
     student_early_stop_patience = int(
         training.get("student_early_stop_patience", 0)
@@ -3761,6 +3778,12 @@ def parse_args() -> argparse.Namespace:
     d2_support.add_argument("--teacher-cache-metadata", required=True)
     d2_support_audit = subparsers.add_parser("audit-d2-support")
     d2_support_audit.add_argument("--run-dir", required=True)
+    d2_smoke = subparsers.add_parser("smoke-d2")
+    d2_smoke.add_argument("--support-run-dir", required=True)
+    d2_smoke.add_argument("--run-id", required=True)
+    d2_train = subparsers.add_parser("train-d2")
+    d2_train.add_argument("--support-run-dir", required=True)
+    d2_train.add_argument("--run-id", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -3864,6 +3887,109 @@ def main() -> None:
             ],
             "speaker_limitation": support["speaker_limitation"],
         }
+    elif args.command in {"smoke-d2", "train-d2"}:
+        config = load_campaign_config(args.config)
+        dataset_audit = validate_campaign_config(config)
+        git = _git_state()
+        if git["dirty"]:
+            raise RuntimeError("D2 fitting requires a clean committed snapshot.")
+        require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+        device = require_training_cuda(str(config["runtime"]["device"]))
+        support_root = Path(args.support_run_dir).expanduser().resolve()
+        support_audit = audit_d2_support(support_root)
+        if not support_audit["valid"]:
+            raise ValueError(f"D2 support audit failed: {support_audit['issues']}")
+        support_path = support_root / "support" / "support.json"
+        run_root = (
+            Path(str(config["runtime"]["run_root"])).expanduser().resolve()
+            / args.run_id
+        )
+        run_root.mkdir(parents=True, exist_ok=False)
+        mode = "smoke" if args.command == "smoke-d2" else "full"
+        provenance = {
+            "schema_version": 1,
+            "run_id": args.run_id,
+            "status": "running",
+            "campaign_scope": "t2_d2_official",
+            "mode": mode,
+            "verification_only": mode == "smoke",
+            "git_commit": git["commit"],
+            "git_dirty": git["dirty"],
+            "dataset_audit": dataset_audit,
+            "support_source": {
+                "run_id": support_root.name,
+                "support_sha256": sha256(support_path),
+                "audit": support_audit,
+            },
+        }
+        _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+        (run_root / "provenance" / "config_resolved.yaml").write_text(
+            yaml.safe_dump(config, sort_keys=False),
+            encoding="utf-8",
+        )
+        training = dict(config["training"])
+        try:
+            result = fit_d2_official(
+                support_path=support_path,
+                output_dir=run_root,
+                device=device,
+                max_epochs=(
+                    1 if mode == "smoke" else int(training["d2_max_epochs"])
+                ),
+                current_rows=(
+                    2 if mode == "smoke" else int(training["d2_current_rows"])
+                ),
+                lr=float(training["metric_discriminator_lr"]),
+                history_portion=float(
+                    training["metric_discriminator_history_portion"]
+                ),
+                lr_factor=float(training["d2_lr_factor"]),
+                lr_patience=int(training["d2_lr_patience"]),
+                min_lr=float(training["d2_min_lr"]),
+                early_stop_patience=int(training["d2_early_stop_patience"]),
+                grad_clip=float(training["grad_clip"]),
+                seed=int(training["seed"]),
+                evaluation_limit=(2 if mode == "smoke" else None),
+                run_directional_audit=True,
+                strict_gate=mode == "full",
+                progress_callback=print,
+            )
+        except BaseException as exc:
+            provenance["status"] = "failed"
+            provenance["failure"] = {
+                "type": exc.__class__.__name__,
+                "message": str(exc),
+                "traceback": traceback.format_exc(),
+            }
+            _atomic_json(
+                run_root / "provenance" / "provenance.json",
+                provenance,
+            )
+            _atomic_json(
+                run_root / "status.json",
+                {
+                    "status": "failed",
+                    "campaign_scope": "t2_d2_official",
+                    "valid_for_promotion": False,
+                },
+            )
+            raise
+        provenance["status"] = result["status"]
+        provenance["selected_checkpoint_sha256"] = result[
+            "selected_checkpoint_sha256"
+        ]
+        provenance["gate_passed"] = result["passed"]
+        _atomic_json(run_root / "provenance" / "provenance.json", provenance)
+        _atomic_json(
+            run_root / "status.json",
+            {
+                "status": result["status"],
+                "campaign_scope": "t2_d2_official",
+                "valid_for_promotion": False,
+                "verification_only": mode == "smoke",
+                "gate_passed": result["passed"],
+            },
+        )
     elif args.command in {
         "smoke-teacher-calibration",
         "calibrate-teacher",
@@ -3996,6 +4122,8 @@ def main() -> None:
         "monitor-run",
         "prepare-d2-support",
         "audit-d2-support",
+        "smoke-d2",
+        "train-d2",
         "smoke-resume",
         "continue-students",
     }:

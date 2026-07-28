@@ -17,7 +17,19 @@ import torch
 
 from metrics.pesq import pesq_score
 from sebench.audio import load_mono_audio
-from sebench.metricgan_alternating import normalize_pesq
+from sebench.losses import (
+    SpeechBrainMetricDiscriminator,
+    load_pesq_proxy_checkpoint,
+    save_pesq_proxy_checkpoint,
+)
+from sebench.metricgan_alternating import (
+    evaluate_calibration_gate,
+    normalize_pesq,
+)
+
+
+class PlannedD2Interruption(RuntimeError):
+    """Controlled interruption used to verify exact D2 resume behavior."""
 
 
 def _atomic_json(path: Path, payload: Any) -> None:
@@ -27,6 +39,13 @@ def _atomic_json(path: Path, payload: Any) -> None:
         json.dumps(payload, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    temporary.replace(path)
+
+
+def _atomic_torch(path: Path, payload: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    torch.save(payload, temporary)
     temporary.replace(path)
 
 
@@ -491,3 +510,689 @@ def audit_d2_support(run_dir: str | Path) -> dict[str, Any]:
         ),
         "speaker_limitation": payload.get("speaker_limitation"),
     }
+
+
+def _load_support_record(
+    record: dict[str, Any],
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    return _load_aligned(
+        record["noisy"],
+        record["clean"],
+        record["enhanced"],
+    )
+
+
+def _d2_update(
+    discriminator: SpeechBrainMetricDiscriminator,
+    optimizer: torch.optim.Optimizer,
+    candidate: torch.Tensor,
+    clean: torch.Tensor,
+    target: float,
+    *,
+    device: str,
+    grad_clip: float,
+) -> float:
+    prediction = discriminator.normalized_score(
+        candidate.unsqueeze(0).to(device),
+        clean.unsqueeze(0).to(device),
+    )
+    target_tensor = torch.tensor([float(target)], device=device)
+    loss = torch.mean((prediction - target_tensor) ** 2)
+    optimizer.zero_grad(set_to_none=True)
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(discriminator.parameters(), float(grad_clip))
+    optimizer.step()
+    return float(loss.detach().cpu())
+
+
+def _d2_current_pass(
+    discriminator: SpeechBrainMetricDiscriminator,
+    optimizer: torch.optim.Optimizer,
+    records: list[dict[str, Any]],
+    *,
+    device: str,
+    grad_clip: float,
+) -> list[float]:
+    losses: list[float] = []
+    for record in records:
+        noisy, clean, enhanced = _load_support_record(record)
+        for candidate, target in (
+            (clean, 1.0),
+            (enhanced, float(record["enhanced_target"])),
+            (noisy, float(record["noisy_target"])),
+        ):
+            losses.append(
+                _d2_update(
+                    discriminator,
+                    optimizer,
+                    candidate,
+                    clean,
+                    target,
+                    device=device,
+                    grad_clip=grad_clip,
+                )
+            )
+    return losses
+
+
+@torch.inference_mode()
+def _evaluate_d2(
+    discriminator: SpeechBrainMetricDiscriminator,
+    records: list[dict[str, Any]],
+    *,
+    device: str,
+) -> dict[str, Any]:
+    discriminator.eval()
+    targets: list[float] = []
+    predictions: list[float] = []
+    snr_values: list[float] = []
+    for record in records:
+        _, clean, enhanced = _load_support_record(record)
+        normalized = discriminator.normalized_score(
+            enhanced.unsqueeze(0).to(device),
+            clean.unsqueeze(0).to(device),
+        )
+        targets.append(float(record["enhanced_pesq"]))
+        predictions.append(float((5.0 * normalized - 0.5).cpu()))
+        snr_values.append(float(record["estimated_input_snr_db"]))
+    target_array = np.asarray(targets, dtype=np.float64)
+    prediction_array = np.asarray(predictions, dtype=np.float64)
+    errors = prediction_array - target_array
+
+    def ranks(values: np.ndarray) -> np.ndarray:
+        order = np.argsort(values, kind="mergesort")
+        output = np.empty(len(values), dtype=np.float64)
+        start = 0
+        while start < len(values):
+            end = start + 1
+            while end < len(values) and values[order[end]] == values[order[start]]:
+                end += 1
+            output[order[start:end]] = (start + end - 1) / 2.0
+            start = end
+        return output
+
+    def correlation(left: np.ndarray, right: np.ndarray) -> float:
+        if (
+            len(left) < 2
+            or float(np.std(left)) == 0.0
+            or float(np.std(right)) == 0.0
+        ):
+            return float("nan")
+        return float(np.corrcoef(left, right)[0, 1])
+
+    rmse = float(np.sqrt(np.mean(errors**2))) if len(errors) else float("nan")
+    return {
+        "record_count": len(records),
+        "count": len(records),
+        "mae": float(np.mean(np.abs(errors))) if len(errors) else float("nan"),
+        "normalized_mae": (
+            float(np.mean(np.abs(errors))) / 5.0
+            if len(errors)
+            else float("nan")
+        ),
+        "rmse": rmse,
+        "normalized_rmse": rmse / 5.0,
+        "mse": float(np.mean(errors**2)) if len(errors) else float("nan"),
+        "pearson": correlation(target_array, prediction_array),
+        "spearman": correlation(ranks(target_array), ranks(prediction_array)),
+        "target_min": float(np.min(target_array)),
+        "target_max": float(np.max(target_array)),
+        "target_std": float(np.std(target_array)),
+        "prediction_min": float(np.min(prediction_array)),
+        "prediction_max": float(np.max(prediction_array)),
+        "prediction_std": float(np.std(prediction_array)),
+        "targets": targets,
+        "predictions": predictions,
+        "estimated_input_snr_db": snr_values,
+    }
+
+
+def _calibration_selection_score(metrics: dict[str, Any]) -> float:
+    """Minimized D2 selection score; audit thresholds remain unchanged."""
+    pearson = float(metrics.get("pearson", float("nan")))
+    spearman = float(metrics.get("spearman", float("nan")))
+    if not math.isfinite(pearson):
+        pearson = -1.0
+    if not math.isfinite(spearman):
+        spearman = -1.0
+    range_excess = max(
+        0.0,
+        float(metrics["target_min"]) - float(metrics["prediction_min"]),
+        float(metrics["prediction_max"]) - float(metrics["target_max"]),
+    )
+    return float(
+        float(metrics["normalized_mae"])
+        + 0.10 * max(0.0, 0.80 - pearson)
+        + 0.10 * max(0.0, 0.80 - spearman)
+        + 0.01 * range_excess
+    )
+
+
+def _snr_subgroups(
+    metrics: dict[str, Any],
+) -> list[dict[str, Any]]:
+    snr = np.asarray(metrics["estimated_input_snr_db"], dtype=np.float64)
+    targets = np.asarray(metrics["targets"], dtype=np.float64)
+    predictions = np.asarray(metrics["predictions"], dtype=np.float64)
+    if not len(snr):
+        return []
+    boundaries = np.quantile(snr, [0.0, 0.25, 0.5, 0.75, 1.0])
+    groups = []
+    for index in range(4):
+        lower = float(boundaries[index])
+        upper = float(boundaries[index + 1])
+        mask = (snr >= lower) & (
+            snr <= upper if index == 3 else snr < upper
+        )
+        selected_targets = targets[mask]
+        selected_predictions = predictions[mask]
+        errors = selected_predictions - selected_targets
+        if not len(selected_targets):
+            groups.append(
+                {
+                    "quartile": index + 1,
+                    "snr_min": lower,
+                    "snr_max": upper,
+                    "count": 0,
+                    "mae": float("nan"),
+                    "pearson": float("nan"),
+                }
+            )
+            continue
+        correlation = (
+            float(np.corrcoef(selected_targets, selected_predictions)[0, 1])
+            if len(selected_targets) > 1
+            and np.std(selected_targets) > 0
+            and np.std(selected_predictions) > 0
+            else float("nan")
+        )
+        groups.append(
+            {
+                "quartile": index + 1,
+                "snr_min": lower,
+                "snr_max": upper,
+                "count": int(np.sum(mask)),
+                "mae": float(np.mean(np.abs(errors))),
+                "pearson": correlation,
+            }
+        )
+    return groups
+
+
+def _rank_correlation(left: list[float], right: list[float]) -> float:
+    left_array = np.asarray(left, dtype=np.float64)
+    right_array = np.asarray(right, dtype=np.float64)
+    if (
+        len(left_array) < 2
+        or np.std(left_array) == 0
+        or np.std(right_array) == 0
+    ):
+        return float("nan")
+    left_rank = np.argsort(np.argsort(left_array, kind="mergesort"))
+    right_rank = np.argsort(np.argsort(right_array, kind="mergesort"))
+    return float(np.corrcoef(left_rank, right_rank)[0, 1])
+
+
+@torch.inference_mode()
+def _directional_audit(
+    discriminator: SpeechBrainMetricDiscriminator,
+    records: list[dict[str, Any]],
+    *,
+    device: str,
+    alpha: float = 0.05,
+    true_delta_floor: float = 0.005,
+) -> dict[str, Any]:
+    discriminator.eval()
+    rows: list[dict[str, Any]] = []
+    for record in records:
+        noisy, clean, enhanced = _load_support_record(record)
+        base_true = float(record["enhanced_pesq"])
+        base_prediction = float(
+            (
+                5.0
+                * discriminator.normalized_score(
+                    enhanced.unsqueeze(0).to(device),
+                    clean.unsqueeze(0).to(device),
+                )
+                - 0.5
+            ).cpu()
+        )
+        variants = {
+            "toward_clean": (1.0 - alpha) * enhanced + alpha * clean,
+            "toward_noisy": (1.0 - alpha) * enhanced + alpha * noisy,
+        }
+        for name, candidate in variants.items():
+            true_score = float(
+                pesq_score(
+                    clean.numpy(),
+                    candidate.numpy(),
+                    16_000,
+                    bandwidth="wb",
+                )
+            )
+            prediction = float(
+                (
+                    5.0
+                    * discriminator.normalized_score(
+                        candidate.unsqueeze(0).to(device),
+                        clean.unsqueeze(0).to(device),
+                    )
+                    - 0.5
+                ).cpu()
+            )
+            true_delta = true_score - base_true
+            predicted_delta = prediction - base_prediction
+            eligible = abs(true_delta) >= float(true_delta_floor)
+            rows.append(
+                {
+                    "token": record["token"],
+                    "variant": name,
+                    "true_delta": true_delta,
+                    "predicted_delta": predicted_delta,
+                    "eligible": eligible,
+                    "sign_match": (
+                        bool(np.sign(true_delta) == np.sign(predicted_delta))
+                        if eligible
+                        else None
+                    ),
+                }
+            )
+    eligible_rows = [row for row in rows if row["eligible"]]
+    sign_agreement = (
+        float(np.mean([bool(row["sign_match"]) for row in eligible_rows]))
+        if eligible_rows
+        else float("nan")
+    )
+    spearman = _rank_correlation(
+        [float(row["true_delta"]) for row in eligible_rows],
+        [float(row["predicted_delta"]) for row in eligible_rows],
+    )
+    gate = {
+        "passed": bool(
+            len(eligible_rows) >= len(records)
+            and math.isfinite(sign_agreement)
+            and sign_agreement >= 0.70
+            and math.isfinite(spearman)
+            and spearman >= 0.60
+        ),
+        "checks": {
+            "eligible_pair_count": len(eligible_rows) >= len(records),
+            "sign_agreement": math.isfinite(sign_agreement)
+            and sign_agreement >= 0.70,
+            "spearman": math.isfinite(spearman) and spearman >= 0.60,
+        },
+        "thresholds": {
+            "minimum_eligible_pairs": len(records),
+            "minimum_sign_agreement": 0.70,
+            "minimum_spearman": 0.60,
+            "true_delta_floor": float(true_delta_floor),
+            "alpha": float(alpha),
+        },
+    }
+    return {
+        "pair_count": len(rows),
+        "eligible_pair_count": len(eligible_rows),
+        "sign_agreement": sign_agreement,
+        "spearman": spearman,
+        "gate": gate,
+        "pairs": rows,
+    }
+
+
+def _write_d2_plots(
+    *,
+    output_root: Path,
+    history: list[dict[str, Any]],
+    audit: dict[str, Any],
+    directional: dict[str, Any],
+) -> dict[str, str]:
+    history_plot = output_root / "reports" / "training_history.png"
+    calibration_plot = output_root / "reports" / "audit_calibration.png"
+    directional_plot = output_root / "reports" / "directional_deltas.png"
+    history_plot.parent.mkdir(parents=True, exist_ok=True)
+
+    figure, axes = plt.subplots(1, 2, figsize=(10, 4))
+    axes[0].plot(
+        [row["epoch"] for row in history],
+        [row["calibration"]["normalized_mae"] for row in history],
+        marker="o",
+    )
+    axes[0].axhline(0.06, linestyle="--", color="black")
+    axes[0].set_title("D2 calibration normalized MAE")
+    axes[0].set_xlabel("epoch")
+    axes[1].plot(
+        [row["epoch"] for row in history],
+        [row["calibration"]["pearson"] for row in history],
+        marker="o",
+        label="Pearson",
+    )
+    axes[1].plot(
+        [row["epoch"] for row in history],
+        [row["calibration"]["spearman"] for row in history],
+        marker="o",
+        label="Spearman",
+    )
+    axes[1].axhline(0.80, linestyle="--", color="black")
+    axes[1].set_title("D2 calibration correlation")
+    axes[1].set_xlabel("epoch")
+    axes[1].legend()
+    figure.tight_layout()
+    figure.savefig(history_plot, dpi=160)
+    plt.close(figure)
+
+    figure, axis = plt.subplots(figsize=(5, 5))
+    axis.scatter(audit["targets"], audit["predictions"], s=14, alpha=0.65)
+    lower = min(audit["target_min"], audit["prediction_min"])
+    upper = max(audit["target_max"], audit["prediction_max"])
+    axis.plot([lower, upper], [lower, upper], linestyle="--", color="black")
+    axis.set_xlabel("true PESQ-WB")
+    axis.set_ylabel("D2 PESQ-WB")
+    axis.set_title("Untouched D2 audit")
+    figure.tight_layout()
+    figure.savefig(calibration_plot, dpi=160)
+    plt.close(figure)
+
+    eligible = [row for row in directional["pairs"] if row["eligible"]]
+    figure, axis = plt.subplots(figsize=(5, 5))
+    axis.scatter(
+        [row["true_delta"] for row in eligible],
+        [row["predicted_delta"] for row in eligible],
+        s=14,
+        alpha=0.65,
+    )
+    axis.axhline(0.0, color="black", linewidth=0.8)
+    axis.axvline(0.0, color="black", linewidth=0.8)
+    axis.set_xlabel("true PESQ-WB delta")
+    axis.set_ylabel("D2 predicted delta")
+    axis.set_title("Local directional audit")
+    figure.tight_layout()
+    figure.savefig(directional_plot, dpi=160)
+    plt.close(figure)
+    return {
+        "history_plot": history_plot.as_posix(),
+        "calibration_plot": calibration_plot.as_posix(),
+        "directional_plot": directional_plot.as_posix(),
+    }
+
+
+def fit_d2_official(
+    *,
+    support_path: str | Path,
+    output_dir: str | Path,
+    device: str,
+    max_epochs: int = 20,
+    current_rows: int = 100,
+    lr: float = 5e-4,
+    history_portion: float = 0.20,
+    lr_factor: float = 0.5,
+    lr_patience: int = 2,
+    min_lr: float = 1e-6,
+    early_stop_patience: int = 5,
+    grad_clip: float = 5.0,
+    seed: int = 0,
+    resume: bool = False,
+    interrupt_after_epoch: int | None = None,
+    base_channels: int = 15,
+    evaluation_limit: int | None = None,
+    run_directional_audit: bool = True,
+    strict_gate: bool = True,
+    progress_callback: Callable[[str], None] | None = None,
+) -> dict[str, Any]:
+    """Fit D2 with official batch-1 passes and select without reading audit."""
+    output_root = Path(output_dir)
+    output_root.mkdir(parents=True, exist_ok=True)
+    payload = json.loads(Path(support_path).read_text(encoding="utf-8"))
+    records = list(payload.get("records") or [])
+    train_records = [row for row in records if row["partition"] == "train"]
+    calibration_records = [
+        row for row in records if row["partition"] == "calibration"
+    ]
+    audit_records = [row for row in records if row["partition"] == "audit"]
+    if evaluation_limit is not None:
+        calibration_records = calibration_records[: int(evaluation_limit)]
+        audit_records = audit_records[: int(evaluation_limit)]
+    if not train_records or not calibration_records or not audit_records:
+        raise ValueError("D2 requires non-empty train/calibration/audit support.")
+    if int(current_rows) > len(train_records):
+        raise ValueError("D2 current_rows exceeds the fixed train support.")
+
+    torch.manual_seed(int(seed))
+    if str(device).startswith("cuda"):
+        torch.cuda.manual_seed_all(int(seed))
+    discriminator = SpeechBrainMetricDiscriminator(
+        base_channels=int(base_channels)
+    ).to(device)
+    optimizer = torch.optim.Adam(discriminator.parameters(), lr=float(lr))
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode="min",
+        factor=float(lr_factor),
+        patience=int(lr_patience),
+        min_lr=float(min_lr),
+    )
+    state_path = output_root / "training_state.pt"
+    selected_checkpoint = output_root / "models" / "D2-OFFICIAL.pt"
+    history_path = output_root / "metrics" / "history.json"
+    history: list[dict[str, Any]] = []
+    seen_tokens: list[str] = []
+    best_score = float("inf")
+    best_epoch = 0
+    epochs_without_improve = 0
+    start_epoch = 1
+
+    if resume:
+        if not state_path.is_file():
+            raise FileNotFoundError("D2 resume state does not exist.")
+        state = torch.load(state_path, map_location="cpu", weights_only=True)
+        if state.get("support_sha256") != _sha256(support_path):
+            raise ValueError("D2 resume support identity mismatch.")
+        discriminator.load_state_dict(state["model_state"], strict=True)
+        optimizer.load_state_dict(state["optimizer_state"])
+        for optimizer_state in optimizer.state.values():
+            for key, value in optimizer_state.items():
+                if isinstance(value, torch.Tensor):
+                    optimizer_state[key] = value.to(device)
+        scheduler.load_state_dict(state["scheduler_state"])
+        history = list(state["history"])
+        seen_tokens = list(state["seen_tokens"])
+        best_score = float(state["best_score"])
+        best_epoch = int(state["best_epoch"])
+        epochs_without_improve = int(state["epochs_without_improve"])
+        start_epoch = int(state["epoch"]) + 1
+
+    records_by_token = {str(row["token"]): row for row in train_records}
+    stopped_early = False
+    for epoch in range(start_epoch, int(max_epochs) + 1):
+        rng = random.Random(int(seed) + epoch * 1009)
+        current = rng.sample(train_records, int(current_rows))
+        current_tokens = [str(row["token"]) for row in current]
+        seen_tokens = list(dict.fromkeys([*seen_tokens, *current_tokens]))
+        history_count = max(1, round(len(seen_tokens) * float(history_portion)))
+        historical_tokens = list(seen_tokens)
+        rng.shuffle(historical_tokens)
+        historical = [
+            records_by_token[token]
+            for token in historical_tokens[:history_count]
+        ]
+
+        discriminator.train()
+        if progress_callback:
+            progress_callback(
+                f"D2 epoch {epoch}/{max_epochs} pass 1/3 current "
+                f"({len(current)} records)"
+            )
+        current_first = _d2_current_pass(
+            discriminator,
+            optimizer,
+            current,
+            device=device,
+            grad_clip=grad_clip,
+        )
+        if progress_callback:
+            progress_callback(
+                f"D2 epoch {epoch}/{max_epochs} pass 2/3 historical "
+                f"({len(historical)} records)"
+            )
+        historical_losses = []
+        for record in historical:
+            _, clean, enhanced = _load_support_record(record)
+            historical_losses.append(
+                _d2_update(
+                    discriminator,
+                    optimizer,
+                    enhanced,
+                    clean,
+                    float(record["enhanced_target"]),
+                    device=device,
+                    grad_clip=grad_clip,
+                )
+            )
+        if progress_callback:
+            progress_callback(
+                f"D2 epoch {epoch}/{max_epochs} pass 3/3 current"
+            )
+        current_second = _d2_current_pass(
+            discriminator,
+            optimizer,
+            current,
+            device=device,
+            grad_clip=grad_clip,
+        )
+        calibration = _evaluate_d2(
+            discriminator,
+            calibration_records,
+            device=device,
+        )
+        selection_score = _calibration_selection_score(calibration)
+        improved = selection_score < best_score - 1e-12
+        if improved:
+            best_score = selection_score
+            best_epoch = epoch
+            epochs_without_improve = 0
+            save_pesq_proxy_checkpoint(selected_checkpoint, discriminator)
+        else:
+            epochs_without_improve += 1
+        scheduler.step(selection_score)
+        row = {
+            "epoch": epoch,
+            "current_record_count": len(current),
+            "historical_record_count": len(historical),
+            "current_first_mse": float(np.mean(current_first)),
+            "historical_mse": float(np.mean(historical_losses)),
+            "current_second_mse": float(np.mean(current_second)),
+            "calibration": calibration,
+            "selection_score": selection_score,
+            "improved": improved,
+            "best_epoch": best_epoch,
+            "best_score": best_score,
+            "epochs_without_improve": epochs_without_improve,
+            "lr_after_eval": float(optimizer.param_groups[0]["lr"]),
+        }
+        history.append(row)
+        _atomic_json(history_path, history)
+        state = {
+            "schema_version": 1,
+            "epoch": epoch,
+            "support_sha256": _sha256(support_path),
+            "model_state": {
+                key: value.detach().cpu().clone()
+                for key, value in discriminator.state_dict().items()
+            },
+            "optimizer_state": optimizer.state_dict(),
+            "scheduler_state": scheduler.state_dict(),
+            "history": history,
+            "seen_tokens": seen_tokens,
+            "best_score": best_score,
+            "best_epoch": best_epoch,
+            "epochs_without_improve": epochs_without_improve,
+            "selected_checkpoint": selected_checkpoint.as_posix(),
+        }
+        _atomic_torch(state_path, state)
+        if progress_callback:
+            progress_callback(
+                f"D2 epoch {epoch}: nMAE={calibration['normalized_mae']:.4f} "
+                f"r={calibration['pearson']:.4f} "
+                f"rho={calibration['spearman']:.4f} "
+                f"best={best_epoch} lr={optimizer.param_groups[0]['lr']:.2e}"
+            )
+        if interrupt_after_epoch is not None and epoch == int(
+            interrupt_after_epoch
+        ):
+            raise PlannedD2Interruption(
+                f"Planned D2 interruption after epoch {epoch}."
+            )
+        if epochs_without_improve >= int(early_stop_patience):
+            stopped_early = True
+            break
+
+    if not selected_checkpoint.is_file():
+        raise RuntimeError("D2 fitting did not produce a selected checkpoint.")
+    selected = load_pesq_proxy_checkpoint(
+        selected_checkpoint,
+        device=device,
+        freeze=True,
+    )
+    if not isinstance(selected, SpeechBrainMetricDiscriminator):
+        raise TypeError("Selected D2 checkpoint has the wrong model kind.")
+    audit = _evaluate_d2(selected, audit_records, device=device)
+    audit_gate = evaluate_calibration_gate(
+        audit,
+        min_records=(len(audit_records) if not strict_gate else 200),
+        max_normalized_mae=(0.06 if strict_gate else 1.0),
+        min_pearson=(0.80 if strict_gate else -1.0),
+        min_spearman=(0.80 if strict_gate else -1.0),
+        min_prediction_std=(0.02 if strict_gate else 0.0),
+        range_tolerance_raw=(0.30 if strict_gate else 5.0),
+    )
+    audit["subgroups_by_estimated_snr"] = _snr_subgroups(audit)
+    directional = (
+        _directional_audit(selected, audit_records, device=device)
+        if run_directional_audit
+        else {
+            "pair_count": 0,
+            "eligible_pair_count": 0,
+            "sign_agreement": float("nan"),
+            "spearman": float("nan"),
+            "gate": {
+                "passed": not strict_gate,
+                "checks": {},
+                "thresholds": {},
+            },
+            "pairs": [],
+        }
+    )
+    if not strict_gate:
+        directional["gate"]["verification_only_observed_passed"] = bool(
+            directional["gate"]["passed"]
+        )
+        directional["gate"]["passed"] = True
+    passed = bool(audit_gate["passed"] and directional["gate"]["passed"])
+    plots = _write_d2_plots(
+        output_root=output_root,
+        history=history,
+        audit=audit,
+        directional=directional,
+    )
+    result = {
+        "schema_version": 1,
+        "status": "passed" if passed else "failed",
+        "strategy": "D2-OFFICIAL",
+        "support_path": str(Path(support_path)),
+        "support_sha256": _sha256(support_path),
+        "max_epochs": int(max_epochs),
+        "completed_epochs": len(history),
+        "best_epoch": best_epoch,
+        "best_selection_score": best_score,
+        "stopped_early": stopped_early,
+        "selected_checkpoint": selected_checkpoint.as_posix(),
+        "selected_checkpoint_sha256": _sha256(selected_checkpoint),
+        "training_state": state_path.as_posix(),
+        "history": history_path.as_posix(),
+        "audit": audit,
+        "audit_gate": audit_gate,
+        "directional": directional,
+        "passed": passed,
+        "plots": plots,
+    }
+    _atomic_json(output_root / "metrics" / "summary.json", result)
+    return result

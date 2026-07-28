@@ -151,6 +151,18 @@ Train a fresh D with the official architecture and batch-1 update semantics:
 - early stopping patience `5` on the calibration composite;
 - complete resumable state after every calibration.
 
+Checkpoint selection minimizes the predeclared calibration composite:
+
+```text
+normalized_MAE
++ 0.10 * max(0, 0.80 - Pearson)
++ 0.10 * max(0, 0.80 - Spearman)
++ 0.01 * raw_prediction_range_excess
+```
+
+This composite controls scheduling, early stopping and D checkpoint selection.
+It does not replace or relax the untouched audit thresholds below.
+
 The fixed audit support is evaluated once after D selection. The existing
 strict fidelity gate is retained:
 

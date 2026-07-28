@@ -213,6 +213,14 @@ speaker/noise labels were not retained by content-addressed staging, the
 support is provably pair/clean-utterance disjoint but not claimed
 speaker-disjoint.
 
+`fit_d2_official` performs two clean/enhanced/noisy current passes with one
+enhanced historical pass between them, all at batch 1. It selects D only on
+the fixed calibration partition using normalized MAE with correlation/range
+penalties, persists model/optimizer/plateau-scheduler/patience/history after
+every evaluation, and reads the audit partition only after selection. The
+final audit combines the strict scalar fidelity gate with true-PESQ local
+direction tests for bounded T0→clean and T0→noisy interpolations.
+
 The active T1 fidelity protocol draws two disjoint current-output partitions
 per refresh: at least 100 examples for D updates and at least 100 held out for
 calibration. The held-out partition reports raw/normalized MAE and RMSE,
