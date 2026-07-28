@@ -132,8 +132,10 @@ metric/reference profile matches the run profile
 - T12 implementation adds one exact `val_rank` four-action pass, a predeclared
   72-policy ranking surface, deterministic selection, checkpoint round-trip
   and one conditional `val_select` evaluation. Full suite `97/97` and
-  VoiceBank campaign split validation and project guard pass; CUDA smoke
-  remains.
+  VoiceBank campaign split validation and project guard pass.
+- T12 clean CUDA smoke `20260728-t12-router-smoke-wb-s3003-a1` completed ten
+  rank examples, all 72 policies, guardrail-aware selection and checkpoint
+  round-trip. It was verification-only and read neither `val_select` nor test.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend
