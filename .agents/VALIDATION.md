@@ -82,6 +82,9 @@ metric/reference profile matches the run profile
 - T7 implementation: 90/90 unit/integration tests passed, including disabled
   parity, exact confidence formula and portable checkpoint round-trip;
   campaign split validation and project guard passed.
+- T7 clean CUDA smoke `20260728-t7-confidence-smoke-wb-s3003-a1` completed
+  fit/cal/rank/select, T0 fallback and checkpoint round-trip; verification-only,
+  two-file support and no test read.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend
