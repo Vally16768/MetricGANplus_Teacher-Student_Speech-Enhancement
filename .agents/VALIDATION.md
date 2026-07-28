@@ -178,6 +178,9 @@ metric/reference profile matches the run profile
 - T16 smoke A1 stopped safely before select/test because the generalized
   search omitted forwarding the custom lows at final router configuration.
   The missing forwarding is corrected before a fresh A2 contract.
+- Corrected T16 smoke A2 completed all eight actions, 336 rank policies and
+  checkpoint round-trip. Verification-only `val_select` and test remained
+  unread.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend
