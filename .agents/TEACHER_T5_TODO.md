@@ -1,9 +1,9 @@
 # T5 teacher-improvement TODO
 
-Status: **in progress — predeclared method and implementation**
+Status: **complete negative outcome — safe gain below promotion threshold**
 Last update: **2026-07-28**
-Current phase: **T5.1 implementation and validation**
-Next action: **commit smoke evidence and execute the full contracted T5 search**
+Current phase: **T5.2 closed; T6 affine-logit successor activated**
+Next action: **execute `.agents/TEACHER_T6_TODO.md`**
 
 Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 `not-applicable`.
@@ -32,12 +32,12 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T5.2.1 | Run contracted full search | 48 fit candidates; 3 calibrated sweeps; rank candidates | pending |
-| T5.2.2 | Apply one-shot `val_select` gate | gain `>=.01`; STOI/SI-SDR guards; no test | pending |
+| T5.2.1 | Run contracted full search | 48 fit candidates; 3 calibrated sweeps; 5 rank candidates | passed |
+| T5.2.2 | Apply one-shot `val_select` gate | PESQ `+0.005075`; guards pass; threshold fails; no test | failed |
 | T5.2.3 | Independently re-evaluate passed checkpoint | exact metrics/hash/support provenance | blocked |
 | T5.2.4 | Confirm across three declared seeds/bootstrap | positive mean; paired PESQ CI excludes zero | blocked |
 | T5.2.5 | Promote evidence and shut down after success | immediate power check; no active writes | blocked |
-| T5.2.6 | Predeclare capacity successor if T5 fails | preserve negative evidence; no gate relaxation | blocked |
+| T5.2.6 | Predeclare capacity successor if T5 fails | T6 affine logit scale + curve; no gate relaxation | passed |
 
 ## Progress log
 
@@ -48,3 +48,4 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | 2026-07-28 | Implemented T5 fit/cal/rank/select flow | eight-knot ordinary checkpoint, fit-only coordinate decisions, disjoint support and one-shot select | complete validation |
 | 2026-07-28 | Passed complete T5 pre-run validation | 87/87 tests; real campaign/research plan; architecture hashes; guard zero issues | clean commit and CUDA smoke |
 | 2026-07-28 | Passed clean contracted T5 CUDA smoke | two-file fit/cal/rank/select; rank rejected fit-only gain; verification-only; no test | full 96/96 search |
+| 2026-07-28 | Closed full T5 below gate | sweep 3 selected; PESQ `+0.005075`; SI-SDR `-0.245701`; no test/cache/students | activate affine-logit T6 |

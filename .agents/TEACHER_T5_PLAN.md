@@ -1,6 +1,6 @@
 # T5 true-PESQ frequency-curve search plan
 
-Status: **active — predeclared zeroth-order successor**
+Status: **complete negative outcome — safe gain below `+0.01`**
 
 ## Cause
 
@@ -78,3 +78,10 @@ hard constraints, not secondary reporting. No student/cache/test work starts
 from a single search result. If T5 fails, preserve the negative curve evidence
 and predeclare a model-capacity successor; do not widen bounds or reuse
 `val_select` for tuning.
+
+## Observed outcome
+
+`20260728-t5-frequency-wb-s3003-a1` selected sweep 3. On `val_select`, PESQ-WB
+gained `+0.005075`, STOI changed `-0.000782` and SI-SDR changed `-0.245701`
+dB. The guardrails passed but PESQ missed `+0.01`; no teacher is promoted.
+T6 is the active affine-logit successor.

@@ -305,5 +305,11 @@ backtracking trial.
 horizon; the full 256-step proposal crossed the rollback boundary. The
 selected H1/alpha-0.125 checkpoint changed `val_select` PESQ by `-0.000001`,
 STOI by `+0.00000009` and SI-SDR by `+0.000074` dB. It is effectively T0 and
-fails the teacher gate. T5 therefore replaces surrogate gradients with direct
+fails the teacher gate. T5 therefore replaced surrogate gradients with direct
 true-PESQ search in a bounded smooth frequency curve.
+
+`20260728-t5-frequency-wb-s3003-a1` used disjoint 96/96 train-only fit and
+calibration supports. Its eight-knot sweep generalized positively through
+`val_rank`; sweep 3 was selected. On `val_select`, PESQ improved `+0.005075`,
+STOI changed `-0.000782` and SI-SDR `-0.245701` dB. The result is safe but
+below the `+0.01` teacher gate and is retained as negative evidence.

@@ -89,17 +89,19 @@ def prepare_t5_support_manifests(
     *,
     fit_count: int = T5_FIT_SUPPORT,
     calibration_count: int = T5_CALIBRATION_SUPPORT,
+    start_index: int = 0,
 ) -> dict[str, Any]:
     """Freeze disjoint fit/cal manifests from T3 train identities only."""
     identities = json.loads(Path(identities_path).read_text(encoding="utf-8"))
     train = [
         row for row in identities["records"] if row.get("partition") == "train"
     ]
-    required = int(fit_count) + int(calibration_count)
-    if fit_count < 1 or calibration_count < 1 or len(train) < required:
+    start = int(start_index)
+    required = start + int(fit_count) + int(calibration_count)
+    if start < 0 or fit_count < 1 or calibration_count < 1 or len(train) < required:
         raise ValueError("T5 support does not contain the required train identities.")
-    fit = train[: int(fit_count)]
-    calibration = train[int(fit_count) : required]
+    fit = train[start : start + int(fit_count)]
+    calibration = train[start + int(fit_count) : required]
     fit_tokens = {str(row["token"]) for row in fit}
     calibration_tokens = {str(row["token"]) for row in calibration}
     fit_clean = {str(row["clean_token"]) for row in fit}
@@ -126,6 +128,7 @@ def prepare_t5_support_manifests(
         "schema_version": 1,
         "source_identities_sha256": sha256_file(identities_path),
         "source_partition": "train",
+        "start_index": start,
         "fit": {
             "count": len(fit),
             "manifest": fit_path.as_posix(),

@@ -216,6 +216,14 @@ metric/reference profile matches the run profile
   completed fit-only coordinate selection, disjoint calibration, rank
   rejection and T0 fallback on CUDA. It is explicitly two-file,
   `production_support=false`, `verification_only=true` and `test_read=false`.
+- Full T5 run `20260728-t5-frequency-wb-s3003-a1` completed 48 fit decisions,
+  three disjoint-calibration sweeps, five `val_rank` candidates and one
+  `val_select` evaluation. Selected sweep 3 gained `+0.005075` PESQ with both
+  guards passing, but correctly failed the unchanged `+0.01` gate; test was
+  unread.
+- T6 affine-logit implementation passes `88/88` tests, including exact
+  final-layer `scale * logits + curve` folding. Campaign validation,
+  architecture hashes, project guard and diff check pass.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

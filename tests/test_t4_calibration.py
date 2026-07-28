@@ -26,6 +26,7 @@ from sebench.t5_zeroth_order import (  # noqa: E402
     frequency_curve_from_knots,
     prepare_t5_support_manifests,
 )
+from sebench.t6_affine import apply_affine_logit_calibration  # noqa: E402
 
 
 class T4CalibrationTests(unittest.TestCase):
@@ -146,6 +147,33 @@ class T4CalibrationTests(unittest.TestCase):
             )
             self.assertEqual(summary["pair_overlap"], 0)
             self.assertEqual(summary["clean_overlap"], 0)
+
+    def test_t6_affine_folds_exact_scale_and_curve(self) -> None:
+        model = build_enhancer(
+            "metricgan_plus_teacher_official_wb",
+            "small",
+            initialize_from_official=False,
+            n_fft=512,
+            hop_length=256,
+            win_length=512,
+        )
+        weight = model.mask_generator.linear2.weight.detach().clone()
+        bias = model.mask_generator.linear2.bias.detach().clone()
+        curve = apply_affine_logit_calibration(
+            model,
+            scale=1.2,
+            coefficients=[-0.1] * 8,
+        )
+        self.assertTrue(
+            torch.allclose(model.mask_generator.linear2.weight, 1.2 * weight)
+        )
+        self.assertTrue(
+            torch.allclose(
+                model.mask_generator.linear2.bias,
+                1.2 * bias + curve,
+                atol=3e-8,
+            )
+        )
 
 
 if __name__ == "__main__":

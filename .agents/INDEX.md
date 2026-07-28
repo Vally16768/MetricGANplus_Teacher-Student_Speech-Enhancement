@@ -20,8 +20,10 @@ This directory is the canonical control plane for the research project.
 | [TEACHER_T3_TODO.md](TEACHER_T3_TODO.md) | Completed T3 dependency board and negative E1/E2 evidence | T3 audit or successor diagnosis |
 | [TEACHER_T4_PLAN.md](TEACHER_T4_PLAN.md) | Executed bounded true-PESQ trust-region successor | T4 audit or successor diagnosis |
 | [TEACHER_T4_TODO.md](TEACHER_T4_TODO.md) | Completed T4 board and negative scalar/micro-step evidence | T4 audit |
-| [TEACHER_T5_PLAN.md](TEACHER_T5_PLAN.md) | Active true-PESQ low-dimensional frequency-curve successor | all T5 work |
-| [TEACHER_T5_TODO.md](TEACHER_T5_TODO.md) | Active T5 dependency board, gates, evidence and next action | start and end of every T5 iteration |
+| [TEACHER_T5_PLAN.md](TEACHER_T5_PLAN.md) | Executed true-PESQ frequency-curve successor | T5 audit |
+| [TEACHER_T5_TODO.md](TEACHER_T5_TODO.md) | Completed T5 board and below-gate evidence | T5 audit |
+| [TEACHER_T6_PLAN.md](TEACHER_T6_PLAN.md) | Active true-PESQ affine-logit successor | all T6 work |
+| [TEACHER_T6_TODO.md](TEACHER_T6_TODO.md) | Active T6 dependency board and exit gates | every T6 iteration |
 
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
@@ -31,13 +33,13 @@ and canonical. S0-WB selected epoch 34/stop 42 and S0-NB selected 41/49.
 T1 failed calibration. T2 then restored exact official parity, but both
 D2-OFFICIAL and D2-RANGE failed scalar/local-direction gates. T3 direct
 perceptual direction passed locally, but every full E1/E2 proposal was harmful.
-T4 found only `+0.002034` from scalar calibration and no gain from PMSQE
-micro-steps. T0 remains selected; T5 now optimizes true PESQ directly in a
-guarded eight-knot frequency curve**.
+T4 found only `+0.002034`; T5 improved this to `+0.005075` but remained below
+the gate and nearly exhausted SI-SDR margin. T0 remains selected; T6 now tests
+guarded affine-logit calibration**.
 
 Open work:
 
-- implement and validate the predeclared T5 true-PESQ frequency-curve search;
+- implement and validate the predeclared T6 affine-logit search;
 - run fit/cal/rank/select in order without reading test;
 - no cache, student or test evaluation may start before teacher promotion;
 - the TTS metric-critic hypothesis remains a separate future campaign.

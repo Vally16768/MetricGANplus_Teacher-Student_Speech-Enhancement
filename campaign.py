@@ -55,6 +55,7 @@ from sebench.t3_training import run_t3_branch  # noqa: E402
 from sebench.t4_calibration import run_t4_logit_bias_scan  # noqa: E402
 from sebench.t4_microstep import run_t4_microstep_backtracking  # noqa: E402
 from sebench.t5_zeroth_order import run_t5_frequency_search  # noqa: E402
+from sebench.t6_affine import run_t6_affine_search  # noqa: E402
 from sebench.teacher_cache import (  # noqa: E402
     TeacherCacheTarget,
     build_multi_target_teacher_cache,
@@ -2677,6 +2678,125 @@ def run_t5_frequency_trial(
     return {"run_root": run_root.as_posix(), **summary}
 
 
+def run_t6_affine_trial(
+    config: dict[str, Any],
+    *,
+    baseline_run_dir: str | Path,
+    t5_run_dir: str | Path,
+    support_run_dir: str | Path,
+    teacher_checkpoint: str | Path,
+    run_id: str,
+    smoke: bool = False,
+) -> dict[str, Any]:
+    dataset_audit = validate_campaign_config(config)
+    git = _git_state()
+    if git["dirty"]:
+        raise RuntimeError("T6 requires a clean committed snapshot.")
+    require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+    device = require_training_cuda(str(config["runtime"]["device"]))
+    run_root = Path(str(config["runtime"]["run_root"])).expanduser().resolve() / run_id
+    provenance_path = run_root / "provenance" / "provenance.json"
+    if not provenance_path.is_file():
+        raise FileNotFoundError("T6 requires a planned run contract.")
+    provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+    if provenance.get("status") != "planned" or provenance.get("git_commit") != git["commit"]:
+        raise ValueError("T6 planned contract does not match the clean commit.")
+    resolved_config = run_root / "provenance" / "config_resolved.yaml"
+    if not resolved_config.is_file() or sha256(resolved_config) != provenance.get("config_sha256"):
+        raise ValueError("T6 run contract config mismatch.")
+    baseline_root = Path(baseline_run_dir).expanduser().resolve()
+    baseline_path = baseline_root / "metrics" / "campaign_summary.json"
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    t5_root = Path(t5_run_dir).expanduser().resolve()
+    t5_path = t5_root / "cells" / "T5-FREQUENCY-CURVE" / "summary.json"
+    t5 = json.loads(t5_path.read_text(encoding="utf-8"))
+    expected_hash = str(config["model"]["teacher_checkpoint_sha256"])
+    if (
+        t5.get("status") != "failed"
+        or bool(t5["gate"]["passed"])
+        or float(t5["val_select_deltas"]["pesq_mean"]) >= 0.01
+        or t5["teacher_checkpoint_sha256"] != expected_hash
+        or baseline["baseline"]["checkpoint_sha256"] != expected_hash
+        or sha256(teacher_checkpoint) != expected_hash
+        or bool(t5.get("test_read"))
+        or bool(baseline.get("test_read"))
+    ):
+        raise ValueError("T6 requires the terminal safe below-threshold T5 result.")
+    support_root = Path(support_run_dir).expanduser().resolve()
+    identities_path = support_root / "support" / "identities.json"
+    source_contract = {
+        "baseline_summary_sha256": sha256(baseline_path),
+        "t5_summary_sha256": sha256(t5_path),
+        "identities_sha256": sha256(identities_path),
+        "teacher_checkpoint_sha256": expected_hash,
+    }
+    provenance.update({
+        "status": "running",
+        "campaign_scope": "t6_true_pesq_affine_logit",
+        "verification_only": bool(smoke),
+        "dataset_audit": dataset_audit,
+        "source_contract": source_contract,
+    })
+    _atomic_json(provenance_path, provenance)
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    torch.use_deterministic_algorithms(True)
+
+    def progress(message: str) -> None:
+        print(f"[T6] {message}", file=sys.stderr, flush=True)
+
+    try:
+        result = run_t6_affine_search(
+            teacher_checkpoint=teacher_checkpoint,
+            identities_path=identities_path,
+            t5_summary_path=t5_path,
+            val_rank_manifest=config["dataset"]["val_rank"],
+            val_select_manifest=config["dataset"]["val_select"],
+            baseline_rank_metrics=baseline["baseline"]["val_rank_metrics"],
+            baseline_select_metrics=baseline["baseline"]["val_select_metrics"],
+            output_dir=run_root / "cells" / "T6-AFFINE-LOGIT",
+            device=device,
+            scales=(0.9, 1.1) if smoke else (0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4),
+            fit_count=2 if smoke else 96,
+            calibration_count=2 if smoke else 96,
+            top_fit=2 if smoke else 5,
+            top_calibration=1 if smoke else 3,
+            max_eval_files=2 if smoke else None,
+            progress_callback=progress,
+        )
+    except BaseException as exc:
+        provenance["status"] = "failed"
+        provenance["failure"] = {"type": exc.__class__.__name__, "message": str(exc), "traceback": traceback.format_exc()}
+        _atomic_json(provenance_path, provenance)
+        _atomic_json(run_root / "status.json", {"status": "failed", "valid_for_promotion": False})
+        raise
+    summary = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "campaign_scope": "t6_true_pesq_affine_logit",
+        "verification_only": bool(smoke),
+        "source_contract": source_contract,
+        "test_read": False,
+        "result": result,
+        "teacher_gate": result["gate"],
+    }
+    _atomic_json(run_root / "metrics" / "campaign_summary.json", summary)
+    provenance["status"] = "verification_complete" if smoke else (
+        "candidate_gate_passed" if result["gate"]["passed"] else "complete_failed_gate"
+    )
+    provenance["result_summary_sha256"] = sha256(run_root / "cells" / "T6-AFFINE-LOGIT" / "summary.json")
+    _atomic_json(provenance_path, provenance)
+    _atomic_json(run_root / "status.json", {
+        "status": provenance["status"],
+        "teacher_gate_passed": bool(result["gate"]["passed"]),
+        "valid_for_promotion": False,
+        "verification_only": bool(smoke),
+        "test_read": False,
+    })
+    return {"run_root": run_root.as_posix(), **summary}
+
+
 def run_all(
     config: dict[str, Any],
     *,
@@ -4619,6 +4739,13 @@ def parse_args() -> argparse.Namespace:
         t5_search.add_argument("--support-run-dir", required=True)
         t5_search.add_argument("--teacher-checkpoint", required=True)
         t5_search.add_argument("--run-id", required=True)
+    for command in ("smoke-t6-affine", "search-t6-affine"):
+        t6_search = subparsers.add_parser(command)
+        t6_search.add_argument("--baseline-run-dir", required=True)
+        t6_search.add_argument("--t5-run-dir", required=True)
+        t6_search.add_argument("--support-run-dir", required=True)
+        t6_search.add_argument("--teacher-checkpoint", required=True)
+        t6_search.add_argument("--run-id", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -5157,6 +5284,17 @@ def main() -> None:
             run_id=args.run_id,
             smoke=args.command == "smoke-t5-frequency",
         )
+    elif args.command in {"smoke-t6-affine", "search-t6-affine"}:
+        config = load_campaign_config(args.config)
+        result = run_t6_affine_trial(
+            config,
+            baseline_run_dir=args.baseline_run_dir,
+            t5_run_dir=args.t5_run_dir,
+            support_run_dir=args.support_run_dir,
+            teacher_checkpoint=args.teacher_checkpoint,
+            run_id=args.run_id,
+            smoke=args.command == "smoke-t6-affine",
+        )
     else:
         config = load_campaign_config(args.config)
     if args.command == "validate":
@@ -5279,6 +5417,8 @@ def main() -> None:
         "train-t4-microstep",
         "smoke-t5-frequency",
         "search-t5-frequency",
+        "smoke-t6-affine",
+        "search-t6-affine",
         "smoke-resume",
         "continue-students",
     }:

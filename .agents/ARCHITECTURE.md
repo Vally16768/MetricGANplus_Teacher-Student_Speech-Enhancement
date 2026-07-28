@@ -309,6 +309,12 @@ support. A disjoint train-only calibration support is read only after complete
 sweeps; `val_rank` selects among T0, the uniform T4-A start and completed
 sweeps; only one candidate reads `val_select`.
 
+T6 expands only the final-layer calibration to
+`scale * original_logit + frequency_curve`. It folds the scale into the
+257-output linear weight/bias and adds one of two frozen T5 curves. A fresh
+train-only 96/96 fit/calibration support filters a fixed seven-scale grid
+before `val_rank` and one-shot `val_select`.
+
 The earlier bounded frozen-proxy branch remains historical negative evidence,
 not the canonical T1 implementation. The alternating branch passed structural
 smoke but failed its clean pilot promotion gate: current-output D calibration
@@ -407,6 +413,11 @@ smoke-t5-frequency / search-t5-frequency
   -> optimize eight bounded frequency knots with true PESQ, no surrogate
   -> hard STOI/SI-SDR constraints at fit/cal/rank/select
   -> ordinary selected checkpoint; never test/cache/students
+smoke-t6-affine / search-t6-affine
+  -> fresh disjoint 96/96 train-only support
+  -> two frozen curves x seven exact final-logit scales
+  -> top-5 calibration, top-3 rank, one selected val_select
+  -> ordinary checkpoint; never test/cache/students
 promote-baseline
   -> accept only an audited/promotable converged S0 closure
   -> preserve corrective true-length evaluation provenance when present
@@ -445,6 +456,7 @@ Evidence:
   `code_and_documentation/sebench/t4_microstep.py`;
 - T5 zeroth-order frequency curve:
   `code_and_documentation/sebench/t5_zeroth_order.py`;
+- T6 affine-logit search: `code_and_documentation/sebench/t6_affine.py`;
 - configuration: `configs/voicebank_campaign.yaml`;
 - post-cleanup GPU smoke:
   `20260727-postcleanup-smoke-wbnb-s0-a5` (six cells, audit zero issues).
