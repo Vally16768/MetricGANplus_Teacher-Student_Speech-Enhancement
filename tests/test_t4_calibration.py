@@ -44,6 +44,7 @@ from sebench.t9_multi_router import (  # noqa: E402
     configure_multi_action_router,
     prepare_t9_support_manifests,
 )
+from sebench.t10_risk_router import prepare_t10_calibration_manifest  # noqa: E402
 
 
 class T4CalibrationTests(unittest.TestCase):
@@ -426,6 +427,53 @@ class T4CalibrationTests(unittest.TestCase):
         self.assertEqual(support["calibration"]["count"], 128)
         self.assertEqual(support["pair_overlap"], 0)
         self.assertEqual(support["clean_overlap"], 0)
+
+    def test_t10_support_is_fresh_audit_partition(self) -> None:
+        records = []
+        for partition, count, offset in (
+            ("train", 4, 0),
+            ("calibration", 4, 100),
+            ("audit", 4, 200),
+        ):
+            for index in range(count):
+                records.append(
+                    {
+                        "partition": partition,
+                        "token": f"{partition}-{index}",
+                        "clean_token": f"clean-{offset + index}",
+                        "noisy": f"/dataset/{partition}-{index}.wav",
+                        "clean": f"/dataset/clean-{offset + index}.wav",
+                    }
+                )
+        t9 = {
+            "support": {
+                "fit": {
+                    "tokens": ["train-0"],
+                    "clean_tokens": ["clean-0"],
+                },
+                "calibration": {
+                    "tokens": ["calibration-0"],
+                    "clean_tokens": ["clean-100"],
+                },
+            }
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            identities = root / "identities.json"
+            identities.write_text(
+                json.dumps({"records": records}),
+                encoding="utf-8",
+            )
+            support = prepare_t10_calibration_manifest(
+                identities,
+                t9,
+                root / "support",
+                calibration_count=4,
+            )
+        self.assertEqual(support["source_partition"], "audit")
+        self.assertEqual(support["count"], 4)
+        self.assertEqual(support["t9_pair_overlap"], 0)
+        self.assertEqual(support["t9_clean_overlap"], 0)
 
 
 if __name__ == "__main__":

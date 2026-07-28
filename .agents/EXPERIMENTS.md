@@ -332,3 +332,10 @@ the T7 action for 75/128 examples and gained `+0.009197` PESQ with STOI
 `-0.000957` and SI-SDR `-0.145724` dB. Its exact oracle ceiling was only
 `+0.014197`, below the predeclared `+0.015` pre-validation gate, so validation
 and test remained unread. T9 is the active four-action routing successor.
+
+`20260728-t9-router-wb-s3003-a1` raised the four-action calibration oracle to
+`+0.031116` PESQ. The PESQ-only router gained up to `+0.022907` but violated
+both auxiliary guards. Its conservative threshold `0.02` retained `+0.017368`
+PESQ and passed STOI (`-0.001773`), while SI-SDR (`-0.279120` dB) missed the
+unchanged limit by `0.029120` dB. It stopped before validation and test. T10
+is the active fresh-support conservative-margin successor.

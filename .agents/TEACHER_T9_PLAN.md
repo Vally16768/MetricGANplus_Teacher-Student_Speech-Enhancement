@@ -1,6 +1,6 @@
 # T9 multi-action adaptive teacher-routing plan
 
-Status: **predeclared — implementation pending**
+Status: **complete negative outcome — auxiliary-risk gate**
 
 ## Cause and hypothesis
 
@@ -64,3 +64,13 @@ final guards. The final teacher gate remains:
 A single pass still requires independent recomputation, three declared support
 seeds, paired bootstrap confidence interval excluding zero, checkpoint/hash
 audit and independent package audit before promotion and shutdown.
+
+## Observed outcome
+
+`20260728-t9-router-wb-s3003-a1` completed 256 fit and 128 fresh calibration
+examples. The four-action oracle gained `+0.031116` PESQ. The PESQ-only learned
+router gained up to `+0.022907`, but lost `0.002732` STOI and `0.450111` dB
+SI-SDR. At threshold `0.02` it retained `+0.017368` PESQ with STOI
+`-0.001773`, but SI-SDR remained `-0.279120` dB. T9 therefore stopped before
+validation and test. T10 freezes the learned regressors and calibrates a more
+conservative margin on fresh train-only support.

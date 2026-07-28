@@ -104,6 +104,14 @@ metric/reference profile matches the run profile
   fit/cal labels, four ridge models, multi-action selection and checkpoint
   round-trip. Its small-support guardrail failure caused the intended stop
   before validation; it is verification-only and test remained unread.
+- T9 production `20260728-t9-router-wb-s3003-a1` completed 256/128 labels,
+  four ridge models and checkpoint round-trip. Oracle gain was `+0.031116`;
+  no learned threshold met both auxiliary guards, so validation/test remained
+  unread.
+- T10 implementation: 95/95 unit/integration tests pass, including fresh
+  T3-audit support separation and inherited exact router/checkpoint behavior.
+  Campaign split validation and project guard pass; clean CUDA smoke remains
+  pending.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

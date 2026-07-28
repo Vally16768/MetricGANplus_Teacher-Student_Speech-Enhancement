@@ -28,8 +28,10 @@ This directory is the canonical control plane for the research project.
 | [TEACHER_T7_TODO.md](TEACHER_T7_TODO.md) | Completed T7 board and below-gate evidence | T7 audit |
 | [TEACHER_T8_PLAN.md](TEACHER_T8_PLAN.md) | Executed train-only single-action adaptive-routing successor | T8 audit |
 | [TEACHER_T8_TODO.md](TEACHER_T8_TODO.md) | Completed T8 board and oracle-ceiling evidence | T8 audit |
-| [TEACHER_T9_PLAN.md](TEACHER_T9_PLAN.md) | Active train-only multi-action adaptive-routing successor | all T9 work |
-| [TEACHER_T9_TODO.md](TEACHER_T9_TODO.md) | Active T9 dependency board and exit gates | every T9 iteration |
+| [TEACHER_T9_PLAN.md](TEACHER_T9_PLAN.md) | Executed train-only multi-action adaptive-routing successor | T9 audit |
+| [TEACHER_T9_TODO.md](TEACHER_T9_TODO.md) | Completed T9 board and auxiliary-risk evidence | T9 audit |
+| [TEACHER_T10_PLAN.md](TEACHER_T10_PLAN.md) | Active conservative-risk margin-calibration successor | all T10 work |
+| [TEACHER_T10_TODO.md](TEACHER_T10_TODO.md) | Active T10 dependency board and exit gates | every T10 iteration |
 
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
@@ -42,12 +44,14 @@ perceptual direction passed locally, but every full E1/E2 proposal was harmful.
 T4 found only `+0.002034`; T5 improved this to `+0.005075` but remained below
 the gate and nearly exhausted SI-SDR margin. T6 selected exact T5. T7 gained
 only `+0.004931`. T8 learned a safe `+0.009197` calibration router, but its
-single-action oracle ceiling was only `+0.014197`, below its frozen gate. T0
-remains selected; T9 now tests train-only multi-action routing**.
+single-action oracle ceiling was only `+0.014197`. T9 raised the oracle to
+`+0.031116`, but its PESQ-only decisions over-consumed SI-SDR; threshold
+`0.02` retained `+0.017368` PESQ and missed SI-SDR by `0.029120` dB. T0
+remains selected; T10 now calibrates conservative risk on fresh support**.
 
 Open work:
 
-- implement and validate the predeclared T9 multi-action router;
-- run fit/fresh-calibration/rank/select in order without reading test;
+- implement and validate the predeclared T10 risk-margin calibration;
+- run fresh-calibration/rank/select in order without reading test;
 - no cache, student or test evaluation may start before teacher promotion;
 - the TTS metric-critic hypothesis remains a separate future campaign.

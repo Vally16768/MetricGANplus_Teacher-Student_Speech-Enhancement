@@ -66,7 +66,8 @@ Update this register whenever a gate changes state.
 | C59 | Execute T6 affine-logit true-PESQ search | exact T5 selected; PESQ `+0.005075`, below gate | failed |
 | C60 | Execute T7 confidence-conditioned true-PESQ search | safe `+0.004931` PESQ but below gate; SI-SDR near limit | failed |
 | C61 | Execute T8 adaptive teacher routing | learned `+0.009197`; oracle `+0.014197` missed frozen `+0.015`; validation/test unread | failed |
-| C62 | Execute T9 multi-action teacher routing | four confidence actions plus exact T0; fresh calibration and unchanged final teacher gate | in-progress |
+| C62 | Execute T9 multi-action teacher routing | oracle `+0.031116`; PESQ-only decisions violated auxiliary guards; validation/test unread | failed |
+| C63 | Execute T10 conservative-risk routing | frozen T9 regressors, fresh audit-partition calibration and unchanged final gate | in-progress |
 
 ## Execution rule
 
