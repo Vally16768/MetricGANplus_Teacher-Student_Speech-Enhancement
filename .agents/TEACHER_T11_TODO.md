@@ -1,8 +1,8 @@
 # T11 teacher-improvement TODO
 
-Status: **in progress — clean CUDA smoke**
+Status: **in progress — production fresh calibration**
 Last update: **2026-07-28**
-Next action: **commit validated snapshot and run clean CUDA smoke**
+Next action: **commit smoke evidence and run the 72-example T11 search**
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
@@ -11,8 +11,8 @@ Next action: **commit validated snapshot and run clean CUDA smoke**
 | T11.0.3 | Predeclare penalty/margin grid and gate | `.agents/TEACHER_T11_PLAN.md` | passed |
 | T11.1.1 | Implement penalized deployable router | bias-folded penalty; no clean inference input | passed |
 | T11.1.2 | Add support/policy/round-trip tests | penalty immutability plus inherited exact round-trip | passed |
-| T11.1.3 | Run suite, guard and CUDA smoke | 96/96, campaign validation and guard pass; smoke pending | in-progress |
-| T11.2.1 | Run fresh 72-example calibration | stop before validation on failure | blocked |
+| T11.1.3 | Run suite, guard and CUDA smoke | 96/96; guard; `20260728-t11-router-smoke-wb-s3003-a1` | passed |
+| T11.2.1 | Run fresh 72-example calibration | stop before validation on failure | in-progress |
 | T11.2.2 | Evaluate rank/select conditionally | no test | blocked |
 | T11.2.3 | Apply final teacher gate | unchanged | blocked |
 | T11.2.4 | Independently confirm/promote/shutdown | multi-seed + bootstrap + audit | blocked |
@@ -26,3 +26,4 @@ Next action: **commit validated snapshot and run clean CUDA smoke**
 | 2026-07-28 | Implemented T11 support/search/CLI | frozen ridges, bias-folded penalty, fresh remaining audit support | complete validation |
 | 2026-07-28 | Passed complete unit/integration suite | 96/96 tests | refresh hashes and guard |
 | 2026-07-28 | Passed split/configuration and project guard | zero issues | commit and CUDA smoke |
+| 2026-07-28 | Completed clean CUDA smoke | 10-row fresh support, 25 policies, checkpoint and intended prevalidation stop | production 72-row search |

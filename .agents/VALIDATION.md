@@ -122,6 +122,10 @@ metric/reference profile matches the run profile
 - T11 implementation: 96/96 unit/integration tests pass, including immutable
   strength-penalty folding and inherited router/checkpoint behavior. Campaign
   validation and project guard pass; clean CUDA smoke remains pending.
+- T11 clean CUDA smoke `20260728-t11-router-smoke-wb-s3003-a1` completed fresh
+  support, all 25 penalty/margin policies and checkpoint round-trip. The
+  small-support PESQ gate caused the intended stop before validation; test was
+  unread.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend
