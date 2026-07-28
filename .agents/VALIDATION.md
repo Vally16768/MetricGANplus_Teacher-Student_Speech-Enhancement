@@ -212,6 +212,10 @@ metric/reference profile matches the run profile
   uniform-curve/scalar equivalence, coefficient bounds and pair/clean-disjoint
   train-only fit/calibration manifests. Research-plan/campaign validation,
   architecture hashes, project guard and diff check pass.
+- Clean contracted T5 smoke `20260728-t5-frequency-smoke-wb-s3003-a1`
+  completed fit-only coordinate selection, disjoint calibration, rank
+  rejection and T0 fallback on CUDA. It is explicitly two-file,
+  `production_support=false`, `verification_only=true` and `test_read=false`.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.

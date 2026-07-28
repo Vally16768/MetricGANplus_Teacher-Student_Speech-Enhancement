@@ -3,7 +3,7 @@
 Status: **in progress — predeclared method and implementation**
 Last update: **2026-07-28**
 Current phase: **T5.1 implementation and validation**
-Next action: **commit the validated T5 snapshot and run contracted CUDA smoke**
+Next action: **commit smoke evidence and execute the full contracted T5 search**
 
 Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 `not-applicable`.
@@ -26,7 +26,7 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | T5.1.2 | Implement deterministic coordinate search | true PESQ; fit-only coordinate decisions; sweep calibration | passed |
 | T5.1.3 | Add unit/provenance/split tests | curve bounds/equivalence/disjoint roles | passed |
 | T5.1.4 | Run full tests, validators and guard | 87/87; plan/campaign valid; guard/diff pass | passed |
-| T5.1.5 | Run clean contracted CUDA smoke | nonpromotable two-file path | pending |
+| T5.1.5 | Run clean contracted CUDA smoke | `...t5-frequency-smoke...a1`; fit/cal/rank/select complete; nonpromotable | passed |
 
 ## T5.2 — Scientific run and exit
 
@@ -47,3 +47,4 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | 2026-07-28 | Predeclared eight-knot zeroth-order search | separated 96/96 train support; three fixed coordinate steps; hard quality guards | implement and test |
 | 2026-07-28 | Implemented T5 fit/cal/rank/select flow | eight-knot ordinary checkpoint, fit-only coordinate decisions, disjoint support and one-shot select | complete validation |
 | 2026-07-28 | Passed complete T5 pre-run validation | 87/87 tests; real campaign/research plan; architecture hashes; guard zero issues | clean commit and CUDA smoke |
+| 2026-07-28 | Passed clean contracted T5 CUDA smoke | two-file fit/cal/rank/select; rank rejected fit-only gain; verification-only; no test | full 96/96 search |
