@@ -53,6 +53,7 @@ from sebench.t3_support import (  # noqa: E402
 )
 from sebench.t3_training import run_t3_branch  # noqa: E402
 from sebench.t4_calibration import run_t4_logit_bias_scan  # noqa: E402
+from sebench.t4_microstep import run_t4_microstep_backtracking  # noqa: E402
 from sebench.teacher_cache import (  # noqa: E402
     TeacherCacheTarget,
     build_multi_target_teacher_cache,
@@ -2354,6 +2355,175 @@ def run_t4_calibration(
     return {"run_root": run_root.as_posix(), **summary}
 
 
+def run_t4_microstep_trial(
+    config: dict[str, Any],
+    *,
+    baseline_run_dir: str | Path,
+    t4a_run_dir: str | Path,
+    support_run_dir: str | Path,
+    teacher_checkpoint: str | Path,
+    teacher_cache_manifest: str | Path,
+    run_id: str,
+    smoke: bool = False,
+    resume: bool = False,
+) -> dict[str, Any]:
+    """Run T4-B PMSQE-primary micro-steps; never read test or train students."""
+    dataset_audit = validate_campaign_config(config)
+    git = _git_state()
+    if git["dirty"]:
+        raise RuntimeError("T4-B requires a clean committed snapshot.")
+    require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+    device = require_training_cuda(str(config["runtime"]["device"]))
+    run_root = (
+        Path(str(config["runtime"]["run_root"])).expanduser().resolve() / run_id
+    )
+    provenance_path = run_root / "provenance" / "provenance.json"
+    if not provenance_path.is_file():
+        raise FileNotFoundError("T4-B requires a planned run contract.")
+    provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+    if resume:
+        if (
+            provenance.get("campaign_scope") != "t4_pmsqe_microstep_backtracking"
+            or provenance.get("status") not in {"running", "failed"}
+        ):
+            raise ValueError("T4-B resume provenance is not resumable.")
+    elif provenance.get("status") != "planned":
+        raise ValueError("T4-B new run must adopt a planned contract.")
+    if provenance.get("git_commit") != git["commit"]:
+        raise ValueError("T4-B run contract commit mismatch.")
+    resolved_config = run_root / "provenance" / "config_resolved.yaml"
+    if (
+        not resolved_config.is_file()
+        or sha256(resolved_config) != provenance.get("config_sha256")
+    ):
+        raise ValueError("T4-B run contract config mismatch.")
+    baseline_root = Path(baseline_run_dir).expanduser().resolve()
+    baseline_path = baseline_root / "metrics" / "campaign_summary.json"
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    t4a_root = Path(t4a_run_dir).expanduser().resolve()
+    t4a_path = t4a_root / "cells" / "T4-A-LOGIT-BIAS" / "summary.json"
+    t4a = json.loads(t4a_path.read_text(encoding="utf-8"))
+    if (
+        t4a.get("status") != "failed"
+        or bool(t4a["gate"]["passed"])
+        or not bool(t4a["gate"]["checks"]["stoi_drop_at_most_0_002"])
+        or not bool(t4a["gate"]["checks"]["sisdr_drop_at_most_0_25"])
+        or float(t4a["val_select_deltas"]["pesq_mean"]) >= 0.01
+    ):
+        raise ValueError("T4-B requires a safe but below-threshold T4-A result.")
+    expected_hash = str(config["model"]["teacher_checkpoint_sha256"])
+    if (
+        sha256(teacher_checkpoint) != expected_hash
+        or baseline["baseline"]["checkpoint_sha256"] != expected_hash
+        or t4a["teacher_checkpoint_sha256"] != expected_hash
+    ):
+        raise ValueError("T4-B baseline teacher identity mismatch.")
+    if bool(baseline.get("test_read")) or bool(t4a.get("test_read")):
+        raise ValueError("T4-B sources must not read test.")
+    support_root = Path(support_run_dir).expanduser().resolve()
+    identities_path = support_root / "support" / "identities.json"
+    weights_path = support_root / "support" / "weights.json"
+    source_contract = {
+        "baseline_run_id": baseline_root.name,
+        "baseline_summary_sha256": sha256(baseline_path),
+        "t4a_run_id": t4a_root.name,
+        "t4a_summary_sha256": sha256(t4a_path),
+        "support_run_id": support_root.name,
+        "identities_sha256": sha256(identities_path),
+        "weights_sha256": sha256(weights_path),
+        "teacher_checkpoint_sha256": expected_hash,
+        "teacher_cache_manifest_sha256": sha256(teacher_cache_manifest),
+    }
+    if resume and provenance.get("source_contract") != source_contract:
+        raise ValueError("T4-B resume source contract mismatch.")
+    provenance.update(
+        {
+            "status": "running",
+            "campaign_scope": "t4_pmsqe_microstep_backtracking",
+            "verification_only": bool(smoke),
+            "dataset_audit": dataset_audit,
+            "source_contract": source_contract,
+        }
+    )
+    _atomic_json(provenance_path, provenance)
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    torch.use_deterministic_algorithms(True)
+
+    def progress(message: str) -> None:
+        print(f"[T4-B] {message}", file=sys.stderr, flush=True)
+
+    try:
+        result = run_t4_microstep_backtracking(
+            teacher_checkpoint=teacher_checkpoint,
+            teacher_cache_manifest=teacher_cache_manifest,
+            identities_path=identities_path,
+            weights_path=weights_path,
+            val_rank_manifest=config["dataset"]["val_rank"],
+            val_select_manifest=config["dataset"]["val_select"],
+            baseline_rank_metrics=baseline["baseline"]["val_rank_metrics"],
+            baseline_select_metrics=baseline["baseline"]["val_select_metrics"],
+            output_dir=run_root / "cells" / "T4-B-MICROSTEP",
+            device=device,
+            seed=int(config["training"]["t3_direction_seed"]),
+            horizons=(1,) if smoke else (1, 4, 16, 64, 256),
+            alphas=(1.0, 0.5) if smoke else (1.0, 0.5, 0.25, 0.125, 0.0625),
+            max_eval_files=2 if smoke else None,
+            resume=True,
+            progress_callback=progress,
+        )
+    except BaseException as exc:
+        provenance["status"] = "failed"
+        provenance["failure"] = {
+            "type": exc.__class__.__name__,
+            "message": str(exc),
+            "traceback": traceback.format_exc(),
+        }
+        _atomic_json(provenance_path, provenance)
+        _atomic_json(
+            run_root / "status.json",
+            {"status": "failed", "valid_for_promotion": False},
+        )
+        raise
+    summary = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "campaign_scope": "t4_pmsqe_microstep_backtracking",
+        "verification_only": bool(smoke),
+        "source_contract": source_contract,
+        "test_read": False,
+        "result": result,
+        "teacher_gate": result["gate"],
+    }
+    _atomic_json(run_root / "metrics" / "campaign_summary.json", summary)
+    provenance["status"] = (
+        "verification_complete"
+        if smoke
+        else (
+            "candidate_gate_passed"
+            if result["gate"]["passed"]
+            else "complete_failed_gate"
+        )
+    )
+    provenance["result_summary_sha256"] = sha256(
+        run_root / "cells" / "T4-B-MICROSTEP" / "summary.json"
+    )
+    _atomic_json(provenance_path, provenance)
+    _atomic_json(
+        run_root / "status.json",
+        {
+            "status": provenance["status"],
+            "campaign_scope": "t4_pmsqe_microstep_backtracking",
+            "teacher_gate_passed": bool(result["gate"]["passed"]),
+            "valid_for_promotion": False,
+            "verification_only": bool(smoke),
+            "test_read": False,
+        },
+    )
+    return {"run_root": run_root.as_posix(), **summary}
+
+
 def run_all(
     config: dict[str, Any],
     *,
@@ -4279,6 +4449,16 @@ def parse_args() -> argparse.Namespace:
     t4_scan.add_argument("--baseline-run-dir", required=True)
     t4_scan.add_argument("--teacher-checkpoint", required=True)
     t4_scan.add_argument("--run-id", required=True)
+    for command in ("smoke-t4-microstep", "train-t4-microstep"):
+        t4_micro = subparsers.add_parser(command)
+        t4_micro.add_argument("--baseline-run-dir", required=True)
+        t4_micro.add_argument("--t4a-run-dir", required=True)
+        t4_micro.add_argument("--support-run-dir", required=True)
+        t4_micro.add_argument("--teacher-checkpoint", required=True)
+        t4_micro.add_argument("--teacher-cache-manifest", required=True)
+        t4_micro.add_argument("--run-id", required=True)
+        if command == "train-t4-microstep":
+            t4_micro.add_argument("--resume", action="store_true")
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -4793,6 +4973,19 @@ def main() -> None:
             teacher_checkpoint=args.teacher_checkpoint,
             run_id=args.run_id,
         )
+    elif args.command in {"smoke-t4-microstep", "train-t4-microstep"}:
+        config = load_campaign_config(args.config)
+        result = run_t4_microstep_trial(
+            config,
+            baseline_run_dir=args.baseline_run_dir,
+            t4a_run_dir=args.t4a_run_dir,
+            support_run_dir=args.support_run_dir,
+            teacher_checkpoint=args.teacher_checkpoint,
+            teacher_cache_manifest=args.teacher_cache_manifest,
+            run_id=args.run_id,
+            smoke=args.command == "smoke-t4-microstep",
+            resume=bool(getattr(args, "resume", False)),
+        )
     else:
         config = load_campaign_config(args.config)
     if args.command == "validate":
@@ -4911,6 +5104,8 @@ def main() -> None:
         "smoke-t3-teacher",
         "train-t3-teacher",
         "scan-t4-logit-bias",
+        "smoke-t4-microstep",
+        "train-t4-microstep",
         "smoke-resume",
         "continue-students",
     }:

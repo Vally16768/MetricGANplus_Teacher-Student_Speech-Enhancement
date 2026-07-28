@@ -1,9 +1,9 @@
 # T4 teacher-improvement TODO
 
-Status: **in progress — T4-A clean snapshot preparation**
+Status: **in progress — T4-B implementation and validation**
 Last update: **2026-07-28**
-Current phase: **T4.1 bounded scalar calibration**
-Next action: **commit the tested snapshot and create the immutable T4-A run contract**
+Current phase: **T4.2 conditional micro-step backtracking**
+Next action: **commit T4-B and run its clean contracted CUDA smoke**
 
 This board executes `TEACHER_T4_PLAN.md`. T0 remains the selected teacher; T1,
 T2 and T3 remain immutable negative evidence.
@@ -27,19 +27,19 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | T4.1.1 | Implement bounded bias folding | ordinary checkpoint; no runtime wrapper; `+/-0.10` bound | passed |
 | T4.1.2 | Add focused equivalence and bound tests | folded bias equals official mask-logit variant | passed |
 | T4.1.3 | Run full tests, validators and project guard | 83/83; plan/campaign valid; guard and diff check pass | passed |
-| T4.1.4 | Create immutable run contract | exact commit/config/T0/T3 baseline ancestry | pending |
-| T4.1.5 | Scan fixed grid on true `val_rank` | ten predeclared deltas; WB PESQ/STOI/SI-SDR | pending |
-| T4.1.6 | Evaluate one selected candidate on `val_select` | no test read; one-shot gate | pending |
-| T4.1.7 | Independently re-evaluate/audit a passed candidate | exact checkpoint/hash/support and metric reconciliation | blocked |
+| T4.1.4 | Create immutable run contract | commit `e58f8b1`; contract validation passed | passed |
+| T4.1.5 | Scan fixed grid on true `val_rank` | `...t4-logit-bias...a1`; selected `-0.10`; all ten complete | passed |
+| T4.1.6 | Evaluate one selected candidate on `val_select` | PESQ `+0.002034`; STOI `-0.000467`; SI-SDR `-0.161412`; no test | failed |
+| T4.1.7 | Independently re-evaluate/audit a passed candidate | gate did not pass; no promotion audit applicable | not-applicable |
 
 ## T4.2 — Conditional micro-step backtracking
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
-| T4.2.1 | Confirm T4-B eligibility | T4-A safe but gain below `+0.01` | pending |
-| T4.2.2 | Implement exact micro-step/resume trajectory | horizons `1,4,16,64,256`; exact T0 restart | pending |
-| T4.2.3 | Implement checkpoint interpolation line search | alpha `1,.5,.25,.125,.0625`; true `val_rank` gate | pending |
-| T4.2.4 | Run focused/full tests and CUDA smoke | finite direction, rollback and reproducibility | pending |
+| T4.2.1 | Confirm T4-B eligibility | T4-A passed both guardrails but gained only `+0.002034` PESQ | passed |
+| T4.2.2 | Implement exact micro-step/resume trajectory | horizons `1,4,16,64,256`; each incomplete horizon restarts exact T0 | passed |
+| T4.2.3 | Implement checkpoint interpolation line search | alpha `1,.5,.25,.125,.0625`; true `val_rank` gate | passed |
+| T4.2.4 | Run focused/full tests and CUDA smoke | 85/85 and validators pass; clean CUDA smoke pending | in-progress |
 | T4.2.5 | Run contracted T4-B pilot | stop at first unsafe horizon; no full harmful epoch | pending |
 | T4.2.6 | Apply one-shot `val_select` gate and audit | gain `>=.01`; STOI/SI-SDR guards; no test | pending |
 
@@ -59,3 +59,5 @@ Allowed states: `pending`, `in-progress`, `blocked`, `passed`, `failed`,
 | 2026-07-28 | Opened T4 after terminal T3 rollback result | T3 A2 selected exact T0 for E1/E2; no teacher improvement | implement T4-A |
 | 2026-07-28 | Implemented bounded scalar checkpoint calibration | fixed ten-delta grid; true WB rank/select separation; focused equivalence/bound tests pass | full validation and clean commit |
 | 2026-07-28 | Passed complete pre-run validation | 83/83 tests; research plan and real campaign validation pass; project guard zero issues | commit and create run contract |
+| 2026-07-28 | Closed T4-A below the promotion threshold | selected `-0.10`; `val_select` PESQ `+0.002034`; both quality guardrails pass; test unread | activate T4-B |
+| 2026-07-28 | Implemented deterministic T4-B micro-step/backtracking | exact T0 per horizon; atomic horizon resume; ordinary checkpoints; 85/85 tests and validators pass | clean commit and CUDA smoke |

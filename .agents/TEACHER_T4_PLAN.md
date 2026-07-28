@@ -34,8 +34,12 @@ STOI loss at most `0.002` and SI-SDR loss at most `0.25 dB`.
 Run only if T4-A is safe but below the teacher threshold.
 
 1. Start each trajectory from exact T0.
-2. Use E2-PMSQE as the primary direction with MR-STFT/SI-SDR as constraints,
-   not as the dominant accumulated epoch loss.
+2. Use E2-PMSQE as the primary direction. Scale the frozen
+   MR-STFT/SI-SDR/T0-anchor component by `0.10`, retain the frozen PMSQE weight
+   unchanged, use Adam at `1e-6`, batch size one and 32,000-sample cached
+   train segments. At T0 this makes the calibrated PMSQE contribution slightly
+   larger than the constrained supervised contribution without removing the
+   latter.
 3. Create checkpoints after `1, 4, 16, 64, 256` optimizer steps.
 4. For every checkpoint, line-search interpolation coefficients
    `[1, 0.5, 0.25, 0.125, 0.0625]` between T0 and the proposal.
@@ -46,6 +50,14 @@ Run only if T4-A is safe but below the teacher threshold.
 
 If T4-B also fails, diagnose gradient conflict explicitly and predeclare a
 constrained-gradient T5; do not relax the +0.01 promotion gate.
+
+## T4-A observed outcome
+
+Run `20260728-t4-logit-bias-wb-s3003-a1` selected `delta=-0.10`. On
+`val_select`, PESQ-WB changed by `+0.002034`, STOI by `-0.000467` and SI-SDR
+by `-0.161412` dB. Both guardrails passed but the PESQ gain missed `+0.01`.
+T4-A is therefore safe negative evidence and activates T4-B; it is not a
+promoted teacher.
 
 ## Exit and downstream rules
 

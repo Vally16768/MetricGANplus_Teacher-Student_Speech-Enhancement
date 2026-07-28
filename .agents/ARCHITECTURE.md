@@ -295,6 +295,13 @@ true PESQ-WB on `val_rank`, rejects STOI/SI-SDR violations, and reads
 `val_select` only for the single selected delta. The ordinary checkpoint is
 therefore offline-loadable without a runtime wrapper.
 
+T4-B restarts each declared micro-step horizon from exact T0. Its
+PMSQE-primary objective retains the frozen PMSQE coefficient and scales the
+MR-STFT/SI-SDR/T0-anchor constraint block by `0.10`. Each horizon produces an
+ordinary checkpoint; interpolation back toward T0 at the frozen alpha grid
+implements the trust-region line search. True WB `val_rank` selects at most
+one candidate and only that candidate reads `val_select`.
+
 The earlier bounded frozen-proxy branch remains historical negative evidence,
 not the canonical T1 implementation. The alternating branch passed structural
 smoke but failed its clean pilot promotion gate: current-output D calibration
@@ -383,6 +390,11 @@ scan-t4-logit-bias
   -> true-WB val_rank scan of bounded uniform mask-logit bias
   -> one selected val_select evaluation and unchanged teacher gate
   -> never read test or train students
+smoke-t4-microstep / train-t4-microstep
+  -> exact T0 restart at each bounded train-step horizon
+  -> PMSQE-primary update with supervised/anchor constraints
+  -> checkpoint interpolation and true-WB val_rank backtracking
+  -> one selected val_select evaluation; never test/cache/students
 promote-baseline
   -> accept only an audited/promotable converged S0 closure
   -> preserve corrective true-length evaluation provenance when present
@@ -417,6 +429,8 @@ Evidence:
 - teacher cache: `code_and_documentation/sebench/teacher_cache.py`;
 - matched T3 pilot: `code_and_documentation/sebench/t3_training.py`;
 - T4 bounded calibration: `code_and_documentation/sebench/t4_calibration.py`;
+- T4 micro-step backtracking:
+  `code_and_documentation/sebench/t4_microstep.py`;
 - configuration: `configs/voicebank_campaign.yaml`;
 - post-cleanup GPU smoke:
   `20260727-postcleanup-smoke-wbnb-s0-a5` (six cells, audit zero issues).

@@ -287,5 +287,15 @@ discussion.
 | `20260728-t3-e1-e2-contract-smoke-a2` | corrected CUDA flow passed | clean planned contract adopted; deterministic E1/E2 updates and E2 current-direction recheck passed | no, two-file smoke |
 | `20260728-t3-e1-e2-full-s3003-a2` | complete negative outcome | E1/E2 each rolled back at `1e-6`, `5e-7`, `2.5e-7`; selected checkpoints equal T0 and `val_select` gain is zero | no |
 
-T3 is closed. The next evidence-producing run is T4-A bounded mask-logit
-calibration. Test, teacher cache regeneration and students remain blocked.
+T3 is closed. T4-A is recorded below and T4-B is the active successor. Test,
+teacher cache regeneration and students remain blocked.
+
+### T4 bounded trust region
+
+`20260728-t4-logit-bias-wb-s3003-a1` evaluated the exact ten-value scalar
+mask-logit grid on `val_rank`, selected `-0.10`, then evaluated only that
+checkpoint on `val_select`. PESQ-WB improved by `+0.002034`, while STOI and
+SI-SDR changed by `-0.000467` and `-0.161412` dB. Both guardrails passed, but
+the PESQ gain was below `+0.01`; the checkpoint is not promoted. This safe,
+below-threshold outcome activates the predeclared T4-B micro-step
+backtracking trial.

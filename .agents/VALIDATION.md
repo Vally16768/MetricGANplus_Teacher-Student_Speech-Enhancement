@@ -190,6 +190,14 @@ metric/reference profile matches the run profile
 - T4-A pre-run validation passes `83/83` repository tests, the canonical
   research-plan validator, the real `campaign.py validate` entry point,
   architecture-source hash reconciliation, project guard and diff check.
+- Contracted T4-A run `20260728-t4-logit-bias-wb-s3003-a1` completed all ten
+  `val_rank` candidates and one selected `val_select` evaluation. Its artifact
+  hashes reconcile, `test_read=false`, both guardrails pass and the
+  `+0.002034` PESQ gain correctly fails the unchanged `+0.01` gate.
+- T4-B implementation validation passes `85/85` tests. Coverage includes the
+  exact bounded state interpolation and the declared PMSQE-primary constrained
+  loss composition. Research-plan/campaign validation, architecture hashes,
+  project guard and diff check pass before the clean CUDA smoke.
 - `campaign.py --help`: passed in the shared project environment.
 - safe I/O config: passed.
 - output-under-dataset guard: blocked as expected.
