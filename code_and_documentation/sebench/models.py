@@ -1095,6 +1095,7 @@ def build_metricgan_standalone(
     multi_router_weights: list[list[float]] | tuple[tuple[float, ...], ...] | None = None,
     multi_router_biases: list[float] | tuple[float, ...] | None = None,
     multi_router_threshold: float = 0.0,
+    multi_router_feature_transform: str = "identity",
 ) -> MetricGANLikeEnhancer:
     if variant == "small":
         hidden_size = 200
@@ -1137,6 +1138,7 @@ def build_metricgan_standalone(
         multi_router_weights=multi_router_weights,
         multi_router_biases=multi_router_biases,
         multi_router_threshold=multi_router_threshold,
+        multi_router_feature_transform=multi_router_feature_transform,
     )
 
 
@@ -1229,6 +1231,7 @@ def build_model(
     multi_router_weights: list[list[float]] | tuple[tuple[float, ...], ...] | None = None,
     multi_router_biases: list[float] | tuple[float, ...] | None = None,
     multi_router_threshold: float = 0.0,
+    multi_router_feature_transform: str = "identity",
 ) -> nn.Module:
     if variant not in MODEL_VARIANTS:
         raise ValueError(f"Unsupported model variant: {variant}")
@@ -1302,6 +1305,7 @@ def build_model(
             multi_router_weights=multi_router_weights,
             multi_router_biases=multi_router_biases,
             multi_router_threshold=multi_router_threshold,
+            multi_router_feature_transform=multi_router_feature_transform,
         )
     if model_family == "metricgan_plus_native8k":
         if spectral_native_gate:
@@ -1384,6 +1388,7 @@ def build_enhancer(
     multi_router_weights: list[list[float]] | tuple[tuple[float, ...], ...] | None = None,
     multi_router_biases: list[float] | tuple[float, ...] | None = None,
     multi_router_threshold: float = 0.0,
+    multi_router_feature_transform: str = "identity",
 ) -> nn.Module:
     base_model = build_model(
         model_family,
@@ -1417,6 +1422,7 @@ def build_enhancer(
         multi_router_weights=multi_router_weights,
         multi_router_biases=multi_router_biases,
         multi_router_threshold=multi_router_threshold,
+        multi_router_feature_transform=multi_router_feature_transform,
     )
     postfilter_config = resolve_postfilter_config(postfilter_mode, postfilter_preset)
     if not postfilter_config.enabled:

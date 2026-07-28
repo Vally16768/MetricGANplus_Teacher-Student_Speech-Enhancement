@@ -150,6 +150,10 @@ metric/reference profile matches the run profile
   PESQ. Both auxiliary guards passed and test remained unread.
 - T14 implementation full suite `99/99` and VoiceBank campaign split
   validation pass; architecture hashes and project guard pass; smoke remains.
+- T14 first smoke `20260728-t14-router-smoke-wb-s3003-a1` stopped safely at
+  checkpoint reload because intermediate constructors omitted the saved
+  transform. No select/test read occurred. Constructor forwarding and a real
+  quadratic package round-trip regression are now fixed; full suite `99/99`.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

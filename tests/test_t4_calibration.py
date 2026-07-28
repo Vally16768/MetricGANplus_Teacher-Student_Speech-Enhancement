@@ -582,6 +582,22 @@ class T4CalibrationTests(unittest.TestCase):
         features = [torch.ones(2, 16) * 3.0 for _ in range(4)]
         scores = model.multi_router_scores(features)
         self.assertTrue(torch.equal(scores, torch.full((2, 4), 9.0)))
+        with tempfile.TemporaryDirectory() as temporary:
+            checkpoint = Path(temporary) / "quadratic.pt"
+            save_checkpoint_package(
+                checkpoint,
+                model,
+                model_family="metricgan_plus_teacher_official_wb",
+                variant="small",
+            )
+            restored, package = load_model_from_checkpoint(checkpoint)
+        self.assertEqual(restored.multi_router_feature_transform, "quadratic")
+        self.assertEqual(
+            package["model_config"]["multi_router_feature_transform"],
+            "quadratic",
+        )
+        restored_scores = restored.multi_router_scores(features)
+        self.assertTrue(torch.equal(restored_scores, scores))
 
 
 if __name__ == "__main__":
