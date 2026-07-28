@@ -85,6 +85,11 @@ metric/reference profile matches the run profile
 - T7 clean CUDA smoke `20260728-t7-confidence-smoke-wb-s3003-a1` completed
   fit/cal/rank/select, T0 fallback and checkpoint round-trip; verification-only,
   two-file support and no test read.
+- T7 production `20260728-t7-confidence-wb-s3003-a1` completed with checkpoint
+  round-trip and no test read; `+0.004931` PESQ missed the teacher gate.
+- T8 implementation: 92/92 unit/integration tests passed, including ridge
+  recovery, exact T0/T7 routing and portable checkpoint round-trip; campaign
+  split validation and project guard passed.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

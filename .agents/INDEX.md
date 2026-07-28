@@ -24,8 +24,10 @@ This directory is the canonical control plane for the research project.
 | [TEACHER_T5_TODO.md](TEACHER_T5_TODO.md) | Completed T5 board and below-gate evidence | T5 audit |
 | [TEACHER_T6_PLAN.md](TEACHER_T6_PLAN.md) | Executed affine-logit successor | T6 audit |
 | [TEACHER_T6_TODO.md](TEACHER_T6_TODO.md) | Completed T6 board and below-gate evidence | T6 audit |
-| [TEACHER_T7_PLAN.md](TEACHER_T7_PLAN.md) | Active confidence-conditioned true-PESQ successor | all T7 work |
-| [TEACHER_T7_TODO.md](TEACHER_T7_TODO.md) | Active T7 dependency board and exit gates | every T7 iteration |
+| [TEACHER_T7_PLAN.md](TEACHER_T7_PLAN.md) | Executed confidence-conditioned successor | T7 audit |
+| [TEACHER_T7_TODO.md](TEACHER_T7_TODO.md) | Completed T7 board and below-gate evidence | T7 audit |
+| [TEACHER_T8_PLAN.md](TEACHER_T8_PLAN.md) | Active train-only adaptive-routing successor | all T8 work |
+| [TEACHER_T8_TODO.md](TEACHER_T8_TODO.md) | Active T8 dependency board and exit gates | every T8 iteration |
 
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
@@ -37,12 +39,13 @@ D2-OFFICIAL and D2-RANGE failed scalar/local-direction gates. T3 direct
 perceptual direction passed locally, but every full E1/E2 proposal was harmful.
 T4 found only `+0.002034`; T5 improved this to `+0.005075` but remained below
 the gate and nearly exhausted SI-SDR margin. T6 selected exact T5, showing
-global temperature adds no useful capacity. T0 remains selected; T7 now tests
-confidence-conditioned logit calibration**.
+global temperature adds no useful capacity. T7 gained only `+0.004931` while
+again exhausting SI-SDR. T0 remains selected; T8 now tests train-only
+per-utterance adaptive routing**.
 
 Open work:
 
-- implement and validate the predeclared T7 confidence-conditioned search;
+- implement and validate the predeclared T8 adaptive router;
 - run fit/cal/rank/select in order without reading test;
 - no cache, student or test evaluation may start before teacher promotion;
 - the TTS metric-critic hypothesis remains a separate future campaign.

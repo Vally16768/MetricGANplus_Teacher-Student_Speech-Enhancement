@@ -319,3 +319,9 @@ logit scales on fresh disjoint 96/96 support. Scale `1.0` and T5 sweep 3 won,
 so the `val_select` deltas were exactly the T5 result. Global temperature added
 no improvement, the gate failed, and test remained unread. T7 is the active
 confidence-conditioned successor.
+
+`20260728-t7-confidence-wb-s3003-a1` tested 24 confidence-conditioned
+low/high/threshold configurations on fresh disjoint 96/96 support. It selected
+`low=-0.30/high=0/threshold=0/temperature=1.5`; `val_select` PESQ changed
+`+0.004931`, STOI `-0.001245` and SI-SDR `-0.246202` dB. The gate failed and
+test remained unread. T8 is the active per-utterance routing successor.

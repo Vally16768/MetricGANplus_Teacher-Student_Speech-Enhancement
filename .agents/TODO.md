@@ -64,7 +64,8 @@ Update this register whenever a gate changes state.
 | C57 | Execute T4 bounded true-PESQ trust region | T4-A safe `+0.002034`; T4-B effectively T0; no promotion | failed |
 | C58 | Execute T5 direct true-PESQ frequency-curve search | safe `+0.005075` PESQ but below gate; SI-SDR near limit | failed |
 | C59 | Execute T6 affine-logit true-PESQ search | exact T5 selected; PESQ `+0.005075`, below gate | failed |
-| C60 | Execute T7 confidence-conditioned true-PESQ search | 24 candidates on fresh 96/96 support; unchanged gate | in-progress |
+| C60 | Execute T7 confidence-conditioned true-PESQ search | safe `+0.004931` PESQ but below gate; SI-SDR near limit | failed |
+| C61 | Execute T8 adaptive teacher routing | train-only ridge router between exact T0 and frozen T7; oracle/generalization gates | in-progress |
 
 ## Execution rule
 

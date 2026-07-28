@@ -32,6 +32,7 @@ ARCHITECTURE_SOURCES = (
     "code_and_documentation/sebench/t5_zeroth_order.py",
     "code_and_documentation/sebench/t6_affine.py",
     "code_and_documentation/sebench/t7_confidence.py",
+    "code_and_documentation/sebench/t8_router.py",
     "code_and_documentation/sebench/teacher_cache.py",
     "code_and_documentation/sebench/training.py",
     "code_and_documentation/configs/research_plan_voicebank_wb_nb.yaml",

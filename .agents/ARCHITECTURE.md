@@ -324,6 +324,14 @@ candidates reach `val_rank` selection and one reaches `val_select`. Disabled
 calibration is exactly the original T0 path; checkpoint reconstruction restores
 the transform from portable `model_config`.
 
+T8 wraps exact T0/T7 behavior in one checkpoint-configured utterance router.
+It computes a frozen 16-value feature vector from the noisy waveform, official
+log-magnitude frontend, logits, masks and bounded T7 correction. A standardized
+ridge score selects either the exact base mask or exact T7 mask per utterance.
+Ridge labels and threshold selection use only fresh train identities; clean
+audio is not part of the inference graph. Oracle and learned-router
+pre-validation gates can stop the experiment before `val_rank`.
+
 The earlier bounded frozen-proxy branch remains historical negative evidence,
 not the canonical T1 implementation. The alternating branch passed structural
 smoke but failed its clean pilot promotion gate: current-output D calibration
@@ -432,6 +440,11 @@ smoke-t7-confidence / search-t7-confidence
   -> fixed confidence-conditioned low/high/threshold grid
   -> top-8 fit, top-4 calibration, top-2 rank, one selected val_select
   -> checkpoint round-trip; never test/cache/students
+smoke-t8-router / search-t8-router
+  -> fresh train-only 256/128 fit/calibration support
+  -> true-PESQ T7-minus-T0 labels and fixed 16-feature ridge router
+  -> oracle/generalization/auxiliary gates before val_rank
+  -> one frozen rank and conditional val_select; never test/cache/students
 promote-baseline
   -> accept only an audited/promotable converged S0 closure
   -> preserve corrective true-length evaluation provenance when present
@@ -473,6 +486,8 @@ Evidence:
 - T6 affine-logit search: `code_and_documentation/sebench/t6_affine.py`;
 - T7 confidence-conditioned search:
   `code_and_documentation/sebench/t7_confidence.py`;
+- T8 train-only adaptive router:
+  `code_and_documentation/sebench/t8_router.py`;
 - configuration: `configs/voicebank_campaign.yaml`;
 - post-cleanup GPU smoke:
   `20260727-postcleanup-smoke-wbnb-s0-a5` (six cells, audit zero issues).

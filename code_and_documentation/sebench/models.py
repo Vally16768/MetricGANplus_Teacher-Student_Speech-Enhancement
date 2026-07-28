@@ -338,6 +338,12 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         confidence_calibration_high: float = 0.0,
         confidence_calibration_threshold: float = -4.0,
         confidence_calibration_temperature: float = 1.5,
+        adaptive_router_enabled: bool = False,
+        adaptive_router_feature_mean: list[float] | tuple[float, ...] | None = None,
+        adaptive_router_feature_scale: list[float] | tuple[float, ...] | None = None,
+        adaptive_router_weights: list[float] | tuple[float, ...] | None = None,
+        adaptive_router_bias: float = 0.0,
+        adaptive_router_threshold: float = 0.0,
     ) -> None:
         super().__init__()
         feature_bins = n_fft // 2 + 1
@@ -361,10 +367,31 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         self.confidence_calibration_temperature = float(
             confidence_calibration_temperature
         )
+        self.adaptive_router_enabled = bool(adaptive_router_enabled)
+        self.adaptive_router_feature_mean = tuple(
+            float(value) for value in (adaptive_router_feature_mean or ())
+        )
+        self.adaptive_router_feature_scale = tuple(
+            float(value) for value in (adaptive_router_feature_scale or ())
+        )
+        self.adaptive_router_weights = tuple(
+            float(value) for value in (adaptive_router_weights or ())
+        )
+        self.adaptive_router_bias = float(adaptive_router_bias)
+        self.adaptive_router_threshold = float(adaptive_router_threshold)
         if self.confidence_calibration_temperature <= 0.0:
             raise ValueError(
                 "Confidence-calibration temperature must be positive."
             )
+        if self.adaptive_router_enabled and not (
+            len(self.adaptive_router_feature_mean)
+            == len(self.adaptive_router_feature_scale)
+            == len(self.adaptive_router_weights)
+            == 16
+        ):
+            raise ValueError("Adaptive T8 router requires exactly 16 features.")
+        if any(value <= 0.0 for value in self.adaptive_router_feature_scale):
+            raise ValueError("Adaptive T8 router feature scales must be positive.")
         if self.feature_domain not in {
             "sqrt_magnitude",
             "official_log_magnitude",
@@ -409,6 +436,12 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
             "confidence_calibration_high": self.confidence_calibration_high,
             "confidence_calibration_threshold": self.confidence_calibration_threshold,
             "confidence_calibration_temperature": self.confidence_calibration_temperature,
+            "adaptive_router_enabled": self.adaptive_router_enabled,
+            "adaptive_router_feature_mean": list(self.adaptive_router_feature_mean),
+            "adaptive_router_feature_scale": list(self.adaptive_router_feature_scale),
+            "adaptive_router_weights": list(self.adaptive_router_weights),
+            "adaptive_router_bias": self.adaptive_router_bias,
+            "adaptive_router_threshold": self.adaptive_router_threshold,
         }
         if official_checkpoint_sha256:
             self.model_config["official_checkpoint_sha256"] = str(
@@ -512,6 +545,11 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         """Apply T7 calibration without a clean-reference dependency."""
         if not self.confidence_calibration_enabled:
             return logits
+        return self._confidence_candidate_logits(logits)
+
+    def _confidence_candidate_logits(
+        self, logits: torch.Tensor
+    ) -> torch.Tensor:
         gate = torch.sigmoid(
             (logits - self.confidence_calibration_threshold)
             / self.confidence_calibration_temperature
@@ -521,6 +559,116 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
             - self.confidence_calibration_low
         ) * gate
         return logits + correction
+
+    def configure_adaptive_router(
+        self,
+        *,
+        enabled: bool,
+        feature_mean: list[float] | tuple[float, ...],
+        feature_scale: list[float] | tuple[float, ...],
+        weights: list[float] | tuple[float, ...],
+        bias: float,
+        threshold: float,
+    ) -> None:
+        mean = tuple(float(value) for value in feature_mean)
+        scale = tuple(float(value) for value in feature_scale)
+        router_weights = tuple(float(value) for value in weights)
+        if bool(enabled) and not (len(mean) == len(scale) == len(router_weights) == 16):
+            raise ValueError("Adaptive T8 router requires exactly 16 features.")
+        if any(value <= 0.0 for value in scale):
+            raise ValueError("Adaptive T8 router feature scales must be positive.")
+        self.adaptive_router_enabled = bool(enabled)
+        self.adaptive_router_feature_mean = mean
+        self.adaptive_router_feature_scale = scale
+        self.adaptive_router_weights = router_weights
+        self.adaptive_router_bias = float(bias)
+        self.adaptive_router_threshold = float(threshold)
+        self.model_config.update(
+            {
+                "adaptive_router_enabled": self.adaptive_router_enabled,
+                "adaptive_router_feature_mean": list(mean),
+                "adaptive_router_feature_scale": list(scale),
+                "adaptive_router_weights": list(router_weights),
+                "adaptive_router_bias": self.adaptive_router_bias,
+                "adaptive_router_threshold": self.adaptive_router_threshold,
+            }
+        )
+
+    def confidence_router_features(
+        self,
+        noisy: torch.Tensor,
+        magnitude: torch.Tensor,
+        logits: torch.Tensor,
+        base_mask: torch.Tensor,
+        candidate_logits: torch.Tensor,
+        candidate_mask: torch.Tensor,
+    ) -> torch.Tensor:
+        """Return the frozen 16-feature clean-free T8 router schema."""
+        batch = logits.shape[0]
+
+        def flat(value: torch.Tensor) -> torch.Tensor:
+            return value.reshape(batch, -1).float()
+
+        noisy_flat = flat(noisy)
+        magnitude_flat = flat(magnitude)
+        logits_flat = flat(logits)
+        mask_flat = flat(base_mask)
+        correction_flat = flat(candidate_logits - logits)
+        disagreement_flat = flat(candidate_mask - base_mask)
+        log_rms = torch.log(
+            noisy_flat.square().mean(dim=1).clamp_min(1e-12)
+        ) * 0.5
+        log_magnitude = torch.log1p(magnitude_flat)
+        frequency = torch.linspace(
+            0.0,
+            1.0,
+            magnitude.shape[1],
+            device=magnitude.device,
+            dtype=magnitude.dtype,
+        ).reshape(1, -1, 1)
+        centroid = (
+            (magnitude * frequency).sum(dim=(1, 2))
+            / magnitude.sum(dim=(1, 2)).clamp_min(1e-12)
+        ).float()
+        quantiles = torch.quantile(
+            logits_flat,
+            torch.tensor(
+                [0.25, 0.50, 0.75],
+                device=logits_flat.device,
+                dtype=logits_flat.dtype,
+            ),
+            dim=1,
+        ).transpose(0, 1)
+        return torch.stack(
+            (
+                log_rms,
+                log_magnitude.mean(dim=1),
+                log_magnitude.std(dim=1, unbiased=False),
+                centroid,
+                logits_flat.mean(dim=1),
+                logits_flat.std(dim=1, unbiased=False),
+                quantiles[:, 0],
+                quantiles[:, 1],
+                quantiles[:, 2],
+                mask_flat.mean(dim=1),
+                mask_flat.std(dim=1, unbiased=False),
+                (mask_flat < 0.25).float().mean(dim=1),
+                (mask_flat > 0.75).float().mean(dim=1),
+                correction_flat.mean(dim=1),
+                correction_flat.std(dim=1, unbiased=False),
+                disagreement_flat.abs().mean(dim=1),
+            ),
+            dim=1,
+        )
+
+    def adaptive_router_scores(self, features: torch.Tensor) -> torch.Tensor:
+        if not self.adaptive_router_enabled:
+            raise RuntimeError("Adaptive T8 router is not enabled.")
+        mean = features.new_tensor(self.adaptive_router_feature_mean)
+        scale = features.new_tensor(self.adaptive_router_feature_scale)
+        weights = features.new_tensor(self.adaptive_router_weights)
+        normalized = (features - mean) / scale
+        return normalized.matmul(weights) + self.adaptive_router_bias
 
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         if input.ndim != 3:
@@ -533,7 +681,25 @@ class MetricGANLikeEnhancer(WaveformEnhancer):
         else:
             features = magnitude.pow(0.5)
         features = features.transpose(1, 2)
-        if self.confidence_calibration_enabled:
+        if self.adaptive_router_enabled:
+            logits = self.mask_generator.forward_logits(features)
+            base_mask = self.mask_generator.learnable_sigmoid(logits)
+            candidate_logits = self._confidence_candidate_logits(logits)
+            candidate_mask = self.mask_generator.learnable_sigmoid(candidate_logits)
+            router_features = self.confidence_router_features(
+                input,
+                magnitude,
+                logits,
+                base_mask,
+                candidate_logits,
+                candidate_mask,
+            )
+            use_candidate = (
+                self.adaptive_router_scores(router_features)
+                >= self.adaptive_router_threshold
+            ).reshape(-1, 1, 1)
+            mask = torch.where(use_candidate, candidate_mask, base_mask)
+        elif self.confidence_calibration_enabled:
             logits = self.mask_generator.forward_logits(features)
             logits = self.calibrate_mask_logits(logits)
             mask = self.mask_generator.learnable_sigmoid(logits)
@@ -722,6 +888,12 @@ def build_metricgan_standalone(
     confidence_calibration_high: float = 0.0,
     confidence_calibration_threshold: float = -4.0,
     confidence_calibration_temperature: float = 1.5,
+    adaptive_router_enabled: bool = False,
+    adaptive_router_feature_mean: list[float] | tuple[float, ...] | None = None,
+    adaptive_router_feature_scale: list[float] | tuple[float, ...] | None = None,
+    adaptive_router_weights: list[float] | tuple[float, ...] | None = None,
+    adaptive_router_bias: float = 0.0,
+    adaptive_router_threshold: float = 0.0,
 ) -> MetricGANLikeEnhancer:
     if variant == "small":
         hidden_size = 200
@@ -751,6 +923,12 @@ def build_metricgan_standalone(
         confidence_calibration_high=confidence_calibration_high,
         confidence_calibration_threshold=confidence_calibration_threshold,
         confidence_calibration_temperature=confidence_calibration_temperature,
+        adaptive_router_enabled=adaptive_router_enabled,
+        adaptive_router_feature_mean=adaptive_router_feature_mean,
+        adaptive_router_feature_scale=adaptive_router_feature_scale,
+        adaptive_router_weights=adaptive_router_weights,
+        adaptive_router_bias=adaptive_router_bias,
+        adaptive_router_threshold=adaptive_router_threshold,
     )
 
 
@@ -830,6 +1008,12 @@ def build_model(
     confidence_calibration_high: float = 0.0,
     confidence_calibration_threshold: float = -4.0,
     confidence_calibration_temperature: float = 1.5,
+    adaptive_router_enabled: bool = False,
+    adaptive_router_feature_mean: list[float] | tuple[float, ...] | None = None,
+    adaptive_router_feature_scale: list[float] | tuple[float, ...] | None = None,
+    adaptive_router_weights: list[float] | tuple[float, ...] | None = None,
+    adaptive_router_bias: float = 0.0,
+    adaptive_router_threshold: float = 0.0,
 ) -> nn.Module:
     if variant not in MODEL_VARIANTS:
         raise ValueError(f"Unsupported model variant: {variant}")
@@ -890,6 +1074,12 @@ def build_model(
             confidence_calibration_high=confidence_calibration_high,
             confidence_calibration_threshold=confidence_calibration_threshold,
             confidence_calibration_temperature=confidence_calibration_temperature,
+            adaptive_router_enabled=adaptive_router_enabled,
+            adaptive_router_feature_mean=adaptive_router_feature_mean,
+            adaptive_router_feature_scale=adaptive_router_feature_scale,
+            adaptive_router_weights=adaptive_router_weights,
+            adaptive_router_bias=adaptive_router_bias,
+            adaptive_router_threshold=adaptive_router_threshold,
         )
     if model_family == "metricgan_plus_native8k":
         if spectral_native_gate:
@@ -959,6 +1149,12 @@ def build_enhancer(
     confidence_calibration_high: float = 0.0,
     confidence_calibration_threshold: float = -4.0,
     confidence_calibration_temperature: float = 1.5,
+    adaptive_router_enabled: bool = False,
+    adaptive_router_feature_mean: list[float] | tuple[float, ...] | None = None,
+    adaptive_router_feature_scale: list[float] | tuple[float, ...] | None = None,
+    adaptive_router_weights: list[float] | tuple[float, ...] | None = None,
+    adaptive_router_bias: float = 0.0,
+    adaptive_router_threshold: float = 0.0,
 ) -> nn.Module:
     base_model = build_model(
         model_family,
@@ -979,6 +1175,12 @@ def build_enhancer(
         confidence_calibration_high=confidence_calibration_high,
         confidence_calibration_threshold=confidence_calibration_threshold,
         confidence_calibration_temperature=confidence_calibration_temperature,
+        adaptive_router_enabled=adaptive_router_enabled,
+        adaptive_router_feature_mean=adaptive_router_feature_mean,
+        adaptive_router_feature_scale=adaptive_router_feature_scale,
+        adaptive_router_weights=adaptive_router_weights,
+        adaptive_router_bias=adaptive_router_bias,
+        adaptive_router_threshold=adaptive_router_threshold,
     )
     postfilter_config = resolve_postfilter_config(postfilter_mode, postfilter_preset)
     if not postfilter_config.enabled:

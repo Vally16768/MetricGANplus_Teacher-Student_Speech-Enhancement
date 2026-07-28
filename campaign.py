@@ -57,6 +57,7 @@ from sebench.t4_microstep import run_t4_microstep_backtracking  # noqa: E402
 from sebench.t5_zeroth_order import run_t5_frequency_search  # noqa: E402
 from sebench.t6_affine import run_t6_affine_search  # noqa: E402
 from sebench.t7_confidence import run_t7_confidence_search  # noqa: E402
+from sebench.t8_router import run_t8_router_search  # noqa: E402
 from sebench.teacher_cache import (  # noqa: E402
     TeacherCacheTarget,
     build_multi_target_teacher_cache,
@@ -2932,6 +2933,141 @@ def run_t7_confidence_trial(
     return {"run_root": run_root.as_posix(), **summary}
 
 
+def run_t8_router_trial(
+    config: dict[str, Any],
+    *,
+    baseline_run_dir: str | Path,
+    t7_run_dir: str | Path,
+    support_run_dir: str | Path,
+    teacher_checkpoint: str | Path,
+    run_id: str,
+    smoke: bool = False,
+) -> dict[str, Any]:
+    dataset_audit = validate_campaign_config(config)
+    git = _git_state()
+    if git["dirty"]:
+        raise RuntimeError("T8 requires a clean committed snapshot.")
+    require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+    device = require_training_cuda(str(config["runtime"]["device"]))
+    run_root = Path(str(config["runtime"]["run_root"])).expanduser().resolve() / run_id
+    provenance_path = run_root / "provenance" / "provenance.json"
+    if not provenance_path.is_file():
+        raise FileNotFoundError("T8 requires a planned run contract.")
+    provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+    if provenance.get("status") != "planned" or provenance.get("git_commit") != git["commit"]:
+        raise ValueError("T8 planned contract does not match the clean commit.")
+    resolved_config = run_root / "provenance" / "config_resolved.yaml"
+    if not resolved_config.is_file() or sha256(resolved_config) != provenance.get("config_sha256"):
+        raise ValueError("T8 run contract config mismatch.")
+
+    baseline_root = Path(baseline_run_dir).expanduser().resolve()
+    baseline_path = baseline_root / "metrics" / "campaign_summary.json"
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    t7_root = Path(t7_run_dir).expanduser().resolve()
+    t7_path = t7_root / "cells" / "T7-CONFIDENCE-LOGIT" / "summary.json"
+    t7 = json.loads(t7_path.read_text(encoding="utf-8"))
+    expected_hash = str(config["model"]["teacher_checkpoint_sha256"])
+    expected_candidate = {
+        "low": -0.3,
+        "high": 0.0,
+        "threshold": 0.0,
+        "temperature": 1.5,
+    }
+    if (
+        t7.get("status") != "failed"
+        or bool(t7["gate"]["passed"])
+        or float(t7["val_select_deltas"]["pesq_mean"]) >= 0.01
+        or t7.get("selected_candidate") != expected_candidate
+        or t7["teacher_checkpoint_sha256"] != expected_hash
+        or baseline["baseline"]["checkpoint_sha256"] != expected_hash
+        or sha256(teacher_checkpoint) != expected_hash
+        or bool(t7.get("test_read"))
+        or bool(baseline.get("test_read"))
+    ):
+        raise ValueError("T8 requires the terminal below-threshold T7 result.")
+
+    support_root = Path(support_run_dir).expanduser().resolve()
+    identities_path = support_root / "support" / "identities.json"
+    source_contract = {
+        "baseline_summary_sha256": sha256(baseline_path),
+        "t7_summary_sha256": sha256(t7_path),
+        "identities_sha256": sha256(identities_path),
+        "teacher_checkpoint_sha256": expected_hash,
+    }
+    provenance.update({
+        "status": "running",
+        "campaign_scope": "t8_train_only_adaptive_router",
+        "verification_only": bool(smoke),
+        "dataset_audit": dataset_audit,
+        "source_contract": source_contract,
+    })
+    _atomic_json(provenance_path, provenance)
+    os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
+    torch.use_deterministic_algorithms(True)
+
+    def progress(message: str) -> None:
+        print(f"[T8] {message}", file=sys.stderr, flush=True)
+
+    try:
+        result = run_t8_router_search(
+            teacher_checkpoint=teacher_checkpoint,
+            identities_path=identities_path,
+            val_rank_manifest=config["dataset"]["val_rank"],
+            val_select_manifest=config["dataset"]["val_select"],
+            baseline_rank_metrics=baseline["baseline"]["val_rank_metrics"],
+            baseline_select_metrics=baseline["baseline"]["val_select_metrics"],
+            output_dir=run_root / "cells" / "T8-ADAPTIVE-ROUTER",
+            device=device,
+            fit_count=10 if smoke else 256,
+            calibration_count=10 if smoke else 128,
+            max_eval_files=10 if smoke else None,
+            progress_callback=progress,
+        )
+    except BaseException as exc:
+        provenance["status"] = "failed"
+        provenance["failure"] = {
+            "type": exc.__class__.__name__,
+            "message": str(exc),
+            "traceback": traceback.format_exc(),
+        }
+        _atomic_json(provenance_path, provenance)
+        _atomic_json(
+            run_root / "status.json",
+            {"status": "failed", "valid_for_promotion": False},
+        )
+        raise
+
+    summary = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "campaign_scope": "t8_train_only_adaptive_router",
+        "verification_only": bool(smoke),
+        "source_contract": source_contract,
+        "test_read": False,
+        "result": result,
+        "teacher_gate": result["gate"],
+    }
+    _atomic_json(run_root / "metrics" / "campaign_summary.json", summary)
+    provenance["status"] = "verification_complete" if smoke else (
+        "candidate_gate_passed" if result["gate"]["passed"] else "complete_failed_gate"
+    )
+    provenance["result_summary_sha256"] = sha256(
+        run_root / "cells" / "T8-ADAPTIVE-ROUTER" / "summary.json"
+    )
+    _atomic_json(provenance_path, provenance)
+    _atomic_json(run_root / "status.json", {
+        "status": provenance["status"],
+        "campaign_scope": "t8_train_only_adaptive_router",
+        "teacher_gate_passed": bool(result["gate"]["passed"]),
+        "valid_for_promotion": False,
+        "verification_only": bool(smoke),
+        "test_read": False,
+    })
+    return {"run_root": run_root.as_posix(), **summary}
+
+
 def run_all(
     config: dict[str, Any],
     *,
@@ -4888,6 +5024,13 @@ def parse_args() -> argparse.Namespace:
         t7_search.add_argument("--support-run-dir", required=True)
         t7_search.add_argument("--teacher-checkpoint", required=True)
         t7_search.add_argument("--run-id", required=True)
+    for command in ("smoke-t8-router", "search-t8-router"):
+        t8_search = subparsers.add_parser(command)
+        t8_search.add_argument("--baseline-run-dir", required=True)
+        t8_search.add_argument("--t7-run-dir", required=True)
+        t8_search.add_argument("--support-run-dir", required=True)
+        t8_search.add_argument("--teacher-checkpoint", required=True)
+        t8_search.add_argument("--run-id", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -5448,6 +5591,17 @@ def main() -> None:
             run_id=args.run_id,
             smoke=args.command == "smoke-t7-confidence",
         )
+    elif args.command in {"smoke-t8-router", "search-t8-router"}:
+        config = load_campaign_config(args.config)
+        result = run_t8_router_trial(
+            config,
+            baseline_run_dir=args.baseline_run_dir,
+            t7_run_dir=args.t7_run_dir,
+            support_run_dir=args.support_run_dir,
+            teacher_checkpoint=args.teacher_checkpoint,
+            run_id=args.run_id,
+            smoke=args.command == "smoke-t8-router",
+        )
     else:
         config = load_campaign_config(args.config)
     if args.command == "validate":
@@ -5574,6 +5728,8 @@ def main() -> None:
         "search-t6-affine",
         "smoke-t7-confidence",
         "search-t7-confidence",
+        "smoke-t8-router",
+        "search-t8-router",
         "smoke-resume",
         "continue-students",
     }:

@@ -1,6 +1,6 @@
 # T7 confidence-conditioned true-PESQ calibration plan
 
-Status: **predeclared — implementation pending**
+Status: **complete negative outcome — below teacher gate**
 
 ## Cause
 
@@ -64,3 +64,11 @@ and run the independent package audit.
 
 If T7 fails, preserve its concise negative evidence and predeclare a successor
 with genuinely new capacity. Do not relax the gate and do not train students.
+
+## Observed outcome
+
+`20260728-t7-confidence-wb-s3003-a1` selected
+`low=-0.30/high=0/threshold=0/temperature=1.5`. On `val_select`, PESQ changed
+`+0.004931`, STOI `-0.001245` and SI-SDR `-0.246202` dB. The checkpoint
+round-trip and production-support checks passed, but the PESQ gate failed.
+Test remained unread. T8 tests per-utterance adaptive routing.

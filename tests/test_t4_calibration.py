@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import numpy as np
 import torch
 
 
@@ -34,6 +35,10 @@ from sebench.t6_affine import apply_affine_logit_calibration  # noqa: E402
 from sebench.t7_confidence import (  # noqa: E402
     confidence_candidate_grid,
     configure_confidence_calibration,
+)
+from sebench.t8_router import (  # noqa: E402
+    configure_adaptive_router,
+    fit_ridge_router,
 )
 
 
@@ -247,6 +252,87 @@ class T4CalibrationTests(unittest.TestCase):
         self.assertEqual(
             package["model_config"]["confidence_calibration_threshold"], -2.0
         )
+
+    def test_t8_ridge_recovers_clean_free_linear_direction(self) -> None:
+        rng = np.random.default_rng(8)
+        features = rng.normal(size=(80, 16))
+        direction = np.linspace(-0.03, 0.03, 16)
+        labels = features @ direction + 0.004
+        ridge = fit_ridge_router(features, labels)
+        predictions = (
+            (features - np.asarray(ridge["feature_mean"]))
+            / np.asarray(ridge["feature_scale"])
+        ) @ np.asarray(ridge["weights"]) + ridge["bias"]
+        self.assertGreater(np.corrcoef(predictions, labels)[0, 1], 0.999)
+        self.assertIn(ridge["selected_lambda"], (0.001, 0.01, 0.1, 1.0, 10.0))
+
+    def test_t8_router_selects_exact_base_or_candidate_and_roundtrips(self) -> None:
+        model = build_enhancer(
+            "metricgan_plus_teacher_official_wb",
+            "small",
+            initialize_from_official=False,
+            n_fft=512,
+            hop_length=256,
+            win_length=512,
+        )
+        noisy = 0.02 * torch.randn(1, 1, 4_000)
+        configure_confidence_calibration(
+            model,
+            enabled=False,
+            low=-0.3,
+            high=0.0,
+            threshold=0.0,
+            temperature=1.5,
+        )
+        with torch.no_grad():
+            expected_base = model(noisy)
+        configure_confidence_calibration(
+            model,
+            enabled=True,
+            low=-0.3,
+            high=0.0,
+            threshold=0.0,
+            temperature=1.5,
+        )
+        with torch.no_grad():
+            expected_candidate = model(noisy)
+        ridge = {
+            "feature_mean": [0.0] * 16,
+            "feature_scale": [1.0] * 16,
+            "weights": [0.0] * 16,
+            "bias": 1.0,
+        }
+        configure_adaptive_router(model, ridge=ridge, threshold=0.0)
+        with torch.no_grad():
+            observed_candidate = model(noisy)
+        self.assertTrue(
+            torch.allclose(
+                observed_candidate,
+                expected_candidate,
+                atol=2e-6,
+                rtol=1e-5,
+            )
+        )
+        ridge["bias"] = -1.0
+        configure_adaptive_router(model, ridge=ridge, threshold=0.0)
+        with torch.no_grad():
+            observed_base = model(noisy)
+        self.assertTrue(
+            torch.allclose(observed_base, expected_base, atol=2e-6, rtol=1e-5)
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            checkpoint = Path(temporary) / "t8.pt"
+            save_checkpoint_package(
+                checkpoint,
+                model,
+                model_family="metricgan_plus_teacher_official_wb",
+                variant="small",
+            )
+            reloaded, package = load_model_from_checkpoint(checkpoint)
+            with torch.no_grad():
+                roundtrip = reloaded(noisy)
+        self.assertTrue(torch.allclose(roundtrip, observed_base, atol=2e-6, rtol=1e-5))
+        self.assertTrue(package["model_config"]["adaptive_router_enabled"])
 
 
 if __name__ == "__main__":
