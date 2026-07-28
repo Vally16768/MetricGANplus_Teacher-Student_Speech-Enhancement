@@ -114,9 +114,12 @@ def fit_quadratic_ridge(
 
 def fit_quadratic_metric_ridges(
     records: list[dict[str, Any]],
+    *,
+    lows: Iterable[float] = T9_ACTION_LOWS,
 ) -> dict[str, list[dict[str, Any]]]:
+    action_lows = tuple(float(value) for value in lows)
     fitted = {"pesq": [], "stoi": [], "sisdr": []}
-    for action_index in range(len(T9_ACTION_LOWS)):
+    for action_index in range(len(action_lows)):
         features = np.asarray(
             [row["actions"][action_index]["features"] for row in records],
             dtype=np.float64,
@@ -157,11 +160,15 @@ def run_t14_quadratic_search(
     strategy: str = "T14-QUADRATIC-MULTIOBJECTIVE",
     checkpoint_filename: str = "T14-QUADRATIC-ROUTED.pt",
     prerequisite_name: str = "T13",
+    action_lows: Iterable[float] = T9_ACTION_LOWS,
 ) -> dict[str, Any]:
     if not str(device).startswith("cuda") or not torch.cuda.is_available():
         raise RuntimeError("T14 quadratic router search is CUDA-only.")
     root = Path(output_dir).expanduser().resolve()
     root.mkdir(parents=True, exist_ok=True)
+    lows = tuple(float(value) for value in action_lows)
+    if not lows:
+        raise ValueError("Quadratic router action set cannot be empty.")
     t9 = json.loads(Path(t9_summary_path).read_text(encoding="utf-8"))
     t10 = json.loads(Path(t10_summary_path).read_text(encoding="utf-8"))
     t11 = json.loads(Path(t11_summary_path).read_text(encoding="utf-8"))
@@ -193,7 +200,7 @@ def run_t14_quadratic_search(
         model,
         support["manifest"],
         device=device,
-        lows=T9_ACTION_LOWS,
+        lows=lows,
         max_files=max_eval_files,
         progress_callback=progress_callback,
     )
@@ -206,7 +213,7 @@ def run_t14_quadratic_search(
         model,
         val_rank_manifest,
         device=device,
-        lows=T9_ACTION_LOWS,
+        lows=lows,
         max_files=max_eval_files,
         progress_callback=progress_callback,
     )
@@ -243,7 +250,7 @@ def run_t14_quadratic_search(
     )
     baseline = baseline_rank_metrics if production else observed_baseline
     candidates: list[dict[str, Any]] = []
-    low_penalties = np.square(np.asarray(T9_ACTION_LOWS)).reshape(1, -1)
+    low_penalties = np.square(np.asarray(lows)).reshape(1, -1)
     for stoi_weight in T13_STOI_WEIGHTS:
         for sisdr_weight in T13_SISDR_WEIGHTS:
             for strength_penalty in T13_STRENGTH_PENALTIES:
@@ -295,6 +302,7 @@ def run_t14_quadratic_search(
         stoi_weight=float(selected["stoi_weight"]),
         sisdr_weight=float(selected["sisdr_weight"]),
         strength_penalty=float(selected["strength_penalty"]),
+        lows=lows,
     )
     configure_multi_action_router(
         model,
@@ -361,6 +369,7 @@ def run_t14_quadratic_search(
         "source_t13_summary_sha256": sha256_file(t13_summary_path),
         "support": support,
         "fit_count": len(fit_records),
+        "action_lows": list(lows),
         "metric_ridges": metric_ridges,
         "fit_diagnostics": fit_diagnostics,
         "rank_count": len(rank_records),

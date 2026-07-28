@@ -358,8 +358,13 @@ successor; test remained unread.
 `20260728-t14-router-wb-s3003-a1` fitted regularized quadratic delta models
 and selected the same multi-objective family on `val_rank`. It gained
 `+0.011275` on rank and the current best `+0.009365` on `val_select`; STOI
-`-0.001466` and SI-SDR `-0.241138` dB passed. T15 is the active train-only
-OOF-calibration successor; test remained unread.
+`-0.001466` and SI-SDR `-0.241138` dB passed; test remained unread.
+
+`20260728-t15-router-wb-s3003-a1` applied nested train-only OOF affine
+calibration to the T14 quadratic predictors. It gained `+0.011033` on
+`val_rank` but only `+0.009070` on `val_select`, below both T14 and the gate;
+STOI `-0.001426` and SI-SDR `-0.236114` dB passed. T16 is the active
+fine-action successor; test remained unread.
 
 `20260728-t13-router-wb-s3003-a1` fitted PESQ/STOI/SI-SDR deltas on all 584
 train-only support examples and selected an SI-SDR-aware policy. It gained

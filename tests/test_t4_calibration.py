@@ -57,6 +57,7 @@ from sebench.t15_oof_calibration import (  # noqa: E402
     fit_affine_calibration,
     fit_oof_calibrated_quadratic_ridge,
 )
+from sebench.t16_fine_action_router import T16_ACTION_LOWS  # noqa: E402
 
 
 class T4CalibrationTests(unittest.TestCase):
@@ -649,6 +650,38 @@ class T4CalibrationTests(unittest.TestCase):
             first_diagnostics["calibration"]["oof_mse_after"],
             first_diagnostics["calibration"]["oof_mse_before"] + 1e-15,
         )
+
+    def test_t16_fine_action_set_is_exact_and_checkpoint_supported(self) -> None:
+        self.assertEqual(
+            T16_ACTION_LOWS,
+            (-0.1, -0.2, -0.3, -0.4, -0.5, -0.6, -0.7, -0.8),
+        )
+        model = build_enhancer(
+            "metricgan_plus_teacher_official_wb",
+            "small",
+            initialize_from_official=False,
+            n_fft=512,
+            hop_length=256,
+            win_length=512,
+        )
+        configure_multi_action_router(
+            model,
+            ridges=[
+                {
+                    "feature_mean": [0.0] * 152,
+                    "feature_scale": [1.0] * 152,
+                    "weights": [0.0] * 152,
+                    "bias": float(index),
+                }
+                for index in range(8)
+            ],
+            threshold=0.0,
+            lows=T16_ACTION_LOWS,
+            feature_transform="quadratic",
+        )
+        self.assertEqual(len(model.multi_router_lows), 8)
+        self.assertEqual(len(model.multi_router_weights), 8)
+        self.assertEqual(len(model.multi_router_weights[0]), 152)
 
 
 if __name__ == "__main__":

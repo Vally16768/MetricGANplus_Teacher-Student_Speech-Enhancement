@@ -502,6 +502,8 @@ Evidence:
   `code_and_documentation/sebench/t14_quadratic_router.py`;
 - T15 nested out-of-fold affine calibration of the frozen quadratic router:
   `code_and_documentation/sebench/t15_oof_calibration.py`;
+- T16 eight-action quadratic router:
+  `code_and_documentation/sebench/t16_fine_action_router.py`;
 - configuration: `configs/voicebank_campaign.yaml`;
 - post-cleanup GPU smoke:
   `20260727-postcleanup-smoke-wbnb-s0-a5` (six cells, audit zero issues).

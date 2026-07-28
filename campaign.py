@@ -69,6 +69,7 @@ from sebench.t14_quadratic_router import run_t14_quadratic_search  # noqa: E402
 from sebench.t15_oof_calibration import (  # noqa: E402
     run_t15_oof_calibrated_search,
 )
+from sebench.t16_fine_action_router import run_t16_fine_action_search  # noqa: E402
 from sebench.teacher_cache import (  # noqa: E402
     TeacherCacheTarget,
     build_multi_target_teacher_cache,
@@ -4042,6 +4043,11 @@ def run_t15_oof_calibrated_trial(
     teacher_checkpoint: str | Path,
     run_id: str,
     smoke: bool = False,
+    prerequisite_cell: str = "T14-QUADRATIC-ROUTER",
+    prerequisite_label: str = "T14",
+    campaign_scope: str = "t15_oof_calibrated_quadratic_router",
+    output_cell: str = "T15-OOF-ROUTER",
+    search_runner: Any = run_t15_oof_calibrated_search,
 ) -> dict[str, Any]:
     dataset_audit = validate_campaign_config(config)
     git = _git_state()
@@ -4082,7 +4088,7 @@ def run_t15_oof_calibrated_trial(
     t9_path = summary_path(t9_run_dir, "T9-MULTI-ACTION-ROUTER")
     t10_path = summary_path(t10_run_dir, "T10-CONSERVATIVE-ROUTER")
     t11_path = summary_path(t11_run_dir, "T11-PENALTY-ROUTER")
-    t14_path = summary_path(t14_run_dir, "T14-QUADRATIC-ROUTER")
+    t14_path = summary_path(t14_run_dir, prerequisite_cell)
     t9 = json.loads(t9_path.read_text(encoding="utf-8"))
     t14 = json.loads(t14_path.read_text(encoding="utf-8"))
     t9_checkpoint = Path(str(t9["selected_checkpoint"]))
@@ -4099,7 +4105,10 @@ def run_t15_oof_calibrated_trial(
         or sha256(teacher_checkpoint) != expected_hash
         or bool(t14.get("test_read"))
     ):
-        raise ValueError("T15 requires the auxiliary-safe below-PESQ T14 result.")
+        raise ValueError(
+            f"T15/T16 requires the auxiliary-safe below-PESQ "
+            f"{prerequisite_label} result."
+        )
     source_contract = {
         "baseline_summary_sha256": sha256(baseline_path),
         "t9_summary_sha256": sha256(t9_path),
@@ -4114,7 +4123,7 @@ def run_t15_oof_calibrated_trial(
     provenance.update(
         {
             "status": "running",
-            "campaign_scope": "t15_oof_calibrated_quadratic_router",
+            "campaign_scope": campaign_scope,
             "verification_only": bool(smoke),
             "dataset_audit": dataset_audit,
             "source_contract": source_contract,
@@ -4130,7 +4139,7 @@ def run_t15_oof_calibrated_trial(
         print(f"[T15] {message}", file=sys.stderr, flush=True)
 
     try:
-        result = run_t15_oof_calibrated_search(
+        result = search_runner(
             teacher_checkpoint=teacher_checkpoint,
             t9_checkpoint=t9_checkpoint,
             t9_summary_path=t9_path,
@@ -4141,7 +4150,7 @@ def run_t15_oof_calibrated_trial(
             val_select_manifest=config["dataset"]["val_select"],
             baseline_rank_metrics=baseline["baseline"]["val_rank_metrics"],
             baseline_select_metrics=baseline["baseline"]["val_select_metrics"],
-            output_dir=run_root / "cells" / "T15-OOF-ROUTER",
+            output_dir=run_root / "cells" / output_cell,
             device=device,
             max_eval_files=10 if smoke else None,
             progress_callback=progress,
@@ -4162,7 +4171,7 @@ def run_t15_oof_calibrated_trial(
     summary = {
         "schema_version": 1,
         "run_id": run_id,
-        "campaign_scope": "t15_oof_calibrated_quadratic_router",
+        "campaign_scope": campaign_scope,
         "verification_only": bool(smoke),
         "source_contract": source_contract,
         "test_read": False,
@@ -4180,14 +4189,14 @@ def run_t15_oof_calibrated_trial(
         )
     )
     provenance["result_summary_sha256"] = sha256(
-        run_root / "cells" / "T15-OOF-ROUTER" / "summary.json"
+        run_root / "cells" / output_cell / "summary.json"
     )
     _atomic_json(provenance_path, provenance)
     _atomic_json(
         run_root / "status.json",
         {
             "status": provenance["status"],
-            "campaign_scope": "t15_oof_calibrated_quadratic_router",
+            "campaign_scope": campaign_scope,
             "teacher_gate_passed": bool(result["gate"]["passed"]),
             "valid_for_promotion": False,
             "verification_only": bool(smoke),
@@ -6216,6 +6225,15 @@ def parse_args() -> argparse.Namespace:
         t15_search.add_argument("--t14-run-dir", required=True)
         t15_search.add_argument("--teacher-checkpoint", required=True)
         t15_search.add_argument("--run-id", required=True)
+    for command in ("smoke-t16-router", "search-t16-router"):
+        t16_search = subparsers.add_parser(command)
+        t16_search.add_argument("--baseline-run-dir", required=True)
+        t16_search.add_argument("--t9-run-dir", required=True)
+        t16_search.add_argument("--t10-run-dir", required=True)
+        t16_search.add_argument("--t11-run-dir", required=True)
+        t16_search.add_argument("--t15-run-dir", required=True)
+        t16_search.add_argument("--teacher-checkpoint", required=True)
+        t16_search.add_argument("--run-id", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -6871,6 +6889,24 @@ def main() -> None:
             run_id=args.run_id,
             smoke=args.command == "smoke-t15-router",
         )
+    elif args.command in {"smoke-t16-router", "search-t16-router"}:
+        config = load_campaign_config(args.config)
+        result = run_t15_oof_calibrated_trial(
+            config,
+            baseline_run_dir=args.baseline_run_dir,
+            t9_run_dir=args.t9_run_dir,
+            t10_run_dir=args.t10_run_dir,
+            t11_run_dir=args.t11_run_dir,
+            t14_run_dir=args.t15_run_dir,
+            teacher_checkpoint=args.teacher_checkpoint,
+            run_id=args.run_id,
+            smoke=args.command == "smoke-t16-router",
+            prerequisite_cell="T15-OOF-ROUTER",
+            prerequisite_label="T15",
+            campaign_scope="t16_fine_action_quadratic_router",
+            output_cell="T16-FINE-ACTION-ROUTER",
+            search_runner=run_t16_fine_action_search,
+        )
     else:
         config = load_campaign_config(args.config)
     if args.command == "validate":
@@ -7013,6 +7049,8 @@ def main() -> None:
         "search-t14-router",
         "smoke-t15-router",
         "search-t15-router",
+        "smoke-t16-router",
+        "search-t16-router",
         "smoke-resume",
         "continue-students",
     }:

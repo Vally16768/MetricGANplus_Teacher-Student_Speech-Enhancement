@@ -47,6 +47,7 @@ ARCHITECTURE_SOURCES = (
     "code_and_documentation/sebench/t13_multiobjective_router.py",
     "code_and_documentation/sebench/t14_quadratic_router.py",
     "code_and_documentation/sebench/t15_oof_calibration.py",
+    "code_and_documentation/sebench/t16_fine_action_router.py",
     "code_and_documentation/sebench/teacher_cache.py",
     "code_and_documentation/sebench/training.py",
     "code_and_documentation/configs/research_plan_voicebank_wb_nb.yaml",

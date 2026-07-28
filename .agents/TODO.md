@@ -72,7 +72,9 @@ Update this register whenever a gate changes state.
 | C65 | Execute T12 rank-selected risk policy | rank `+0.011176`, select `+0.008425`; auxiliary guards pass but PESQ gate fails | failed |
 | C66 | Execute T13 multi-objective routing | rank `+0.010932`, select `+0.008806`; safe but below PESQ gate | failed |
 | C67 | Execute T14 quadratic multi-objective routing | rank `+0.011275`, select `+0.009365`; safe but below PESQ gate | failed |
-| C68 | Execute T15 cross-fitted quadratic calibration | train-only OOF affine shrinkage before rank/select | in-progress |
+| C68 | Execute T15 cross-fitted quadratic calibration | rank `+0.011033`, select `+0.009070`; safe but below T14 and gate | failed |
+| C69 | Execute T16 fine-action quadratic routing | eight frozen logit actions; train/rank/select | in-progress |
+| C70 | Apply terminal T16 rule | confirm only if passed; otherwise close search with no successor | blocked |
 
 ## Execution rule
 

@@ -1,8 +1,8 @@
 # T15 teacher-improvement TODO
 
-Status: **in progress — validation**
+Status: **complete — negative result**
 Last update: **2026-07-28**
-Next action: **commit smoke evidence and run full fit/rank/select**
+Next action: **continue from `.agents/TEACHER_T16_TODO.md`**
 
 | ID | Item | Evidence | Status |
 |---|---|---|---|
@@ -11,9 +11,9 @@ Next action: **commit smoke evidence and run full fit/rank/select**
 | T15.1.1 | Implement OOF prediction and affine shrinkage | nested 5x4 CV; train-only | passed |
 | T15.1.2 | Add exact folding/round-trip tests | deterministic and affine equivalence | passed |
 | T15.1.3 | Suite, hashes, guard and CUDA smoke | `101/101`; guard; smoke A1 round-trip | passed |
-| T15.2.1 | Full fit/rank/select | no test | in-progress |
-| T15.2.2 | Apply gate and confirm if passing | unchanged | blocked |
-| T15.2.3 | Predeclare successor if failed | preserve evidence | blocked |
+| T15.2.1 | Full fit/rank/select | rank `+0.011033`; select `+0.009070`; no test | passed |
+| T15.2.2 | Apply gate and confirm if passing | PESQ below `+0.01` | failed |
+| T15.2.3 | Predeclare successor if failed | `.agents/TEACHER_T16_PLAN.md` | passed |
 
 ## Progress log
 
@@ -23,3 +23,4 @@ Next action: **commit smoke evidence and run full fit/rank/select**
 | 2026-07-28 | Implemented T15 estimator and campaign flow | nested train-only OOF calibration; targeted `20/20` | run complete validation |
 | 2026-07-28 | Passed static validation | full suite `101/101`; project guard `0` issues | commit and run CUDA smoke |
 | 2026-07-28 | Passed clean CUDA smoke | `20260728-t15-router-smoke-wb-s3003-a1`; round-trip; select/test unread | run production T15 |
+| 2026-07-28 | Closed production T15 | safe auxiliaries; PESQ `+0.009070`, below T14 and gate | open fine-action T16 |

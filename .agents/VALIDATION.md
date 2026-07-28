@@ -168,6 +168,13 @@ metric/reference profile matches the run profile
   train/rank labeling, nested OOF fits, all 336 policies and quadratic
   checkpoint round-trip. Its deliberately small support did not read
   `val_select` or test.
+- T15 production `20260728-t15-router-wb-s3003-a1` gained `+0.011033` PESQ
+  on rank but only `+0.009070` on select. STOI and SI-SDR guards passed,
+  checkpoint round-trip passed, and test remained unread; T15 is preserved as
+  a negative result.
+- T16 eight-action implementation passed the full suite (`102/102`) and
+  project guard (`0` issues); the exact frozen action list and serialized
+  router dimensions are covered before CUDA smoke.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend
