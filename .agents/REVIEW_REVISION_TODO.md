@@ -2,7 +2,7 @@
 
 Status: **in progress — full reviewer experiment matrix**
 Last update: **2026-07-30**
-Next action: **launch full A-CLEAN WB seed-0 from the clean reviewed snapshot**
+Next action: **monitor full A-CLEAN WB seed-0 to selected-checkpoint test evaluation**
 
 This board addresses the reviewer assessment attached to
 `MetricGAN_Teacher_Student_IEEE_Draft_v2.pdf`. It is a student-evidence
@@ -38,6 +38,7 @@ campaign and does not reopen the closed T1--T16 teacher search.
 | 2026-07-30 | Baseline smoke A3 caught cross-band autocast mismatch | noisy baselines completed; FP16 resample reached teacher complex STFT | force the cross-band reference path to FP32 |
 | 2026-07-30 | Baseline smoke A4 passed | three systems x two test rows; WB/NB metric modes matched; test not used for selection | launch the predeclared full reporting-only evaluation |
 | 2026-07-30 | Full current-protocol baseline evaluation passed independent reconciliation | 824 rows each for `NOISY-WB`, `NOISY-NB` and `MATCHED-INPUT-TEACHER-NB`; CSV hashes and PESQ/STOI/SI-SDR/delta-SNR means reconciled within `1e-6`; 110/110 tests and project guard passed | launch A-CLEAN WB seed-0 |
+| 2026-07-30 | Full clean-only WB seed-0 launched from clean commit `f306a97` | `20260730-review-clean-wb-s0-a1`; 9,754 train pairs, no teacher cache, CUDA, test reserved until selection | monitor training and reconcile the completed package |
 
 ## Frozen experiment matrix
 
