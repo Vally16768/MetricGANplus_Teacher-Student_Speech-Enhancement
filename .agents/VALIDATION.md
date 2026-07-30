@@ -207,6 +207,10 @@ metric/reference profile matches the run profile
   stopped before matched-input teacher metrics because the adapter passed a
   `(batch, length)` waveform to the teacher's 3-D `forward`. The corrected
   adapter now preserves the evaluator's 2-D `denoise_single` contract.
+- Reviewer-baseline smoke A3 completed both noisy references and reached the
+  matched-input teacher, where autocast converted the resampled waveform to
+  FP16 and exposed an unsupported complex-half STFT reconstruction. The
+  cross-band reference path now disables autocast and tests FP32 teacher input.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

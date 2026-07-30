@@ -44,12 +44,25 @@ class BandwidthLimitedTeacher(nn.Module):
         if waveform_8k.ndim != 2:
             raise ValueError("Expected waveform shaped (batch, length).")
         original_length = int(waveform_8k.shape[-1])
-        waveform_16k = resample_mono_audio(waveform_8k, 8_000, 16_000)
-        if hasattr(self.teacher, "denoise_single"):
-            enhanced_16k = self.teacher.denoise_single(waveform_16k)
-        else:
-            enhanced_16k = self.teacher(waveform_16k.unsqueeze(1)).squeeze(1)
-        enhanced_8k = resample_mono_audio(enhanced_16k, 16_000, 8_000)
+        # Resampling inside the evaluator's outer CUDA autocast can produce an
+        # FP16 waveform. The official teacher's complex STFT/iSTFT path must
+        # remain FP32, so this cross-band reference disables autocast locally.
+        device_type = "cuda" if waveform_8k.is_cuda else "cpu"
+        with torch.autocast(device_type=device_type, enabled=False):
+            waveform_16k = resample_mono_audio(
+                waveform_8k.float(),
+                8_000,
+                16_000,
+            )
+            if hasattr(self.teacher, "denoise_single"):
+                enhanced_16k = self.teacher.denoise_single(waveform_16k)
+            else:
+                enhanced_16k = self.teacher(waveform_16k.unsqueeze(1)).squeeze(1)
+            enhanced_8k = resample_mono_audio(
+                enhanced_16k.float(),
+                16_000,
+                8_000,
+            )
         return enhanced_8k[..., :original_length]
 
 

@@ -55,6 +55,23 @@ class ReviewEvidenceTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "batch, length"):
             wrapper.denoise_single(torch.randn(803))
 
+    def test_bandwidth_limited_teacher_single_path_is_float32(self) -> None:
+        class RecordingTeacher(torch.nn.Module):
+            def __init__(self) -> None:
+                super().__init__()
+                self.observed_dtype = None
+
+            def denoise_single(self, waveform: torch.Tensor) -> torch.Tensor:
+                self.observed_dtype = waveform.dtype
+                return waveform
+
+        teacher = RecordingTeacher()
+        wrapper = BandwidthLimitedTeacher(teacher)
+        waveform = torch.randn(2, 803, dtype=torch.float16)
+        observed = wrapper.denoise_single(waveform)
+        self.assertEqual(teacher.observed_dtype, torch.float32)
+        self.assertEqual(observed.dtype, torch.float32)
+
     def test_paired_bootstrap_is_deterministic_and_paired(self) -> None:
         left = np.asarray([2.0, 3.0, 4.0, 5.0])
         right = np.asarray([1.0, 2.0, 3.0, 4.0])
