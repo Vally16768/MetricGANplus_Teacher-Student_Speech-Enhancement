@@ -48,6 +48,8 @@ status. Historical experiment directories are evidence, not canonical docs.
 | `.agents/TEACHER_T15_TODO.md` | completed T15 board and evidence ledger | canonical complete |
 | `.agents/TEACHER_T16_PLAN.md` | executed terminal fine-action search | canonical negative outcome |
 | `.agents/TEACHER_T16_TODO.md` | completed terminal T16 board | canonical closure |
+| `.agents/REVIEW_REVISION_TODO.md` | reviewer-requested experiment and revision board | canonical active |
+| `docs/ADDRESSED_REVIEW.md` | point-by-point reviewer response and article change map | canonical working |
 | `docs/ARTIFACT_POLICY.md` | artifact policy | active, reconcile with this control plane |
 | `docs/FINAL_RESULTS.md` | canonical article-facing S0 table, negative T1 outcome and claim-to-artifact map | canonical reproduced |
 | `docs/audits/2026-07-26-initial-audit.md` | initial forensic audit | historical observed |

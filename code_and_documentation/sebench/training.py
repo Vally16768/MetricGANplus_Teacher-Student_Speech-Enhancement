@@ -152,6 +152,9 @@ class ExperimentConfig:
     bandwidth: str | None = None
     metric_proxy_weight: float = 0.25
     teacher_anchor_weight: float = 0.75
+    distill_mask_weight: float = 0.60
+    distill_teacher_wave_weight: float = 0.25
+    distill_clean_wave_weight: float = 0.15
     metric_discriminator_mode: str = "frozen"
     metric_discriminator_lr: float = 5e-4
     metric_discriminator_rows: int = 100
@@ -1566,6 +1569,9 @@ def run_experiment(config: ExperimentConfig) -> dict[str, Any]:
         pesq_proxy=pesq_proxy_model,
         metric_proxy_weight=config.metric_proxy_weight,
         teacher_anchor_weight=config.teacher_anchor_weight,
+        distill_mask_weight=config.distill_mask_weight,
+        distill_teacher_wave_weight=config.distill_teacher_wave_weight,
+        distill_clean_wave_weight=config.distill_clean_wave_weight,
     )
     trainable_params = [parameter for parameter in model.parameters() if parameter.requires_grad]
     if not trainable_params:

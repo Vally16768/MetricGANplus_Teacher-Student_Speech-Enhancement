@@ -998,7 +998,9 @@ class MetricGANCausalLiteEnhancer(WaveformEnhancer):
             rnn_type=self.rnn_type,
             qat=qat,
         )
-        lookahead_ms = float(n_fft // 2) / float(sample_rate) * 1000.0
+        # Mathematical signal dependency follows the nonzero analysis window,
+        # not the larger zero-padded FFT buffer.
+        lookahead_ms = float(win_length) / (2.0 * float(sample_rate)) * 1000.0
         self.model_config = {
             "arch": arch_name,
             "sample_rate": sample_rate,

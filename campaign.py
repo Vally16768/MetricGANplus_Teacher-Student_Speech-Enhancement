@@ -103,6 +103,27 @@ TEACHER_TRIAL_SCOPE = "teacher_only_metric_improvement"
 T3_DIRECT_SCOPE = "t3_direct_perceptual_pilot"
 TEACHER_CALIBRATION_CELL_ORDER = ("E0-T0", "E0-D-CAL")
 TEACHER_TRIAL_CELL_ORDER = ("E0-T0", "E1-CONTROL", "E2-PESQ")
+REVIEW_STUDENT_SPECS = {
+    "A-CLEAN": {"bandwidth": "wb", "weights": (0.0, 0.0, 1.0), "seeds": (0,)},
+    "A-TWAVE": {"bandwidth": "wb", "weights": (0.0, 1.0, 0.0), "seeds": (0,)},
+    "A-MASK": {"bandwidth": "wb", "weights": (1.0, 0.0, 0.0), "seeds": (0,)},
+    "A-TWAVE-MASK": {
+        "bandwidth": "wb",
+        "weights": (12.0 / 17.0, 5.0 / 17.0, 0.0),
+        "seeds": (0,),
+    },
+    "A-COMPLETE": {
+        "bandwidth": "wb",
+        "weights": (0.60, 0.25, 0.15),
+        "seeds": (1001, 2002),
+    },
+    "N-CLEAN": {"bandwidth": "nb", "weights": (0.0, 0.0, 1.0), "seeds": (0,)},
+    "N-COMPLETE": {
+        "bandwidth": "nb",
+        "weights": (0.60, 0.25, 0.15),
+        "seeds": (1001, 2002),
+    },
+}
 
 
 def sha256(path: str | Path) -> str:
@@ -547,6 +568,7 @@ def _experiment_config(
     lr_patience: int | None = None,
     min_lr: float | None = None,
     mode: str,
+    distill_weights: tuple[float, float, float] = (0.60, 0.25, 0.15),
 ) -> ExperimentConfig:
     profile = resolve_bandwidth(bandwidth)
     model_frontend = dict(frontend or profile.as_dict())
@@ -615,6 +637,9 @@ def _experiment_config(
         pesq_proxy_checkpoint=proxy_checkpoint,
         metric_proxy_weight=float(effective["metric_proxy_weight"]),
         teacher_anchor_weight=float(effective["teacher_anchor_weight"]),
+        distill_mask_weight=float(distill_weights[0]),
+        distill_teacher_wave_weight=float(distill_weights[1]),
+        distill_clean_wave_weight=float(distill_weights[2]),
         metric_discriminator_mode=(
             "alternating" if alternating_metric_discriminator else "frozen"
         ),
@@ -4206,6 +4231,168 @@ def run_t15_oof_calibrated_trial(
     return {"run_root": run_root.as_posix(), **summary}
 
 
+def run_review_student_trial(
+    config: dict[str, Any],
+    *,
+    baseline_run_dir: str | Path,
+    review_cell: str,
+    seed: int,
+    teacher_cache_manifest: str | Path | None,
+    run_id: str,
+    smoke: bool = False,
+) -> dict[str, Any]:
+    """Train one predeclared reviewer-requested student cell."""
+    dataset_audit = validate_campaign_config(config)
+    git = _git_state()
+    if git["dirty"]:
+        raise RuntimeError("Review experiments require a clean committed snapshot.")
+    require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+    device = require_training_cuda(str(config["runtime"]["device"]))
+    config["runtime"]["device"] = device
+    spec = REVIEW_STUDENT_SPECS.get(str(review_cell))
+    if spec is None:
+        raise ValueError(f"Unknown predeclared review cell: {review_cell}")
+    if int(seed) not in tuple(int(value) for value in spec["seeds"]):
+        raise ValueError(f"Seed {seed} is not predeclared for {review_cell}.")
+    weights = tuple(float(value) for value in spec["weights"])
+    needs_teacher = weights[0] > 0.0 or weights[1] > 0.0
+    cache_manifest = (
+        Path(teacher_cache_manifest).expanduser().resolve()
+        if teacher_cache_manifest
+        else None
+    )
+    if needs_teacher and (cache_manifest is None or not cache_manifest.is_file()):
+        raise FileNotFoundError(f"{review_cell} requires the official teacher cache.")
+    if not needs_teacher and cache_manifest is not None:
+        raise ValueError(f"{review_cell} must not load teacher targets.")
+
+    run_root = (
+        Path(str(config["runtime"]["run_root"])).expanduser().resolve() / run_id
+    )
+    provenance_path = run_root / "provenance" / "provenance.json"
+    if not provenance_path.is_file():
+        raise FileNotFoundError("Review training requires a planned run contract.")
+    provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+    resolved_config = run_root / "provenance" / "config_resolved.yaml"
+    if (
+        provenance.get("status") != "planned"
+        or provenance.get("git_commit") != git["commit"]
+        or not resolved_config.is_file()
+        or sha256(resolved_config) != provenance.get("config_sha256")
+    ):
+        raise ValueError("Review run contract does not match clean code/config.")
+
+    baseline_root = Path(baseline_run_dir).expanduser().resolve()
+    baseline_summary_path = baseline_root / "metrics" / "campaign_summary.json"
+    baseline = json.loads(baseline_summary_path.read_text(encoding="utf-8"))
+    expected_teacher_hash = str(config["model"]["teacher_checkpoint_sha256"])
+    if (
+        baseline["baseline_contract"]["teacher_checkpoint_sha256"]
+        != expected_teacher_hash
+    ):
+        raise ValueError("Review baseline teacher identity mismatch.")
+    source_contract = {
+        "baseline_summary_sha256": sha256(baseline_summary_path),
+        "teacher_checkpoint_sha256": expected_teacher_hash,
+        "teacher_cache_manifest_sha256": (
+            sha256(cache_manifest) if cache_manifest is not None else None
+        ),
+        "train_manifest_sha256": sha256(config["dataset"]["train_fit"]),
+        "val_rank_manifest_sha256": sha256(config["dataset"]["val_rank"]),
+        "val_select_manifest_sha256": sha256(config["dataset"]["val_select"]),
+        "test_manifest_sha256": sha256(config["dataset"]["test"]),
+        "test_selection_input": False,
+    }
+    provenance.update(
+        {
+            "status": "running",
+            "campaign_scope": "ieee_review_student_evidence",
+            "review_cell": review_cell,
+            "seed": int(seed),
+            "distill_weights": list(weights),
+            "verification_only": bool(smoke),
+            "dataset_audit": dataset_audit,
+            "source_contract": source_contract,
+        }
+    )
+    _atomic_json(provenance_path, provenance)
+    bandwidth = str(spec["bandwidth"])
+    cell_id = f"{review_cell}-S{int(seed)}"
+    try:
+        result = _run_cell(
+            config=config,
+            run_root=run_root,
+            cell=cell_id,
+            family=str(config["model"][f"student_{bandwidth}_family"]),
+            bandwidth=bandwidth,
+            loss_recipe="D1",
+            epochs=int(
+                config["smoke"]["student_epochs"]
+                if smoke
+                else config["training"]["student_epochs"]
+            ),
+            lr=float(config["training"]["student_lr"]),
+            seed=int(seed),
+            teacher_cache_manifest=(
+                cache_manifest.as_posix() if cache_manifest is not None else None
+            ),
+            include_test=not smoke,
+            early_stop_patience=int(
+                config["training"]["student_early_stop_patience"]
+            ),
+            lr_factor=float(config["training"]["student_lr_factor"]),
+            lr_patience=int(config["training"]["student_lr_patience"]),
+            min_lr=float(config["training"]["student_min_lr"]),
+            distill_weights=weights,
+            mode="smoke" if smoke else "full",
+        )
+    except BaseException as exc:
+        provenance["status"] = "failed"
+        provenance["failure"] = {
+            "type": exc.__class__.__name__,
+            "message": str(exc),
+            "traceback": traceback.format_exc(),
+        }
+        _atomic_json(provenance_path, provenance)
+        _atomic_json(
+            run_root / "status.json",
+            {"status": "failed", "valid_for_promotion": False},
+        )
+        raise
+    summary = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "campaign_scope": "ieee_review_student_evidence",
+        "review_cell": review_cell,
+        "bandwidth": bandwidth,
+        "seed": int(seed),
+        "distill_weights": list(weights),
+        "source_contract": source_contract,
+        "verification_only": bool(smoke),
+        "test_read_after_selection": not smoke,
+        "cell": result,
+    }
+    _atomic_json(run_root / "metrics" / "campaign_summary.json", summary)
+    provenance["status"] = "verification_complete" if smoke else "evaluated"
+    provenance["result_summary_sha256"] = sha256(
+        run_root / "metrics" / "campaign_summary.json"
+    )
+    _atomic_json(provenance_path, provenance)
+    _atomic_json(
+        run_root / "status.json",
+        {
+            "status": "verification_complete" if smoke else "evaluated",
+            "campaign_scope": "ieee_review_student_evidence",
+            "review_cell": review_cell,
+            "seed": int(seed),
+            "valid_for_promotion": False,
+            "verification_only": bool(smoke),
+            "test_read_after_selection": not smoke,
+        },
+    )
+    return {"run_root": run_root.as_posix(), **summary}
+
+
 def run_all(
     config: dict[str, Any],
     *,
@@ -6234,6 +6421,17 @@ def parse_args() -> argparse.Namespace:
         t16_search.add_argument("--t15-run-dir", required=True)
         t16_search.add_argument("--teacher-checkpoint", required=True)
         t16_search.add_argument("--run-id", required=True)
+    for command in ("smoke-review-student", "train-review-student"):
+        review_student = subparsers.add_parser(command)
+        review_student.add_argument("--baseline-run-dir", required=True)
+        review_student.add_argument(
+            "--review-cell",
+            required=True,
+            choices=tuple(REVIEW_STUDENT_SPECS),
+        )
+        review_student.add_argument("--seed", required=True, type=int)
+        review_student.add_argument("--teacher-cache-manifest")
+        review_student.add_argument("--run-id", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -6907,6 +7105,17 @@ def main() -> None:
             output_cell="T16-FINE-ACTION-ROUTER",
             search_runner=run_t16_fine_action_search,
         )
+    elif args.command in {"smoke-review-student", "train-review-student"}:
+        config = load_campaign_config(args.config)
+        result = run_review_student_trial(
+            config,
+            baseline_run_dir=args.baseline_run_dir,
+            review_cell=args.review_cell,
+            seed=args.seed,
+            teacher_cache_manifest=args.teacher_cache_manifest,
+            run_id=args.run_id,
+            smoke=args.command == "smoke-review-student",
+        )
     else:
         config = load_campaign_config(args.config)
     if args.command == "validate":
@@ -7051,6 +7260,8 @@ def main() -> None:
         "search-t15-router",
         "smoke-t16-router",
         "search-t16-router",
+        "train-review-student",
+        "smoke-review-student",
         "smoke-resume",
         "continue-students",
     }:

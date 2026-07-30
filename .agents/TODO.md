@@ -81,3 +81,10 @@ Update this register whenever a gate changes state.
 The next item may start only when its upstream gate passes. A failed experiment
 is recorded with its cause and remains non-canonical. Commit and push are
 authorized only after tests and the project guard pass.
+
+## Active IEEE-review revision
+
+The teacher-search line remains closed at T16. Reviewer-requested student
+ablations, current-protocol baselines, repeated seeds, uncertainty, streaming
+analysis and publication corrections are tracked exclusively in
+`.agents/REVIEW_REVISION_TODO.md`.

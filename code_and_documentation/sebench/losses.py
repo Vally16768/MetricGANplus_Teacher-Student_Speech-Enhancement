@@ -473,6 +473,9 @@ class CompositeEnhancementLoss(nn.Module):
         pesq_proxy: nn.Module | None = None,
         metric_proxy_weight: float = 0.25,
         teacher_anchor_weight: float = 0.75,
+        distill_mask_weight: float = 0.60,
+        distill_teacher_wave_weight: float = 0.25,
+        distill_clean_wave_weight: float = 0.15,
     ):
         super().__init__()
         self.recipe = recipe.upper()
@@ -509,6 +512,15 @@ class CompositeEnhancementLoss(nn.Module):
         self.teacher_anchor_weight = float(teacher_anchor_weight)
         if not 0.0 <= self.teacher_anchor_weight <= 1.0:
             raise ValueError("teacher_anchor_weight must be in [0, 1].")
+        self.distill_weights = {
+            "mask": float(distill_mask_weight),
+            "teacher_wave": float(distill_teacher_wave_weight),
+            "clean_wave": float(distill_clean_wave_weight),
+        }
+        if any(value < 0.0 for value in self.distill_weights.values()):
+            raise ValueError("Distillation weights must be non-negative.")
+        if sum(self.distill_weights.values()) <= 0.0:
+            raise ValueError("At least one distillation weight must be positive.")
         self.metric_objective = (
             MetricGANGeneratorObjective(pesq_proxy)
             if pesq_proxy is not None
@@ -569,24 +581,39 @@ class CompositeEnhancementLoss(nn.Module):
                 predicted_pesq=predicted_pesq,
             )
 
-        if teacher_wav is None or teacher_mask_erb is None:
-            raise ValueError(f"Loss recipe {self.recipe} requires teacher_wav and teacher_mask_erb.")
+        mask_weight = self.distill_weights["mask"]
+        teacher_wave_weight = self.distill_weights["teacher_wave"]
+        clean_wave_weight = self.distill_weights["clean_wave"]
+        if mask_weight > 0.0 and teacher_mask_erb is None:
+            raise ValueError(f"Loss recipe {self.recipe} requires teacher_mask_erb.")
+        if teacher_wave_weight > 0.0 and teacher_wav is None:
+            raise ValueError(f"Loss recipe {self.recipe} requires teacher_wav.")
 
-        student_mask = waveform_to_erb_mask(
-            noisy,
-            enhanced,
-            erb_bands=self.erb_bands,
-            sample_rate=self.sample_rate,
-            n_fft=self.n_fft,
-            hop_length=self.hop_length,
-            win_length=self.win_length,
+        teacher_mask = zero
+        if mask_weight > 0.0:
+            student_mask = waveform_to_erb_mask(
+                noisy,
+                enhanced,
+                erb_bands=self.erb_bands,
+                sample_rate=self.sample_rate,
+                n_fft=self.n_fft,
+                hop_length=self.hop_length,
+                win_length=self.win_length,
+            )
+            teacher_mask = self.teacher_mask_loss(student_mask, teacher_mask_erb)
+        teacher_wave = (
+            self.complex_loss(enhanced, teacher_wav)
+            if teacher_wave_weight > 0.0
+            else zero
         )
-        teacher_mask = self.teacher_mask_loss(student_mask, teacher_mask_erb)
-        teacher_wave = self.complex_loss(enhanced, teacher_wav)
         spectral = self.complex_loss(enhanced, clean)
         sisdr = enhanced.new_tensor(0.0)
 
-        total = 0.60 * teacher_mask + 0.25 * teacher_wave + 0.15 * spectral
+        total = (
+            mask_weight * teacher_mask
+            + teacher_wave_weight * teacher_wave
+            + clean_wave_weight * spectral
+        )
         base_recipe = self.recipe.removesuffix("_PESQ")
         if base_recipe == "D2":
             sisdr = self.sisdr_loss(enhanced, clean)

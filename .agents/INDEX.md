@@ -44,6 +44,7 @@ This directory is the canonical control plane for the research project.
 | [TEACHER_T15_TODO.md](TEACHER_T15_TODO.md) | Completed T15 board and below-gate evidence | T15 audit |
 | [TEACHER_T16_PLAN.md](TEACHER_T16_PLAN.md) | Executed terminal fine-action quadratic search | T16 audit |
 | [TEACHER_T16_TODO.md](TEACHER_T16_TODO.md) | Completed terminal T16 board | canonical closure |
+| [REVIEW_REVISION_TODO.md](REVIEW_REVISION_TODO.md) | Active IEEE-review experiment and article-revision board | every review-revision iteration |
 
 Operational skill:
 [`skills/manage-metricgan-research/SKILL.md`](skills/manage-metricgan-research/SKILL.md).
@@ -68,6 +69,8 @@ without T17**.
 
 Open work:
 
+- execute the active reviewer-requested ablations, multi-seed and analysis
+  campaign in `.agents/REVIEW_REVISION_TODO.md`;
 - preserve T16 and earlier negative evidence for the article;
 - do not continue teacher search without a new explicit research mandate;
 - no cache, student or test evaluation may start before teacher promotion;

@@ -75,7 +75,7 @@ class StudentArchitectureTests(unittest.TestCase):
             self.assertEqual(model.model_config["hidden_size"], 160)
             self.assertEqual(model.model_config["num_layers"], 3)
             self.assertEqual(model.model_config["linear_dims"][1], 224)
-            self.assertEqual(model.model_config["lookahead_ms"], 16.0)
+            self.assertEqual(model.model_config["lookahead_ms"], 10.0)
         self.assertEqual(sum(p.numel() for p in wb.parameters()), 604_386)
         self.assertEqual(sum(p.numel() for p in nb.parameters()), 514_018)
         with self.assertRaisesRegex(ValueError, "mismatch"):

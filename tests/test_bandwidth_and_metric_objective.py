@@ -189,6 +189,70 @@ class MetricObjectiveTests(unittest.TestCase):
         self.assertIsNotNone(enhanced.grad)
         self.assertNotEqual(float(breakdown.predicted_pesq), 0.0)
 
+    def test_clean_only_ablation_requires_no_teacher_targets(self) -> None:
+        loss_fn = CompositeEnhancementLoss(
+            "D1",
+            sample_rate=8000,
+            n_fft=256,
+            hop_length=80,
+            win_length=160,
+            erb_bands=8,
+            distill_mask_weight=0.0,
+            distill_teacher_wave_weight=0.0,
+            distill_clean_wave_weight=1.0,
+        )
+        enhanced = torch.randn(1, 1, 2048, requires_grad=True)
+        clean = torch.randn_like(enhanced)
+        noisy = torch.randn_like(enhanced)
+        breakdown = loss_fn(
+            enhanced,
+            clean,
+            noisy,
+            epoch=1,
+            total_epochs=1,
+        )
+        self.assertAlmostEqual(float(breakdown.teacher_mask), 0.0, places=7)
+        self.assertAlmostEqual(float(breakdown.teacher_wave), 0.0, places=7)
+        self.assertAlmostEqual(
+            float(breakdown.total),
+            float(breakdown.spectral),
+            places=6,
+        )
+        breakdown.total.backward()
+        self.assertIsNotNone(enhanced.grad)
+
+    def test_distillation_ablation_weights_fold_exactly(self) -> None:
+        loss_fn = CompositeEnhancementLoss(
+            "D1",
+            sample_rate=8000,
+            n_fft=256,
+            hop_length=80,
+            win_length=160,
+            erb_bands=8,
+            distill_mask_weight=12.0 / 17.0,
+            distill_teacher_wave_weight=5.0 / 17.0,
+            distill_clean_wave_weight=0.0,
+        )
+        enhanced = torch.randn(1, 1, 2048)
+        clean = torch.randn_like(enhanced)
+        noisy = torch.randn_like(enhanced)
+        teacher_wav = torch.randn_like(enhanced)
+        teacher_mask = torch.rand(1, 8, 26)
+        breakdown = loss_fn(
+            enhanced,
+            clean,
+            noisy,
+            epoch=1,
+            total_epochs=1,
+            teacher_wav=teacher_wav,
+            teacher_mask_erb=teacher_mask,
+        )
+        expected = (
+            (12.0 / 17.0) * breakdown.teacher_mask
+            + (5.0 / 17.0) * breakdown.teacher_wave
+        )
+        self.assertTrue(torch.allclose(breakdown.total, expected))
+
 
 class RuntimeContractTests(unittest.TestCase):
     def test_unindexed_cuda_is_normalized_to_current_gpu(self) -> None:

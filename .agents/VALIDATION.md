@@ -361,8 +361,9 @@ metric/reference profile matches the run profile
 - first full attempt `20260727-full-wbnb-s0-a1` was deliberately stopped and is
   non-promotable; artifacts and hashes are preserved.
 - causal-max structural audit passed: WB `604386` parameters, NB `514018`,
-  GRU hidden size `160`, three layers, linear size `224`, fixed 16 ms
-  lookahead.
+  GRU hidden size `160`, three layers and linear size `224`. The historical
+  `16 ms` metadata used half the padded FFT and is superseded by the corrected
+  10-ms nonzero-window dependency contract.
 - official teacher structure passed: exact 512/256/512 Hamming/log-magnitude
   frontend, 1,895,514 parameters, 21/21 mapped generator tensors and zero
   skipped tensors.

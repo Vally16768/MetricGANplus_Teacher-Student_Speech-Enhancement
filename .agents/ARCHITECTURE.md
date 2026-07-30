@@ -113,9 +113,17 @@ waveform
 
 Both aliases use the same causal capacity so bandwidth is the controlled
 variable. The recurrent graph is frame-causal; centered STFT analysis imposes
-a fixed 16 ms lookahead for both profiles. The WB and NB models contain
+a 10 ms mathematical future-signal dependency for both profiles because the
+nonzero analysis window is 20 ms. The larger zero-padded FFT buffer and
+library framing behavior are reported separately. The WB and NB models contain
 604,386 and 514,018 trainable parameters respectively because their spectral
 input/output dimensions differ.
+
+For the IEEE-review ablation campaign, D1 exposes three non-negative frozen
+weights over ERB-mask imitation, teacher-waveform complex-STFT distance and
+clean-waveform complex-STFT distance. The canonical complete recipe remains
+`(0.60, 0.25, 0.15)`; predeclared zeroed/renormalized variants use the exact
+same student, optimizer, data split and selection policy.
 
 The recovered design is the `causal_max` student used in the historical
 MP-SENet teacher–student campaign. It is a MetricGAN-style magnitude-mask
