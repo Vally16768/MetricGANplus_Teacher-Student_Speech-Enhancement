@@ -17,9 +17,9 @@ campaign and does not reopen the closed T1--T16 teacher search.
 | R4 | Correct lookahead | contract corrected to 10 ms; numerical streaming/dependency test pending | in-progress |
 | R5 | Multi-seed evidence | complete D1 WB/NB seeds 0, 1001, 2002 | pending |
 | R6 | Uncertainty | sample-level test metrics and paired 95% bootstrap CIs | in-progress |
-| R7 | Exact provenance | teacher/code/config/manifest/speaker identifiers and hashes | pending |
-| R8 | Complexity | teacher neural-core MAC/s plus frontend/buffer/activation caveats | pending |
-| R9 | References and presentation | foundational citations, new diagram/plots, shorter historical/refinement text | pending |
+| R7 | Exact provenance | teacher/code/config/manifest/speaker identifiers and hashes | passed |
+| R8 | Complexity | teacher neural-core MAC/s plus frontend/buffer/activation caveats | in-progress |
+| R9 | References and presentation | foundational citations, new diagram/plots, shorter historical/refinement text | in-progress |
 | R10 | Addressed-review document | every point linked to evidence and article-ready replacement text | pending |
 | R11 | Independent audit | tests, guard, run/package/claim reconciliation | pending |
 
@@ -39,6 +39,7 @@ campaign and does not reopen the closed T1--T16 teacher search.
 | 2026-07-30 | Baseline smoke A4 passed | three systems x two test rows; WB/NB metric modes matched; test not used for selection | launch the predeclared full reporting-only evaluation |
 | 2026-07-30 | Full current-protocol baseline evaluation passed independent reconciliation | 824 rows each for `NOISY-WB`, `NOISY-NB` and `MATCHED-INPUT-TEACHER-NB`; CSV hashes and PESQ/STOI/SI-SDR/delta-SNR means reconciled within `1e-6`; 110/110 tests and project guard passed | launch A-CLEAN WB seed-0 |
 | 2026-07-30 | Full clean-only WB seed-0 launched from clean commit `f306a97` | `20260730-review-clean-wb-s0-a1`; 9,754 train pairs, no teacher cache, CUDA, test reserved until selection | monitor training and reconcile the completed package |
+| 2026-07-30 | Added article-ready provenance, complexity and foundational-reference material | canonical commit/checkpoint/config/manifest hashes; validation speaker IDs; teacher 118.02M neural-core MAC/s derivation; verified DOI list | retain complexity as analytical evidence and complete figure/plot revisions |
 
 ## Frozen experiment matrix
 
