@@ -191,6 +191,11 @@ metric/reference profile matches the run profile
   that the legacy smoke profile traversed all 9,754 training pairs with batch
   two. Verification-only student training is now bounded to 32 rows; full
   review runs remain unbounded and canonical.
+- The bounded-train A2 smoke completed its 32-row clean-only epoch, then
+  exposed that the legacy smoke path still evaluated the complete validation
+  splits twice. It was stopped during redundant final evaluation; reviewer
+  verification now limits both training and evaluation support, while full
+  runs remain unchanged.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

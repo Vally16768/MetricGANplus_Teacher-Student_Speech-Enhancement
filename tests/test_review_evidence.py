@@ -1,0 +1,47 @@
+from __future__ import annotations
+
+import sys
+import unittest
+from pathlib import Path
+
+import numpy as np
+import torch
+
+
+ROOT = Path(__file__).resolve().parents[1]
+CODE = ROOT / "code_and_documentation"
+if str(CODE) not in sys.path:
+    sys.path.insert(0, str(CODE))
+
+from sebench.review_evidence import (  # noqa: E402
+    BandwidthLimitedTeacher,
+    NoisyPassthrough,
+    paired_bootstrap,
+)
+
+
+class ReviewEvidenceTests(unittest.TestCase):
+    def test_noisy_passthrough_is_exact(self) -> None:
+        waveform = torch.randn(2, 1, 800)
+        self.assertTrue(torch.equal(NoisyPassthrough()(waveform), waveform))
+
+    def test_bandwidth_limited_teacher_preserves_8k_shape(self) -> None:
+        wrapper = BandwidthLimitedTeacher(torch.nn.Identity())
+        waveform = torch.randn(2, 1, 803)
+        observed = wrapper(waveform)
+        self.assertEqual(observed.shape, waveform.shape)
+        self.assertTrue(torch.isfinite(observed).all())
+
+    def test_paired_bootstrap_is_deterministic_and_paired(self) -> None:
+        left = np.asarray([2.0, 3.0, 4.0, 5.0])
+        right = np.asarray([1.0, 2.0, 3.0, 4.0])
+        first = paired_bootstrap(left, right, draws=2_000)
+        second = paired_bootstrap(left, right, draws=2_000)
+        self.assertEqual(first, second)
+        self.assertEqual(first["mean_delta"], 1.0)
+        self.assertEqual(first["ci95_low"], 1.0)
+        self.assertEqual(first["ci95_high"], 1.0)
+
+
+if __name__ == "__main__":
+    unittest.main()

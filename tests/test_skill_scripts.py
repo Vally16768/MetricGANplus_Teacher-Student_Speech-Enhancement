@@ -23,6 +23,7 @@ ARCHITECTURE_SOURCES = (
     "code_and_documentation/sebench/metric_proxy_training.py",
     "code_and_documentation/sebench/models.py",
     "code_and_documentation/sebench/research_plan.py",
+    "code_and_documentation/sebench/review_evidence.py",
     "code_and_documentation/sebench/runtime.py",
     "code_and_documentation/sebench/t3_perceptual.py",
     "code_and_documentation/sebench/t3_support.py",

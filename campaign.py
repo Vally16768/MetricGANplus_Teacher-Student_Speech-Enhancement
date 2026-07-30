@@ -70,6 +70,7 @@ from sebench.t15_oof_calibration import (  # noqa: E402
     run_t15_oof_calibrated_search,
 )
 from sebench.t16_fine_action_router import run_t16_fine_action_search  # noqa: E402
+from sebench.review_evidence import evaluate_current_protocol_baselines  # noqa: E402
 from sebench.teacher_cache import (  # noqa: E402
     TeacherCacheTarget,
     build_multi_target_teacher_cache,
@@ -683,6 +684,9 @@ def _experiment_config(
         benchmark_seconds=int(evaluation["benchmark_seconds"]),
         benchmark_repeats=int(evaluation["benchmark_repeats"]),
         eval_batch_size=int(evaluation["eval_batch_size"]),
+        max_eval_files=2 if mode == "smoke" else None,
+        rank_max_eval_files=2 if mode == "smoke" else None,
+        final_max_eval_files=2 if mode == "smoke" else None,
         cache_eval_audio=True,
         rank_compute_composite=False,
         select_compute_composite=bool(evaluation["compute_composite"]),
@@ -4394,6 +4398,93 @@ def run_review_student_trial(
     return {"run_root": run_root.as_posix(), **summary}
 
 
+def run_review_baselines_trial(
+    config: dict[str, Any],
+    *,
+    teacher_checkpoint: str | Path,
+    run_id: str,
+    smoke: bool = False,
+) -> dict[str, Any]:
+    dataset_audit = validate_campaign_config(config)
+    git = _git_state()
+    if git["dirty"]:
+        raise RuntimeError("Review baseline evaluation requires a clean snapshot.")
+    require_shared_venv(Path(str(config["runtime"]["shared_venv"])))
+    device = require_training_cuda(str(config["runtime"]["device"]))
+    run_root = (
+        Path(str(config["runtime"]["run_root"])).expanduser().resolve() / run_id
+    )
+    provenance_path = run_root / "provenance" / "provenance.json"
+    provenance = json.loads(provenance_path.read_text(encoding="utf-8"))
+    resolved_config = run_root / "provenance" / "config_resolved.yaml"
+    if (
+        provenance.get("status") != "planned"
+        or provenance.get("git_commit") != git["commit"]
+        or not resolved_config.is_file()
+        or sha256(resolved_config) != provenance.get("config_sha256")
+        or sha256(teacher_checkpoint)
+        != str(config["model"]["teacher_checkpoint_sha256"])
+    ):
+        raise ValueError("Review baseline contract mismatch.")
+    provenance.update(
+        {
+            "status": "running",
+            "campaign_scope": "ieee_review_current_protocol_baselines",
+            "verification_only": bool(smoke),
+            "dataset_audit": dataset_audit,
+            "test_selection_input": False,
+        }
+    )
+    _atomic_json(provenance_path, provenance)
+
+    def progress(message: str) -> None:
+        print(f"[REVIEW-BASELINES] {message}", file=sys.stderr, flush=True)
+
+    try:
+        result = evaluate_current_protocol_baselines(
+            teacher_checkpoint=teacher_checkpoint,
+            test_manifest=config["dataset"]["test"],
+            output_dir=run_root / "evidence",
+            device=device,
+            max_files=2 if smoke else None,
+            progress_callback=progress,
+        )
+    except BaseException as exc:
+        provenance["status"] = "failed"
+        provenance["failure"] = {
+            "type": exc.__class__.__name__,
+            "message": str(exc),
+            "traceback": traceback.format_exc(),
+        }
+        _atomic_json(provenance_path, provenance)
+        _atomic_json(run_root / "status.json", {"status": "failed"})
+        raise
+    summary = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "campaign_scope": "ieee_review_current_protocol_baselines",
+        "verification_only": bool(smoke),
+        "test_selection_input": False,
+        "result": result,
+    }
+    _atomic_json(run_root / "metrics" / "campaign_summary.json", summary)
+    provenance["status"] = "verification_complete" if smoke else "evaluated"
+    provenance["result_summary_sha256"] = sha256(
+        run_root / "metrics" / "campaign_summary.json"
+    )
+    _atomic_json(provenance_path, provenance)
+    _atomic_json(
+        run_root / "status.json",
+        {
+            "status": provenance["status"],
+            "valid_for_promotion": False,
+            "verification_only": bool(smoke),
+            "test_selection_input": False,
+        },
+    )
+    return {"run_root": run_root.as_posix(), **summary}
+
+
 def run_all(
     config: dict[str, Any],
     *,
@@ -6433,6 +6524,10 @@ def parse_args() -> argparse.Namespace:
         review_student.add_argument("--seed", required=True, type=int)
         review_student.add_argument("--teacher-cache-manifest")
         review_student.add_argument("--run-id", required=True)
+    for command in ("smoke-review-baselines", "evaluate-review-baselines"):
+        review_baselines = subparsers.add_parser(command)
+        review_baselines.add_argument("--teacher-checkpoint", required=True)
+        review_baselines.add_argument("--run-id", required=True)
     audit = subparsers.add_parser("audit-run")
     audit.add_argument("--run-dir", required=True)
     monitor = subparsers.add_parser("monitor-run")
@@ -7117,6 +7212,17 @@ def main() -> None:
             run_id=args.run_id,
             smoke=args.command == "smoke-review-student",
         )
+    elif args.command in {
+        "smoke-review-baselines",
+        "evaluate-review-baselines",
+    }:
+        config = load_campaign_config(args.config)
+        result = run_review_baselines_trial(
+            config,
+            teacher_checkpoint=args.teacher_checkpoint,
+            run_id=args.run_id,
+            smoke=args.command == "smoke-review-baselines",
+        )
     else:
         config = load_campaign_config(args.config)
     if args.command == "validate":
@@ -7263,6 +7369,8 @@ def main() -> None:
         "search-t16-router",
         "train-review-student",
         "smoke-review-student",
+        "smoke-review-baselines",
+        "evaluate-review-baselines",
         "smoke-resume",
         "continue-students",
     }:

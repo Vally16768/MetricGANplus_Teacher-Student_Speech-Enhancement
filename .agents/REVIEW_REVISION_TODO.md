@@ -31,6 +31,7 @@ campaign and does not reopen the closed T1--T16 teacher search.
 | 2026-07-30 | Added configurable D1 component weights and review run entry point | focused tests; full suite `104/104` | guard and CUDA smoke |
 | 2026-07-30 | Corrected mathematical lookahead metadata | `win_length/(2*sample_rate)=10 ms` | add numerical streaming evidence |
 | 2026-07-30 | Stopped first clean-only smoke as a harness failure | full 9,754-row train manifest with smoke batch 2; no result claimed | bound verification-only training support |
+| 2026-07-30 | Stopped bounded-train smoke A2 after it exposed full validation evaluation | 32 train rows passed; legacy smoke evaluated 128/1,690 rows twice | bound verification-only evaluation support |
 
 ## Frozen experiment matrix
 

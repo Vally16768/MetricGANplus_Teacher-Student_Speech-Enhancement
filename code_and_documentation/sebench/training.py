@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import math
 import os
@@ -716,6 +717,7 @@ def autotune_loader_profile(
     max_steps: int = 120,
     warmup_steps: int = 30,
     progress_callback: Callable[[str], None] | None = None,
+    sample_metrics_out: str | Path | None = None,
 ) -> dict[str, Any]:
     if not candidates_num_workers:
         raise ValueError("candidates_num_workers cannot be empty.")
@@ -1247,6 +1249,7 @@ def evaluate_manifest(
     dnsmos_bak: list[float] = []
     dnsmos_ovr: list[float] = []
     saved_samples: list[str] = []
+    sample_metric_rows: list[dict[str, Any]] = []
 
     out_dir = Path(sample_dir) if sample_dir else None
     if out_dir is not None:
@@ -1307,6 +1310,30 @@ def evaluate_manifest(
                 delta_snr_value = delta_snr(clean_np, noisy_np, enhanced_np)
                 if np.isfinite(delta_snr_value):
                     delta_snr_values.append(delta_snr_value)
+                pair_id = hashlib.sha256(
+                    f"{row.noisy}\\0{row.clean}".encode("utf-8")
+                ).hexdigest()[:20]
+                sample_metric_rows.append(
+                    {
+                        "pair_id": pair_id,
+                        "pesq": float(pesq) if np.isfinite(pesq) else None,
+                        "stoi": (
+                            float(stoi_value)
+                            if np.isfinite(stoi_value)
+                            else None
+                        ),
+                        "sisdr": (
+                            float(sisdr_value)
+                            if np.isfinite(sisdr_value)
+                            else None
+                        ),
+                        "delta_snr": (
+                            float(delta_snr_value)
+                            if np.isfinite(delta_snr_value)
+                            else None
+                        ),
+                    }
+                )
                 if compute_composite and np.isfinite(pesq):
                     try:
                         composite = composite_scores(clean_np, enhanced_np, sr, pesq_value=pesq)
@@ -1394,6 +1421,24 @@ def evaluate_manifest(
         metrics["dnsmos_sig_mean"] = float(mean(dnsmos_sig))
         metrics["dnsmos_bak_mean"] = float(mean(dnsmos_bak))
         metrics["dnsmos_ovr_mean"] = float(mean(dnsmos_ovr))
+    if sample_metrics_out is not None:
+        sample_metrics_path = Path(sample_metrics_out)
+        sample_metrics_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = sample_metrics_path.with_suffix(
+            sample_metrics_path.suffix + ".tmp"
+        )
+        with temporary.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(
+                handle,
+                fieldnames=("pair_id", "pesq", "stoi", "sisdr", "delta_snr"),
+            )
+            writer.writeheader()
+            writer.writerows(sample_metric_rows)
+        temporary.replace(sample_metrics_path)
+        metrics["sample_metrics_path"] = sample_metrics_path.as_posix()
+        metrics["sample_metrics_sha256"] = hashlib.sha256(
+            sample_metrics_path.read_bytes()
+        ).hexdigest()
     return metrics
 
 

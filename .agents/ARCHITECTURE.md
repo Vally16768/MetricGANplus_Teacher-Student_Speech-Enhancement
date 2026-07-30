@@ -125,6 +125,12 @@ clean-waveform complex-STFT distance. The canonical complete recipe remains
 `(0.60, 0.25, 0.15)`; predeclared zeroed/renormalized variants use the exact
 same student, optimizer, data split and selection policy.
 
+Reviewer evidence utilities in
+`code_and_documentation/sebench/review_evidence.py` provide current-protocol
+noisy WB/NB baselines, an 8-kHz-input/8-kHz-output adapter around the pinned
+WB teacher, privacy-safe sample-level metric tables and deterministic paired
+bootstrap intervals.
+
 The recovered design is the `causal_max` student used in the historical
 MP-SENet teacher–student campaign. It is a MetricGAN-style magnitude-mask
 student, not the full MP-SENet magnitude/phase teacher architecture. Only its
