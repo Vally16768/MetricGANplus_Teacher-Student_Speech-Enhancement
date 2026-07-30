@@ -483,3 +483,9 @@ metric/reference profile matches the run profile
 - the updated project skill and iterative execution board pass the skill
   validator, 48/48 unit/integration tests and the project guard with zero
   issues; this was the pre-closure control-plane checkpoint.
+- reviewer baseline evaluation
+  `20260730-review-baselines-test-s0-a1` completed all 824 test pairs for
+  `NOISY-WB`, `NOISY-NB` and `MATCHED-INPUT-TEACHER-NB`; sample-level CSV
+  hashes and PESQ/STOI/SI-SDR/delta-SNR means independently reconciled within
+  `1e-6`, test was not a selection input, 110/110 tests passed and the project
+  guard reported zero issues.

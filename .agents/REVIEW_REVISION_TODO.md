@@ -1,8 +1,8 @@
 # IEEE review revision execution board
 
-Status: **in progress — runtime validation**
+Status: **in progress — full reviewer experiment matrix**
 Last update: **2026-07-30**
-Next action: **project guard, clean commit and CUDA smoke for cached/non-cached ablations**
+Next action: **launch full A-CLEAN WB seed-0 from the clean reviewed snapshot**
 
 This board addresses the reviewer assessment attached to
 `MetricGAN_Teacher_Student_IEEE_Draft_v2.pdf`. It is a student-evidence
@@ -11,12 +11,12 @@ campaign and does not reopen the closed T1--T16 teacher search.
 | ID | Review item | Required evidence | Status |
 |---|---|---|---|
 | R0 | Reconcile draft claims and canonical S0 package | draft/review/S0 audit; response ledger | passed |
-| R1 | Current-protocol noisy baselines | WB and NB, 824 test pairs, matched PESQ | pending |
+| R1 | Current-protocol noisy baselines | WB and NB, 824 test pairs, matched PESQ | passed |
 | R2 | Isolate knowledge distillation | WB seed 0: clean-only, teacher-wave only, ERB-mask only, teacher-wave+mask, complete D1 | in-progress |
-| R3 | Narrowband references | NB clean-only student and matched-input 8-kHz teacher adapter | pending |
+| R3 | Narrowband references | NB clean-only student and matched-input 8-kHz teacher adapter | in-progress |
 | R4 | Correct lookahead | contract corrected to 10 ms; numerical streaming/dependency test pending | in-progress |
 | R5 | Multi-seed evidence | complete D1 WB/NB seeds 0, 1001, 2002 | pending |
-| R6 | Uncertainty | sample-level test metrics and paired 95% bootstrap CIs | pending |
+| R6 | Uncertainty | sample-level test metrics and paired 95% bootstrap CIs | in-progress |
 | R7 | Exact provenance | teacher/code/config/manifest/speaker identifiers and hashes | pending |
 | R8 | Complexity | teacher neural-core MAC/s plus frontend/buffer/activation caveats | pending |
 | R9 | References and presentation | foundational citations, new diagram/plots, shorter historical/refinement text | pending |
@@ -37,6 +37,7 @@ campaign and does not reopen the closed T1--T16 teacher search.
 | 2026-07-30 | Baseline smoke A2 caught teacher shape mismatch | noisy baselines completed two rows; NB teacher stopped before metrics | preserve evaluator's `(batch, length)` single-waveform contract |
 | 2026-07-30 | Baseline smoke A3 caught cross-band autocast mismatch | noisy baselines completed; FP16 resample reached teacher complex STFT | force the cross-band reference path to FP32 |
 | 2026-07-30 | Baseline smoke A4 passed | three systems x two test rows; WB/NB metric modes matched; test not used for selection | launch the predeclared full reporting-only evaluation |
+| 2026-07-30 | Full current-protocol baseline evaluation passed independent reconciliation | 824 rows each for `NOISY-WB`, `NOISY-NB` and `MATCHED-INPUT-TEACHER-NB`; CSV hashes and PESQ/STOI/SI-SDR/delta-SNR means reconciled within `1e-6`; 110/110 tests and project guard passed | launch A-CLEAN WB seed-0 |
 
 ## Frozen experiment matrix
 

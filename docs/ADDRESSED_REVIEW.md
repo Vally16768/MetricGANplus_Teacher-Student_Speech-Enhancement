@@ -1,6 +1,6 @@
 # Addressed review — IEEE draft v2
 
-Status: **working ledger; experiments pending**
+Status: **working ledger; baseline evidence validated, training matrix in progress**
 Draft reviewed: `MetricGAN_Teacher_Student_IEEE_Draft_v2.pdf` (6 pages,
 created 2026-07-30)
 
@@ -10,10 +10,10 @@ experiment is not an addressed criticism.
 | Reviewer concern | Current assessment | Action/evidence | Article change | Status |
 |---|---|---|---|---|
 | Distillation benefit not isolated | Valid major concern | Run the frozen WB loss-component matrix in `.agents/REVIEW_REVISION_TODO.md` | Add an ablation table and restrict causal attribution to measured contrasts | in progress |
-| NB teacher has privileged >4-kHz information | Valid information mismatch | Report a matched-input teacher adapter and NB clean-only student; retain privileged-information interpretation | Rewrite target-generation text and limitations | pending |
+| NB teacher has privileged >4-kHz information | Valid information mismatch | Matched-input teacher reference completed on 824 pairs; NB clean-only student still required | Rewrite target-generation text and limitations | in progress |
 | Reported 16-ms lookahead | Incorrect mathematical dependency | Correct model contract to 10 ms and add numerical dependency/streaming validation; distinguish library buffering | Replace all 16-ms claims and Table V entries | pending |
-| NB results lack baselines | Valid major concern | Add current-protocol noisy NB, clean-only NB, and matched-input teacher reference | Expand current-results table within NB protocol | pending |
-| One seed | Valid major concern | Complete D1 seeds 0, 1001, 2002 for both bandwidths; paired utterance bootstrap | Report mean, standard deviation and 95% CIs | pending |
+| NB results lack baselines | Valid major concern | Current-protocol noisy NB and matched-input teacher reference are validated; clean-only NB remains | Expand current-results table within NB protocol | in progress |
+| One seed | Valid major concern | Complete D1 seeds 0, 1001, 2002 for both bandwidths; sample-level baseline evidence now exists for paired bootstrap | Report mean, standard deviation and 95% CIs | in progress |
 | Reproducibility identifiers absent | Evidence exists but is missing from draft | Publish sanitized checkpoint, code/config, manifest and speaker-split hashes | Add reproducibility subsection/table | pending |
 | Foundational references absent | Valid presentation/scholarship concern | Add original MetricGAN, MetricGAN+, VoiceBank+DEMAND, PESQ, STOI, SI-SDR and KD references | Replace the artificial 2024--2026 restriction | pending |
 | Same FFT sizes at 16/8 kHz | Valid design asymmetry | State exact time supports; add duration-matched-resolution ablation only if compute budget permits | Justify or label as limitation; do not claim temporal equivalence | pending |
@@ -36,10 +36,30 @@ experiment is not an addressed criticism.
 - The promoted seed-0 S0 package is valid one-seed evidence; it does not
   establish training variability or statistical significance.
 
+## Validated current-protocol references
+
+The reporting-only evaluation
+`local/runs/20260730-review-baselines-test-s0-a1` used the untouched 824-pair
+test manifest after all model-selection decisions. The three sample-level CSV
+hashes, row counts and aggregate PESQ, STOI, SI-SDR and delta-SNR means were
+independently reconciled within `1e-6`.
+
+| System | Protocol | Pairs | PESQ | STOI | SI-SDR (dB) |
+|---|---|---:|---:|---:|---:|
+| Noisy input | WB, 16 kHz, PESQ-WB | 824 | 1.9701 | 0.9210 | 8.4454 |
+| Noisy input | NB, 8 kHz, PESQ-NB | 824 | 2.9481 | 0.9212 | 8.4318 |
+| Fixed WB teacher with matched 8-kHz-bandlimited input | NB, 8 kHz, PESQ-NB | 824 | 3.6058 | 0.9283 | 9.2583 |
+
+These rows must not be compared across PESQ modes. The matched-input teacher
+removes access to frequencies above 4 kHz at its input, but it is not a
+dedicated narrowband model and does not replace the pending clean-only NB
+student ablation.
+
 ## Evidence locations
 
 - Canonical seed-0 package:
   `experiments/runs/20260727-converged-s0-baseline-v2/`
+- Full current-protocol reference evidence:
+  `local/runs/20260730-review-baselines-test-s0-a1/`
 - Active experiment board: `.agents/REVIEW_REVISION_TODO.md`
 - Canonical project evidence language: `.agents/ACADEMIC.md`
-
