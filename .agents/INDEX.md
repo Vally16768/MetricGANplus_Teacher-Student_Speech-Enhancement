@@ -69,8 +69,9 @@ without T17**.
 
 Open work:
 
-- execute the active reviewer-requested ablations, multi-seed and analysis
-  campaign in `.agents/REVIEW_REVISION_TODO.md`;
+- execute the active reviewer-requested ablation and analysis campaign in
+  `.agents/REVIEW_REVISION_TODO.md`; additional complete-model seeds are
+  explicitly outside the active scope;
 - preserve T16 and earlier negative evidence for the article;
 - do not continue teacher search without a new explicit research mandate;
 - no cache, student or test evaluation may start before teacher promotion;

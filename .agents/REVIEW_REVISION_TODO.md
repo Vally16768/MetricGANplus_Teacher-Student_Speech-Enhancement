@@ -15,8 +15,8 @@ campaign and does not reopen the closed T1--T16 teacher search.
 | R2 | Isolate knowledge distillation | WB seed 0: clean-only, teacher-wave only, ERB-mask only, teacher-wave+mask, complete D1 | in-progress |
 | R3 | Narrowband references | NB clean-only student and matched-input 8-kHz teacher adapter | in-progress |
 | R4 | Correct lookahead | contract corrected to 10 ms; numerical streaming/dependency test pending | in-progress |
-| R5 | Multi-seed evidence | complete D1 WB/NB seeds 0, 1001, 2002 | pending |
-| R6 | Uncertainty | sample-level test metrics and paired 95% bootstrap CIs | in-progress |
+| R5 | Multi-seed evidence | additional WB/NB seeds explicitly removed from the active scope by the user | open limitation |
+| R6 | Uncertainty | sample-level test metrics and paired 95% bootstrap CIs; no across-seed estimate | in-progress |
 | R7 | Exact provenance | teacher/code/config/manifest/speaker identifiers and hashes | passed |
 | R8 | Complexity | teacher neural-core MAC/s plus frontend/buffer/activation caveats | in-progress |
 | R9 | References and presentation | foundational citations, new diagram/plots, shorter historical/refinement text | in-progress |
@@ -40,6 +40,7 @@ campaign and does not reopen the closed T1--T16 teacher search.
 | 2026-07-30 | Full current-protocol baseline evaluation passed independent reconciliation | 824 rows each for `NOISY-WB`, `NOISY-NB` and `MATCHED-INPUT-TEACHER-NB`; CSV hashes and PESQ/STOI/SI-SDR/delta-SNR means reconciled within `1e-6`; 110/110 tests and project guard passed | launch A-CLEAN WB seed-0 |
 | 2026-07-30 | Full clean-only WB seed-0 launched from clean commit `f306a97` | `20260730-review-clean-wb-s0-a1`; 9,754 train pairs, no teacher cache, CUDA, test reserved until selection | monitor training and reconcile the completed package |
 | 2026-07-30 | Added article-ready provenance, complexity and foundational-reference material | canonical commit/checkpoint/config/manifest hashes; validation speaker IDs; teacher 118.02M neural-core MAC/s derivation; verified DOI list | retain complexity as analytical evidence and complete figure/plot revisions |
+| 2026-07-30 | Removed four additional complete-model seed runs from scope by explicit user decision | no WB/NB seeds 1001 or 2002 will be launched; promoted seed-0 complete models remain the comparison rows | report single-seed training variability as an unresolved limitation |
 
 ## Frozen experiment matrix
 
@@ -53,15 +54,17 @@ bandwidth-matched evaluation used by canonical S0.
 | A-TWAVE | WB | 0 | 0 | 1 | 0 |
 | A-MASK | WB | 0 | 1 | 0 | 0 |
 | A-TWAVE-MASK | WB | 0 | 12/17 | 5/17 | 0 |
-| A-COMPLETE | WB | 0, 1001, 2002 | 0.60 | 0.25 | 0.15 |
+| A-COMPLETE | WB | 0 (reuse) | 0.60 | 0.25 | 0.15 |
 | N-CLEAN | NB | 0 | 0 | 0 | 1 |
-| N-COMPLETE | NB | 0, 1001, 2002 | 0.60 | 0.25 | 0.15 |
+| N-COMPLETE | NB | 0 (reuse) | 0.60 | 0.25 | 0.15 |
 
-Seed 0 complete cells reuse the promoted S0 checkpoints. New run directories
-are immutable and unique. Test is never used for checkpoint selection.
+Seed-0 complete cells reuse the promoted S0 checkpoints. No additional
+complete-model seeds are in the active scope. New run directories are
+immutable and unique. Test is never used for checkpoint selection.
 
 ## Exit rule
 
 An item is addressed only when its raw evidence, aggregate output and
 article-ready change agree. Unrun listening tests or target-device
-measurements remain explicit limitations, not implied accomplishments.
+measurements and the retained single-seed design remain explicit limitations,
+not implied accomplishments.

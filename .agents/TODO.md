@@ -85,6 +85,7 @@ authorized only after tests and the project guard pass.
 ## Active IEEE-review revision
 
 The teacher-search line remains closed at T16. Reviewer-requested student
-ablations, current-protocol baselines, repeated seeds, uncertainty, streaming
+ablations, current-protocol baselines, paired utterance uncertainty, streaming
 analysis and publication corrections are tracked exclusively in
-`.agents/REVIEW_REVISION_TODO.md`.
+`.agents/REVIEW_REVISION_TODO.md`. Additional complete-model seeds are outside
+the active scope and remain a publication limitation.

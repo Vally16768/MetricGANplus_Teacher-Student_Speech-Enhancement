@@ -62,8 +62,9 @@ not as a cosmetic warning.
 ## Execute the iterative board
 
 - Treat `.agents/REVIEW_REVISION_TODO.md` as the active source of truth for
-  the reviewer-requested student ablation, repeated-seed, analysis and
-  publication campaign. Treat `.agents/TEACHER_T16_TODO.md` as the terminal
+  the reviewer-requested student ablation, analysis and publication campaign.
+  Additional complete-model seeds are not active unless the user explicitly
+  restores them. Treat `.agents/TEACHER_T16_TODO.md` as the terminal
   source of truth for the closed teacher-search sequence. Do not create T17
   without a new explicit user mandate. Treat `.agents/TEACHER_T15_TODO.md`,
   `.agents/TEACHER_T14_TODO.md`,
