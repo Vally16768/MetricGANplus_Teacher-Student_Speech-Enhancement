@@ -717,7 +717,6 @@ def autotune_loader_profile(
     max_steps: int = 120,
     warmup_steps: int = 30,
     progress_callback: Callable[[str], None] | None = None,
-    sample_metrics_out: str | Path | None = None,
 ) -> dict[str, Any]:
     if not candidates_num_workers:
         raise ValueError("candidates_num_workers cannot be empty.")
@@ -1226,6 +1225,7 @@ def evaluate_manifest(
     batch_size: int = 1,
     cache_audio: bool = True,
     progress_callback: Callable[[str], None] | None = None,
+    sample_metrics_out: str | Path | None = None,
 ) -> dict[str, Any]:
     profile = resolve_bandwidth(bandwidth, sample_rate=sample_rate)
     if compute_dnsmos and sample_rate != 16000:

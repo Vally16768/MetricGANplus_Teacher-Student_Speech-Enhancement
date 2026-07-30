@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import inspect
 import unittest
 from pathlib import Path
 
@@ -18,9 +19,16 @@ from sebench.review_evidence import (  # noqa: E402
     NoisyPassthrough,
     paired_bootstrap,
 )
+from sebench.training import evaluate_manifest  # noqa: E402
 
 
 class ReviewEvidenceTests(unittest.TestCase):
+    def test_evaluate_manifest_exposes_sample_metric_output(self) -> None:
+        self.assertIn(
+            "sample_metrics_out",
+            inspect.signature(evaluate_manifest).parameters,
+        )
+
     def test_noisy_passthrough_is_exact(self) -> None:
         waveform = torch.randn(2, 1, 800)
         self.assertTrue(torch.equal(NoisyPassthrough()(waveform), waveform))

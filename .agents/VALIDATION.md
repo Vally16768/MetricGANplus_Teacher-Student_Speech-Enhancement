@@ -196,6 +196,10 @@ metric/reference profile matches the run profile
   splits twice. It was stopped during redundant final evaluation; reviewer
   verification now limits both training and evaluation support, while full
   runs remain unchanged.
+- Review smoke A3 stopped on a `sample_metrics_out` signature wiring error
+  after its bounded clean-only train pass and first two-row rank evaluation.
+  No test was configured. The parameter is now attached to
+  `evaluate_manifest` and covered by API regression.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend
