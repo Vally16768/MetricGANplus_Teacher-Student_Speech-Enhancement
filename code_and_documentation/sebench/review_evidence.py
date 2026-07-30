@@ -22,6 +22,9 @@ class NoisyPassthrough(nn.Module):
     def forward(self, waveform: torch.Tensor) -> torch.Tensor:
         return waveform
 
+    def denoise_single(self, waveform: torch.Tensor) -> torch.Tensor:
+        return waveform
+
 
 class BandwidthLimitedTeacher(nn.Module):
     """Run the WB teacher using only an 8-kHz-bandlimited input."""
@@ -36,6 +39,9 @@ class BandwidthLimitedTeacher(nn.Module):
         enhanced_16k = self.teacher(waveform_16k)
         enhanced_8k = resample_mono_audio(enhanced_16k, 16_000, 8_000)
         return enhanced_8k[..., :original_length]
+
+    def denoise_single(self, waveform_8k: torch.Tensor) -> torch.Tensor:
+        return self.forward(waveform_8k)
 
 
 def _atomic_json(path: Path, payload: Any) -> None:

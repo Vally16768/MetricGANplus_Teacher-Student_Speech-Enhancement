@@ -32,13 +32,21 @@ class ReviewEvidenceTests(unittest.TestCase):
     def test_noisy_passthrough_is_exact(self) -> None:
         waveform = torch.randn(2, 1, 800)
         self.assertTrue(torch.equal(NoisyPassthrough()(waveform), waveform))
+        self.assertTrue(
+            torch.equal(
+                NoisyPassthrough().denoise_single(waveform),
+                waveform,
+            )
+        )
 
     def test_bandwidth_limited_teacher_preserves_8k_shape(self) -> None:
         wrapper = BandwidthLimitedTeacher(torch.nn.Identity())
         waveform = torch.randn(2, 1, 803)
         observed = wrapper(waveform)
+        observed_single = wrapper.denoise_single(waveform)
         self.assertEqual(observed.shape, waveform.shape)
         self.assertTrue(torch.isfinite(observed).all())
+        self.assertTrue(torch.equal(observed, observed_single))
 
     def test_paired_bootstrap_is_deterministic_and_paired(self) -> None:
         left = np.asarray([2.0, 3.0, 4.0, 5.0])

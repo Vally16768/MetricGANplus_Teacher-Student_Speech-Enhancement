@@ -200,6 +200,9 @@ metric/reference profile matches the run profile
   after its bounded clean-only train pass and first two-row rank evaluation.
   No test was configured. The parameter is now attached to
   `evaluate_manifest` and covered by API regression.
+- Reviewer-baseline smoke A1 stopped before metric computation because the
+  identity and bandwidth-limited adapters lacked the evaluator's true-length
+  `denoise_single` interface. Both adapters now implement and test it.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend
