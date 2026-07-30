@@ -601,6 +601,7 @@ def _experiment_config(
         prefetch_factor=2,
         persistent_workers=int(effective["num_workers"]) > 0,
         pin_memory=True,
+        max_train_files=32 if mode == "smoke" else None,
         checkpoint_every_steps=0,
         checkpoint_every_minutes=0,
         checkpoint_keep_last=1,

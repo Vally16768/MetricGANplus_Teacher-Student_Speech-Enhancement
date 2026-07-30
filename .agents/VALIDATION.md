@@ -187,6 +187,10 @@ metric/reference profile matches the run profile
   (`-0.231453` dB). It missed the PESQ gate by `0.000381`; checkpoint
   round-trip passed and test remained unread. The terminal no-T17 rule now
   closes the search.
+- The first reviewer clean-only smoke was stopped controlfully after exposing
+  that the legacy smoke profile traversed all 9,754 training pairs with batch
+  two. Verification-only student training is now bounded to 32 rows; full
+  review runs remain unbounded and canonical.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

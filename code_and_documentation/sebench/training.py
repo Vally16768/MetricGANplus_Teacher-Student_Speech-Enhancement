@@ -19,7 +19,7 @@ import mlflow
 import numpy as np
 import torch
 from torch import nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from tqdm.auto import tqdm
 
 from metrics.dnsmos import dnsmos_wav
@@ -78,6 +78,7 @@ class ExperimentConfig:
     prefetch_factor: int | None = None
     persistent_workers: bool | None = None
     pin_memory: bool | None = None
+    max_train_files: int | None = None
     checkpoint_every_steps: int = 500
     checkpoint_every_minutes: float = 5.0
     checkpoint_snapshot_every_periods: int = 1
@@ -591,6 +592,9 @@ def build_dataloader(csv_path: str, config: ExperimentConfig, shuffle: bool) -> 
         )
     else:
         dataset = VoiceBankDemandDataset(csv_path, segment_len=config.segment_len, sample_rate=config.sample_rate)
+    if config.max_train_files is not None:
+        limit = max(1, min(int(config.max_train_files), len(dataset)))
+        dataset = Subset(dataset, range(limit))
     generator = torch.Generator()
     generator.manual_seed(config.seed)
     requested_workers = max(int(config.num_workers or 0), 0)
