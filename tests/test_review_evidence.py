@@ -43,10 +43,17 @@ class ReviewEvidenceTests(unittest.TestCase):
         wrapper = BandwidthLimitedTeacher(torch.nn.Identity())
         waveform = torch.randn(2, 1, 803)
         observed = wrapper(waveform)
-        observed_single = wrapper.denoise_single(waveform)
+        waveform_single = waveform.squeeze(1)
+        observed_single = wrapper.denoise_single(waveform_single)
         self.assertEqual(observed.shape, waveform.shape)
+        self.assertEqual(observed_single.shape, waveform_single.shape)
         self.assertTrue(torch.isfinite(observed).all())
-        self.assertTrue(torch.equal(observed, observed_single))
+        self.assertTrue(torch.isfinite(observed_single).all())
+
+    def test_bandwidth_limited_teacher_rejects_non_batched_single_input(self) -> None:
+        wrapper = BandwidthLimitedTeacher(torch.nn.Identity())
+        with self.assertRaisesRegex(ValueError, "batch, length"):
+            wrapper.denoise_single(torch.randn(803))
 
     def test_paired_bootstrap_is_deterministic_and_paired(self) -> None:
         left = np.asarray([2.0, 3.0, 4.0, 5.0])

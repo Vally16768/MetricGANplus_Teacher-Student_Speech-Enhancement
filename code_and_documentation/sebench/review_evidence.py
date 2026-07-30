@@ -41,7 +41,16 @@ class BandwidthLimitedTeacher(nn.Module):
         return enhanced_8k[..., :original_length]
 
     def denoise_single(self, waveform_8k: torch.Tensor) -> torch.Tensor:
-        return self.forward(waveform_8k)
+        if waveform_8k.ndim != 2:
+            raise ValueError("Expected waveform shaped (batch, length).")
+        original_length = int(waveform_8k.shape[-1])
+        waveform_16k = resample_mono_audio(waveform_8k, 8_000, 16_000)
+        if hasattr(self.teacher, "denoise_single"):
+            enhanced_16k = self.teacher.denoise_single(waveform_16k)
+        else:
+            enhanced_16k = self.teacher(waveform_16k.unsqueeze(1)).squeeze(1)
+        enhanced_8k = resample_mono_audio(enhanced_16k, 16_000, 8_000)
+        return enhanced_8k[..., :original_length]
 
 
 def _atomic_json(path: Path, payload: Any) -> None:

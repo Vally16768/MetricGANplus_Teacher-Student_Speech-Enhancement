@@ -203,6 +203,10 @@ metric/reference profile matches the run profile
 - Reviewer-baseline smoke A1 stopped before metric computation because the
   identity and bandwidth-limited adapters lacked the evaluator's true-length
   `denoise_single` interface. Both adapters now implement and test it.
+- Reviewer-baseline smoke A2 completed both two-row noisy references, then
+  stopped before matched-input teacher metrics because the adapter passed a
+  `(batch, length)` waveform to the teacher's 3-D `forward`. The corrected
+  adapter now preserves the evaluator's 2-D `denoise_single` contract.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend
