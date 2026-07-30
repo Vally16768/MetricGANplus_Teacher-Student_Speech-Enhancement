@@ -211,6 +211,9 @@ metric/reference profile matches the run profile
   matched-input teacher, where autocast converted the resampled waveform to
   FP16 and exposed an unsupported complex-half STFT reconstruction. The
   cross-band reference path now disables autocast and tests FP32 teacher input.
+- Reviewer-baseline smoke A4 completed all three two-row systems with explicit
+  WB/NB PESQ modes, per-utterance evidence, no selection use of test and a
+  passing planned run contract. It is verification-only and not reportable.
 - final evidence reconciliation: canonical v2 contract/audit, local A3 audit,
   sanitized negative JSON source hashes and privacy scan all passed.
 - T2 parity audit identified that the historical T1 discriminator frontend

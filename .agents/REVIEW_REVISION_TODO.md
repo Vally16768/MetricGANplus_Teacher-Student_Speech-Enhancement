@@ -36,6 +36,7 @@ campaign and does not reopen the closed T1--T16 teacher search.
 | 2026-07-30 | Baseline smoke A1 caught evaluator adapter mismatch | passthrough lacked required true-length `denoise_single`; stopped before metrics | implement/test adapter interface |
 | 2026-07-30 | Baseline smoke A2 caught teacher shape mismatch | noisy baselines completed two rows; NB teacher stopped before metrics | preserve evaluator's `(batch, length)` single-waveform contract |
 | 2026-07-30 | Baseline smoke A3 caught cross-band autocast mismatch | noisy baselines completed; FP16 resample reached teacher complex STFT | force the cross-band reference path to FP32 |
+| 2026-07-30 | Baseline smoke A4 passed | three systems x two test rows; WB/NB metric modes matched; test not used for selection | launch the predeclared full reporting-only evaluation |
 
 ## Frozen experiment matrix
 
