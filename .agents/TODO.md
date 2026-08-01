@@ -91,5 +91,28 @@ analysis and publication corrections are tracked exclusively in
 the active scope and remain a publication limitation. The four new WB seed-0
 ablation cells are complete and audited. N-CLEAN is the only remaining new
 training cell; its first attempt failed before an optimizer step, and
-downstream review work is blocked until the validated target-rate loader fix
-is committed and launched from a new clean snapshot.
+the validated target-rate loader fix is committed at `f69da47`. The clean
+replacement smoke passed, and full N-CLEAN
+`20260801-review-clean-nb-s0-a2` selected epoch 35 and early-stopped at epoch
+43. Its aggregate package passed the independent core audit, so new training
+is closed. Reporting-only sample-level reconciliation and paired bootstrap run
+`20260801-review-matrix-uncertainty-s0-a1` also passed its independent audit:
+ten 824-row system tables and 48 paired interval rows reconcile. R4 numerical
+future-dependency validation now passes for both canonical students: output is
+bit-identical before the 160-sample WB or 80-sample NB lookahead boundary and
+changes within the following 10-ms region. This validates algorithmic
+lookahead, not a stateful streaming implementation or measured device latency.
+R8 analytical complexity reconciliation also passes: the fixed teacher and
+both students now share one parameter, weight-storage and neural-core MAC/s
+table, while recurrent-state-only counts and every unmeasured frontend,
+activation, framework and target-device cost remain explicit. R9--R11 are now
+closed by the audited standalone Word evidence pack at repository root,
+`MetricGAN_IEEE_Review_Response_Evidence_Pack.docx`, with usage guidance in
+`README_REVIEW.md`. It contains the
+point-by-point responses, article-ready replacement wording, separate WB and
+NB tables, all paired intervals, figures, references, provenance and retained
+limitations. The remaining action is manual journal-response preparation and
+manual manuscript revision; no further training is active. The unique private
+matrix/uncertainty package was migrated into the main ignored `local/runs/`
+area with both canonical hashes verified, after which the two detached review
+worktrees were removed; only the main repository worktree remains.

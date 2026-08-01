@@ -49,6 +49,8 @@ status. Historical experiment directories are evidence, not canonical docs.
 | `.agents/TEACHER_T16_PLAN.md` | executed terminal fine-action search | canonical negative outcome |
 | `.agents/TEACHER_T16_TODO.md` | completed terminal T16 board | canonical closure |
 | `.agents/REVIEW_REVISION_TODO.md` | reviewer-requested experiment and revision board | canonical active |
+| `README_REVIEW.md` | repository-root usage guide for the IEEE reviewer-response package | canonical publication guide |
+| `MetricGAN_IEEE_Review_Response_Evidence_Pack.docx` | standalone audited reviewer-response evidence, tables, figures and article-ready wording for manual manuscript revision | canonical publication working document |
 | `docs/ADDRESSED_REVIEW.md` | point-by-point reviewer response and article change map | canonical working |
 | `docs/ARTIFACT_POLICY.md` | artifact policy | active, reconcile with this control plane |
 | `docs/FINAL_RESULTS.md` | canonical article-facing S0 table, negative T1 outcome and claim-to-artifact map | canonical reproduced |

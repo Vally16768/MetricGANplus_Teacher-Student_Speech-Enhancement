@@ -1,8 +1,8 @@
 # IEEE review revision execution board
 
-Status: **blocked — validated N-CLEAN loader fix awaits a clean snapshot**
+Status: **complete — approved training, analysis and publication-evidence package audited**
 Last update: **2026-08-01**
-Next action: **obtain explicit commit authorization, commit the validated fix and registers, then launch a new immutable N-CLEAN run from the clean snapshot**
+Next action: **use the repository-root Word evidence pack and `README_REVIEW.md` to prepare the journal response and revise the manuscript manually; do not reopen training without a new mandate**
 
 This board addresses the reviewer assessment attached to
 `MetricGAN_Teacher_Student_IEEE_Draft_v2.pdf`. It is a student-evidence
@@ -12,16 +12,16 @@ campaign and does not reopen the closed T1--T16 teacher search.
 |---|---|---|---|
 | R0 | Reconcile draft claims and canonical S0 package | draft/review/S0 audit; response ledger | passed |
 | R1 | Current-protocol noisy baselines | WB and NB, 824 test pairs, matched PESQ | passed |
-| R2 | Isolate knowledge distillation | WB seed 0: clean-only, teacher-wave only, ERB-mask only, teacher-wave+mask, complete D1 | in-progress |
-| R3 | Narrowband references | NB clean-only student and matched-input 8-kHz teacher adapter | in-progress |
-| R4 | Correct lookahead | contract corrected to 10 ms; numerical streaming/dependency test pending | in-progress |
+| R2 | Isolate knowledge distillation | WB seed 0: clean-only, teacher-wave only, ERB-mask only, teacher-wave+mask, complete D1 | passed |
+| R3 | Narrowband references | NB clean-only student and matched-input 8-kHz teacher adapter | passed |
+| R4 | Correct lookahead | WB/NB future-perturbation regression validates 160/80-sample (10-ms) dependency; stateful streaming and device latency remain unmeasured | passed |
 | R5 | Multi-seed evidence | additional WB/NB seeds explicitly removed from the active scope by the user | open limitation |
-| R6 | Uncertainty | sample-level test metrics and paired 95% bootstrap CIs; no across-seed estimate | in-progress |
+| R6 | Uncertainty | sample-level test metrics and paired 95% bootstrap CIs; no across-seed estimate | passed |
 | R7 | Exact provenance | teacher/code/config/manifest/speaker identifiers and hashes | passed |
-| R8 | Complexity | teacher neural-core MAC/s plus frontend/buffer/activation caveats | in-progress |
-| R9 | References and presentation | foundational citations, new diagram/plots, shorter historical/refinement text | in-progress |
-| R10 | Addressed-review document | every point linked to evidence and article-ready replacement text | pending |
-| R11 | Independent audit | tests, guard, run/package/claim reconciliation | pending |
+| R8 | Complexity | teacher/student parameters, FP32/INT8 weight bounds, neural-core MAC/s, recurrent-state accounting and frontend/buffer/activation caveats | passed |
+| R9 | References and presentation | foundational citations, new diagram/plots, shorter historical/refinement text | passed |
+| R10 | Addressed-review document | every point linked to evidence and article-ready replacement text | passed |
+| R11 | Independent audit | tests, guard, run/package/claim reconciliation | passed |
 
 ## Progress log
 
@@ -54,6 +54,16 @@ campaign and does not reopen the closed T1--T16 teacher search.
 | 2026-08-01 | Reconciled completed teacher-waveform-plus-mask WB seed-0 package | `20260801-review-twave-mask-wb-s0-a1`; early stop at epoch 42, selected epoch 34; 824-pair WB test PESQ 3.056460, STOI 0.929191, SI-SDR 8.717301 dB and delta-SNR -0.463088 dB; campaign/checkpoint hashes, 42-row history, source contracts and restricted checkpoint metadata independently reconcile; test read only after selection; 110/110 tests, research-plan validation and project guard passed | retain as aggregate evidence pending sample-level paired uncertainty |
 | 2026-08-01 | Preserved first N-CLEAN attempt as an implementation failure | `20260801-review-clean-nb-s0-a1`; default DataLoader collation failed at epoch/global step `0/0`, before any optimizer update or scientific result, because native 16-kHz frame counts were mixed with 8-kHz crop coordinates | correct target-rate segment handling and never reuse this run directory |
 | 2026-08-01 | Corrected and validated N-CLEAN target-rate crop/pad behavior | source lengths are converted to the requested sample-rate coordinates and every loaded pair is finally cropped/padded to the exact target-rate segment length; focused short/long NB, default-collation and WB-preservation tests pass, as do eight real 9,754-row-manifest NB batches with four workers, the complete 113/113 suite, the real `campaign.py validate` entry point, research-plan validation, architecture hashes and project guard | obtain explicit authorization for the required clean fix commit, then use a new immutable N-CLEAN run ID |
+| 2026-08-01 | Preserved the first post-fix smoke as an orchestration interruption | `20260801-review-clean-nb-smoke-s0-a1`; loader and 16 CUDA optimizer steps passed, but the monitoring connection terminated the process during bounded `val_select`; immutable status failed and no scientific result is claimed | rerun the same smoke contract under a new ID with a sufficient execution window |
+| 2026-08-01 | Audited the replacement N-CLEAN smoke from clean commit `f69da47` | `20260801-review-clean-nb-smoke-s0-a2`; one epoch/16 CUDA steps, exact NB/8-kHz metric-reference contract, bounded 2-row rank/select evaluations, no test read, no teacher cache; restricted checkpoint and campaign hashes reconcile; 113/113 tests, plan validation and project guard pass | launch the single full N-CLEAN seed-0 cell |
+| 2026-08-01 | Launched full N-CLEAN seed-0 from clean detached runner at `f69da47` | `20260801-review-clean-nb-s0-a2`; unique contract, 9,754 train pairs, exact clean-only weights `[0,0,1]`, no teacher cache, CUDA, KINGSTON read-only; process reached epoch 1 with the four-worker loader healthy | monitor to early stop or epoch 50, audit the selected-checkpoint package, then close new training scope |
+| 2026-08-01 | Reconciled completed N-CLEAN seed-0 package | `20260801-review-clean-nb-s0-a2`; early stop at epoch 43 after eight non-improving evaluations, selected epoch 35; 824-pair NB test PESQ 3.344523, STOI 0.934739, SI-SDR 18.094036 dB and delta-SNR 9.752861 dB; test started only after final rank/select evaluation; campaign/checkpoint/history hashes, 43-row state, frozen manifests, clean commit and restricted checkpoint load reconcile; 113/113 tests, campaign/plan validation, architecture hashes, diff check and project guard pass | generate sample-level metrics and paired bootstrap evidence; no further training |
+| 2026-08-01 | Closed the new-training scope and launched reporting-only matrix reconciliation | `20260801-review-matrix-uncertainty-s0-a1`; clean runner `f69da47`, untouched 824-pair test, seven selected student checkpoints plus three validated baselines, deterministic 10,000-draw paired bootstrap within WB or NB only | audit every regenerated aggregate/CSV/hash and then replace provisional article language with measured contrasts |
+| 2026-08-01 | Audited the complete sample-level review matrix and paired uncertainty | `20260801-review-matrix-uncertainty-s0-a1`; ten systems, ten unique 824-row CSVs, seven checkpoint hashes and all historical aggregates reconcile within `1e-6`; 48 deterministic paired-bootstrap rows recompute exactly, support remains paired within WB or NB, summary SHA-256 `f0874cfbaf1f5a7f8e1d4b155c2872dc36649e9350f30b67a75d3f9af79a898b`, bootstrap CSV SHA-256 `593211d0360d4ad8a60a448874d7d03489a41e9b83a805b950054708ff3e0f39` | use only the audited contrasts in the article; retain unknown training-seed variability as an explicit limitation |
+| 2026-08-01 | Passed R4 numerical future-dependency validation | deterministic WB/NB future perturbations leave output samples before `cutoff - win_length/2` bit-identical and change the following 10-ms boundary region; WB bound 160 samples, NB bound 80 samples; focused 14/14 and full 114/114 tests, real `campaign.py validate`, plan validator, architecture hash check, diff check and project guard pass | reconcile R8 complexity and implementation caveats |
+| 2026-08-01 | Passed R8 analytical complexity reconciliation | fixed teacher added to the same parameter/storage/neural-core table: 1,895,514 parameters, 7.582-MB FP32 and 1.896-MB INT8 weight-only bounds, 118.02M neural-core MAC/s; student 1.920-kB FP32 GRU state and teacher 6.400-kB LSTM-state-only counts derived exactly; whole-waveform STFT/iSTFT tensors, activations, framework workspace, runtime, latency and energy remain explicitly unmeasured | build R9 article tables, figures and foundational-reference package |
+| 2026-08-01 | Closed R9--R11 with a standalone Word evidence pack | repository-root `MetricGAN_IEEE_Review_Response_Evidence_Pack.docx` and `README_REVIEW.md`; Word SHA-256 `16a7e5bf722291757ea545406590776489056921dc2d275a1a6df310d0276169`; 14 point-by-point responses, audited WB/NB tables, 48 paired-bootstrap rows, figures, references, provenance and limitations; all 15 pages visually inspected, privacy scan clean and accessibility audit has zero high-severity findings; 114/114 tests, campaign/plan validation, diff check and project guard with zero issues passed | manually prepare the journal response and edit the article; no article file was modified |
+| 2026-08-01 | Migrated the final private evidence and removed temporary review worktrees | copied `20260801-review-matrix-uncertainty-s0-a1` into the main ignored `local/runs/` area; recursive comparison was identical and retained summary SHA-256 `f0874cfbaf1f5a7f8e1d4b155c2872dc36649e9350f30b67a75d3f9af79a898b` plus bootstrap SHA-256 `593211d0360d4ad8a60a448874d7d03489a41e9b83a805b950054708ff3e0f39`; removed detached worktrees `fbf27c9` and `f69da47` through Git after confirming no active experiment process; post-cleanup 114/114 tests, campaign/plan validation, architecture hashes, diff check, Word hash and project guard all pass | retain the main repository and its ignored evidence copy; no temporary runner is required |
 
 ## Frozen experiment matrix
 

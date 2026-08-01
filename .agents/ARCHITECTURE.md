@@ -115,9 +115,13 @@ Both aliases use the same causal capacity so bandwidth is the controlled
 variable. The recurrent graph is frame-causal; centered STFT analysis imposes
 a 10 ms mathematical future-signal dependency for both profiles because the
 nonzero analysis window is 20 ms. The larger zero-padded FFT buffer and
-library framing behavior are reported separately. The WB and NB models contain
-604,386 and 514,018 trainable parameters respectively because their spectral
-input/output dimensions differ.
+library framing behavior are reported separately. A deterministic
+future-perturbation regression validates the bound numerically: WB output is
+bit-identical before `cutoff - 160` and NB output before `cutoff - 80`, while
+the following boundary region changes. This does not constitute a stateful
+streaming implementation or device-latency benchmark. The WB and NB models
+contain 604,386 and 514,018 trainable parameters respectively because their
+spectral input/output dimensions differ.
 
 For the IEEE-review ablation campaign, D1 exposes three non-negative frozen
 weights over ERB-mask imitation, teacher-waveform complex-STFT distance and

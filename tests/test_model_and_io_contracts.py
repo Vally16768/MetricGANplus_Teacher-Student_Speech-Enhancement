@@ -118,6 +118,52 @@ class StudentArchitectureTests(unittest.TestCase):
                     all(torch.isfinite(gradient).all() for gradient in gradients)
                 )
 
+    def test_causal_max_wb_nb_future_dependency_is_10_ms(self) -> None:
+        profiles = (
+            ("metricgan_plus_student_wb_causal_max", 16000, 512, 160, 320),
+            ("metricgan_plus_student_nb_causal_max", 8000, 256, 80, 160),
+        )
+        for family, sample_rate, n_fft, hop, win in profiles:
+            with self.subTest(family=family):
+                torch.manual_seed(1234)
+                model = build_enhancer(
+                    family,
+                    "small",
+                    sample_rate=sample_rate,
+                    n_fft=n_fft,
+                    hop_length=hop,
+                    win_length=win,
+                ).eval()
+                torch.manual_seed(5678)
+                waveform = torch.randn(1, 1, 40 * hop)
+                cutoff = 20 * hop
+                changed_future = waveform.clone()
+                changed_future[..., cutoff:] += 0.5 * torch.randn_like(
+                    changed_future[..., cutoff:]
+                )
+
+                with torch.no_grad():
+                    reference = model(waveform)
+                    perturbed = model(changed_future)
+
+                lookahead_samples = win // 2
+                stable_end = cutoff - lookahead_samples
+                self.assertTrue(
+                    torch.equal(
+                        reference[..., :stable_end],
+                        perturbed[..., :stable_end],
+                    )
+                )
+                boundary_delta = (
+                    reference[..., stable_end:cutoff]
+                    - perturbed[..., stable_end:cutoff]
+                ).abs()
+                self.assertGreater(boundary_delta.max().item(), 1e-5)
+                self.assertEqual(
+                    1000.0 * lookahead_samples / sample_rate,
+                    10.0,
+                )
+
     def test_causal_s_forward_preserves_shape(self) -> None:
         model = build_metricgan_causal_lite(
             sample_rate=8000,

@@ -1,6 +1,6 @@
 # Addressed review — IEEE draft v2
 
-Status: **working ledger; baseline evidence validated, training matrix in progress**
+Status: **review evidence complete; retained limitations explicit; manuscript editing remains manual**
 Draft reviewed: `MetricGAN_Teacher_Student_IEEE_Draft_v2.pdf` (6 pages,
 created 2026-07-30)
 
@@ -9,20 +9,20 @@ experiment is not an addressed criticism.
 
 | Reviewer concern | Current assessment | Action/evidence | Article change | Status |
 |---|---|---|---|---|
-| Distillation benefit not isolated | Valid major concern | Run the frozen WB loss-component matrix in `.agents/REVIEW_REVISION_TODO.md` | Add an ablation table and restrict causal attribution to measured contrasts | in progress |
-| NB teacher has privileged >4-kHz information | Valid information mismatch | Matched-input teacher reference completed on 824 pairs; first NB clean-only attempt failed before training and its validated target-rate loader fix awaits a clean snapshot | Rewrite target-generation text and limitations | in progress |
-| Reported 16-ms lookahead | Incorrect mathematical dependency | Correct model contract to 10 ms and add numerical dependency/streaming validation; distinguish library buffering | Replace all 16-ms claims and Table V entries | pending |
-| NB results lack baselines | Valid major concern | Current-protocol noisy NB and matched-input teacher reference are validated; clean-only NB remains | Expand current-results table within NB protocol | in progress |
-| One seed | Valid major concern retained by scope decision | Additional complete-model seeds were explicitly removed from the active plan; sample-level evidence remains available for paired utterance bootstrap only | State that training variability is unknown; do not report across-seed mean or standard deviation | open limitation |
-| Reproducibility identifiers absent | Evidence exists but is missing from draft | Publish sanitized checkpoint, code/config, manifest and speaker-split hashes | Add reproducibility subsection/table | pending |
-| Foundational references absent | Valid presentation/scholarship concern | Add original MetricGAN, MetricGAN+, VoiceBank+DEMAND, PESQ, STOI, SI-SDR and KD references | Replace the artificial 2024--2026 restriction | pending |
-| Same FFT sizes at 16/8 kHz | Valid design asymmetry | State exact time supports; add duration-matched-resolution ablation only if compute budget permits | Justify or label as limitation; do not claim temporal equivalence | pending |
-| “Energy” in Eq. (2) | Terminology is incorrect for summed magnitude | Rename to ERB-band magnitude or square the quantity only in a separately trained method | Correct equation prose and symbols | pending |
-| Complexity incomplete | Valid | Add teacher neural-core MAC/s and explicit recurrent/buffer/STFT memory accounting; retain non-benchmark caveat | Expand complexity table and limitations | pending |
+| Distillation benefit not isolated | Valid major concern | Frozen WB loss-component matrix and utterance-paired intervals validated | Add the audited ablation table and restrict causal attribution to measured contrasts | passed |
+| NB teacher has privileged >4-kHz information | Valid information mismatch | Matched-input teacher and clean-only NB student completed on 824 pairs; paired matrix audited | Rewrite target-generation text and limitations | passed with caveat |
+| Reported 16-ms lookahead | Incorrect mathematical dependency | WB/NB future-perturbation regression validates the 160/80-sample (10-ms) bound; stateful streaming and device latency remain unmeasured | Replace all 16-ms claims and Table V entries with the validated wording | passed |
+| NB results lack baselines | Valid major concern | Current-protocol noisy NB, clean-only NB, complete NB and matched-input teacher reference are validated | Expand current-results table within NB protocol | passed |
+| One seed | Valid major concern retained by scope decision | Additional complete-model seeds were explicitly removed; 824-pair utterance bootstrap is complete but does not estimate training variability | State that training variability is unknown; do not report across-seed mean or standard deviation | open limitation |
+| Reproducibility identifiers absent | Evidence exists but is missing from draft | Publish sanitized checkpoint, code/config, manifest and speaker-split hashes | Add reproducibility subsection/table | passed |
+| Foundational references absent | Valid presentation/scholarship concern | Add original MetricGAN, MetricGAN+, VoiceBank+DEMAND, PESQ, STOI, SI-SDR and KD references | Replace the artificial 2024--2026 restriction | passed |
+| Same FFT sizes at 16/8 kHz | Valid design asymmetry | State exact time supports; duration-matched-resolution retraining remains outside scope | Label as limitation; do not claim temporal equivalence | passed with limitation |
+| “Energy” in Eq. (2) | Terminology is incorrect for summed magnitude | Rename to ERB-band weighted magnitude without changing the trained objective | Correct equation prose and symbols | passed |
+| Complexity incomplete | Valid | Teacher/student parameter, weight-storage, neural-core MAC/s and recurrent-state-only counts reconciled; whole-waveform spectral tensors, activations and target-device costs remain explicitly unmeasured | Replace Table V and retain the non-benchmark caveat | passed |
 | No subjective/artifact evaluation | Not currently measured | Provide sanitized audio/examples only if publication packaging permits; do not invent listening evidence | Keep as explicit limitation/future work | open limitation |
-| Figure/visual density | Valid | Replace Fig. 1 with a real training/inference block diagram; add ablation plots and spectrogram examples | Revise figures and shorten abstract | pending |
-| Historical/refinement discussion | Too long and weakly evidenced in draft | Retain only concise, traceable negative-result statement or remove | Shorten Sections V-A/V-C | pending |
-| Historical SI-SDR discrepancy | Protocols differ and need explicit causal explanation | Identify differences in teacher, architecture, segmentation and evaluation; never pool values | Add a short non-comparability note or remove historical table | pending |
+| Figure/visual density | Valid | Training/inference diagram and separate audited WB/NB plots prepared | Revise figures and shorten abstract | passed |
+| Historical/refinement discussion | Too long and weakly evidenced in draft | Retain only concise, traceable negative-result statement or remove | Shorten Sections V-A/V-C | passed |
+| Historical SI-SDR discrepancy | Protocols differ and need explicit causal explanation | Identify differences in teacher, architecture, segmentation and evaluation; never pool values | Add a short non-comparability note or remove historical table | passed with caveat |
 
 ## Corrections already established by audit
 
@@ -47,15 +47,21 @@ independently reconciled within `1e-6`.
 | System | Protocol | Pairs | PESQ | STOI | SI-SDR (dB) |
 |---|---|---:|---:|---:|---:|
 | Noisy input | WB, 16 kHz, PESQ-WB | 824 | 1.9701 | 0.9210 | 8.4454 |
+| Fixed official T0 teacher | WB, 16 kHz, PESQ-WB | 824 | 3.1309 | 0.9319 | 8.5791 |
+| A-COMPLETE, seed 0 (promoted reuse) | WB, 16 kHz, PESQ-WB | 824 | 3.0519 | 0.9296 | 9.0499 |
 | Noisy input | NB, 8 kHz, PESQ-NB | 824 | 2.9481 | 0.9212 | 8.4318 |
 | Fixed WB teacher with matched 8-kHz-bandlimited input | NB, 8 kHz, PESQ-NB | 824 | 3.6058 | 0.9283 | 9.2583 |
+| N-CLEAN, seed 0 | NB, 8 kHz, PESQ-NB | 824 | 3.3445 | 0.9347 | 18.0940 |
+| N-COMPLETE, seed 0 (promoted reuse) | NB, 8 kHz, PESQ-NB | 824 | 3.6151 | 0.9294 | 9.0709 |
 
 These rows must not be compared across PESQ modes. The matched-input teacher
 removes access to frequencies above 4 kHz at its input, but it is not a
-dedicated narrowband model and does not replace the pending clean-only NB
-student ablation.
+dedicated narrowband model. N-CLEAN supplies the missing student reference.
+Its much higher SI-SDR and lower PESQ than N-COMPLETE are aggregate
+observations. The completed paired uncertainty audit supports only the
+fixed-checkpoint trade-off wording below, not across-seed causal language.
 
-## Completed ablation evidence awaiting matrix-level uncertainty
+## Completed ablation evidence and paired uncertainty
 
 The completed WB seed-0 review cells below used the same frozen splits,
 architecture, optimizer policy and checkpoint-selection protocol. A-CLEAN
@@ -70,12 +76,11 @@ A-TWAVE-MASK early-stopped at epoch 42 and selected epoch 34. The untouched
 | A-TWAVE, seed 0 | WB, 16 kHz, PESQ-WB | 824 | 3.0389 | 0.9278 | 8.7718 | -0.4849 |
 | A-MASK, seed 0 | WB, 16 kHz, PESQ-WB | 824 | 3.0529 | 0.9288 | 8.6783 | -0.4990 |
 | A-TWAVE-MASK, seed 0 | WB, 16 kHz, PESQ-WB | 824 | 3.0565 | 0.9292 | 8.7173 | -0.4631 |
+| A-COMPLETE, seed 0 (promoted reuse) | WB, 16 kHz, PESQ-WB | 824 | 3.0519 | 0.9296 | 9.0499 | -0.1566 |
 
 The result-summary hash, restricted checkpoint metadata and aggregate metric
-support reconcile, and the repository validation suite passes. These are four
-completed new WB cells, but paired sample-level confidence intervals must be
-produced before article-ready causal language is finalized. The complete D1
-WB row is reused from the promoted seed-0 package.
+support reconcile, and the repository validation suite passes. The complete
+D1 WB row is reused from the promoted seed-0 package.
 
 The first N-CLEAN run, `20260801-review-clean-nb-s0-a1`, failed at epoch and
 global step `0/0`, before any optimizer update. Its 16-kHz source lengths were
@@ -83,8 +88,48 @@ mixed with 8-kHz crop coordinates, producing unequal batch tensors during
 default collation. The failed directory is preserved as implementation
 evidence and contains no scientific result. A focused target-rate loader fix
 now passes short/long NB, default-collation, WB-preservation and real-manifest
-batch checks; N-CLEAN still requires a new clean committed snapshot and a new
-immutable run ID.
+batch checks. Clean commit `f69da47` supplies the required new snapshot:
+smoke `20260801-review-clean-nb-smoke-s0-a2` passed without reading test. Full
+run `20260801-review-clean-nb-s0-a2` then selected epoch 35 and early-stopped
+at epoch 43. Its 824-pair NB test produced PESQ 3.344523, STOI 0.934739,
+SI-SDR 18.094036 dB and delta-SNR 9.752861 dB. The test began only after
+selection; the command/config, 43-row history, manifests, result/checkpoint
+hashes and restricted checkpoint load independently reconcile. Reporting-only
+run `20260801-review-matrix-uncertainty-s0-a1` regenerated all sample-level
+metrics and passed independent reconciliation.
+
+### Audited paired contrasts
+
+All intervals below are deterministic 10,000-draw percentile bootstrap
+intervals over the same 824 test utterances. Delta is left minus right, so a
+positive value favors the left system for the displayed metric. WB and NB are
+never mixed. These intervals quantify utterance-level uncertainty for the
+fixed seed-0 checkpoints; they do not quantify training-seed variability.
+
+| Contrast | Metric | Mean delta | Paired 95% CI |
+|---|---|---:|---:|
+| A-TWAVE vs A-CLEAN | PESQ-WB | +0.4872 | [+0.4673, +0.5072] |
+| A-MASK vs A-CLEAN | PESQ-WB | +0.5012 | [+0.4813, +0.5208] |
+| A-TWAVE-MASK vs A-CLEAN | PESQ-WB | +0.5048 | [+0.4852, +0.5240] |
+| A-COMPLETE vs A-CLEAN | PESQ-WB | +0.5002 | [+0.4808, +0.5194] |
+| A-TWAVE-MASK vs A-TWAVE | PESQ-WB | +0.0176 | [+0.0115, +0.0239] |
+| A-TWAVE-MASK vs A-MASK | PESQ-WB | +0.0036 | [-0.0019, +0.0095] |
+| A-COMPLETE vs A-TWAVE-MASK | PESQ-WB | -0.0045 | [-0.0083, -0.0008] |
+| A-COMPLETE vs A-TWAVE-MASK | SI-SDR (dB) | +0.3326 | [+0.3051, +0.3610] |
+| N-COMPLETE vs N-CLEAN | PESQ-NB | +0.2706 | [+0.2576, +0.2836] |
+| N-COMPLETE vs N-CLEAN | STOI | -0.0053 | [-0.0062, -0.0045] |
+| N-COMPLETE vs N-CLEAN | SI-SDR (dB) | -9.0231 | [-9.2528, -8.7927] |
+| N-CLEAN vs noisy NB | PESQ-NB | +0.3964 | [+0.3773, +0.4157] |
+| N-CLEAN vs noisy NB | SI-SDR (dB) | +9.6622 | [+9.3756, +9.9480] |
+
+The evidence supports a trade-off statement, not a universal superiority
+claim. Teacher-target components raise PESQ substantially relative to
+clean-only training, while clean-only training retains much higher STOI and
+SI-SDR. The combined teacher waveform and mask improves PESQ over waveform
+alone, but its PESQ difference from mask alone has an interval spanning zero.
+Adding the clean component to the combined WB teacher targets slightly lowers
+PESQ while improving SI-SDR. The NB complete model shows the same PESQ versus
+signal-fidelity trade-off relative to N-CLEAN.
 
 ## Article-ready corrections supported without new training
 
@@ -114,7 +159,7 @@ revision `36c180c7bfad3bf5c48bd76a24799812952c4565`.
 
 ### Corrected lookahead wording
 
-Provisional replacement text, pending the numerical dependency/streaming test:
+Validated replacement text:
 
 > The recurrent mapping is frame-causal. Each student uses a centered 20-ms
 > Hamming analysis window, so the mathematical future signal dependency is
@@ -126,8 +171,15 @@ Provisional replacement text, pending the numerical dependency/streaming test:
 > device I/O remain to be benchmarked.
 
 The revised paper must replace `16 ms` in the abstract, Section III-C,
-Section VI-A, Table V and the conclusion. It must not claim hop-by-hop
-equivalence until R4's numerical test passes.
+Section VI-A, Table V and the conclusion. The numerical regression perturbs
+only input samples at and after a hop-aligned cutoff. For both canonical
+profiles, every output sample before `cutoff - win_length/2` remains
+bit-identical, while the immediately following 10-ms boundary region changes:
+160 samples at 16 kHz and 80 samples at 8 kHz. This validates the algorithmic
+future-dependency bound of the offline operator. The current implementation
+still processes whole waveforms with centered library STFT/iSTFT calls; it has
+no audited stateful chunk API, hop-by-hop equivalence result or end-to-end
+latency benchmark, and the paper must not imply any of those measurements.
 
 ### Loss terminology and cross-band time supports
 
@@ -148,18 +200,31 @@ predeclared and trained.
 For the fixed teacher, the two bidirectional 200-unit LSTM layers and
 `400x300`/`300x257` projections require approximately 1,888,300 neural-core
 MACs per frame. At a 256-sample hop and 16 kHz (62.5 frames/s), this is
-approximately 118.02 million MAC/s.
+approximately 118.02 million MAC/s. The replacement table is:
 
-| Model | Frames/s | Neural-core MAC/s | Reduction from teacher |
-|---|---:|---:|---:|
-| Fixed MetricGAN+ teacher | 62.5 | 118.02 million | - |
-| WB student | 100 | 60.22 million | 49.0% |
-| NB student | 100 | 51.21 million | 56.6% |
+| Model | Parameters | FP32 weights | INT8 weight-only lower bound | Frames/s | Neural-core MAC/s | Reduction from teacher |
+|---|---:|---:|---:|---:|---:|---:|
+| Fixed MetricGAN+ teacher | 1,895,514 | 7.582 MB | 1.896 MB | 62.5 | 118.02 million | - |
+| WB student | 604,386 | 2.418 MB | 0.604 MB | 100 | 60.22 million | 49.0% |
+| NB student | 514,018 | 2.056 MB | 0.514 MB | 100 | 51.21 million | 56.6% |
 
-These counts cover recurrent and linear arithmetic only. The article must keep
-the caveat that STFT/iSTFT, nonlinearities, memory traffic, recurrent state,
-spectral buffers, framework overhead, wall-clock latency and energy are not
-included or measured.
+Storage uses decimal MB and counts weights only. The INT8 column is a
+theoretical one-byte-per-weight lower bound, not an exported or accuracy-tested
+integer model. The exact FP32 recurrent-state-only count for either student is
+`3 layers x 160 hidden values x 4 bytes = 1.920 kB`. The teacher's LSTM state
+alone is `2 layers x 2 directions x (hidden + cell) x 200 x 4 bytes = 6.400
+kB`; because the teacher is bidirectional, this does not make its inference
+streamable and excludes the full reverse-time input/activation requirement.
+
+The arithmetic counts cover recurrent and linear MACs only. The current
+PyTorch inference path processes whole waveforms and materializes centered
+STFT/iSTFT spectra, magnitudes, masks and intermediate activations whose peak
+memory scales with batch size and utterance length. No stateful streaming
+kernel, fixed backend buffer plan, FFT cost/workspace, nonlinear and
+element-wise cost, memory traffic, framework overhead, worst-case hop runtime,
+end-to-end latency or energy has been measured. Table V must therefore label
+the reported values as analytical architectural indicators, not processor
+benchmarks or deployment results.
 
 ### Foundational references to add
 
@@ -187,6 +252,9 @@ included or measured.
 
 ## Evidence locations
 
+- Standalone Word response/evidence pack:
+  `MetricGAN_IEEE_Review_Response_Evidence_Pack.docx` with repository-root
+  usage guidance in `README_REVIEW.md`
 - Canonical seed-0 package:
   `experiments/runs/20260727-converged-s0-baseline-v2/`
 - Full current-protocol reference evidence:

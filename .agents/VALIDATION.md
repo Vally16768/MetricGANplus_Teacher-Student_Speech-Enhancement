@@ -494,23 +494,23 @@ metric/reference profile matches the run profile
   824-pair WB test only after selection. The result-summary hash, restricted
   checkpoint metadata, manifest support and PESQ/STOI/SI-SDR/delta-SNR
   aggregate metadata reconcile; 110/110 tests, research-plan validation and
-  project guard pass. Sample-level paired uncertainty remains pending and the
-  generic seven-cell `audit-run` command is not applicable to this one-cell
-  review package.
+  project guard pass. The later matrix run closed sample-level paired
+  uncertainty; the generic seven-cell `audit-run` command is not applicable
+  to this one-cell review package.
 - reviewer teacher-waveform-only WB run
   `20260731-review-twave-wb-s0-a1` early-stopped at epoch 40, selected epoch 32
   on `val_select`, and then evaluated all 824 WB test pairs. The
   result-summary hash, 40-row history, restricted checkpoint metadata and
   PESQ/STOI/SI-SDR/delta-SNR aggregate support reconcile; 110/110 tests,
-  research-plan validation and project guard pass. Sample-level paired
-  uncertainty remains pending.
+  research-plan validation and project guard pass. The later matrix run closed
+  sample-level paired uncertainty.
 - reviewer ERB-mask-only WB run `20260731-review-mask-wb-s0-a3`
   early-stopped at epoch 39, selected epoch 31 on `val_select`, and then
   evaluated all 824 WB test pairs. The result-summary and checkpoint hashes,
   39-row history, frozen source contracts, restricted checkpoint metadata and
   PESQ/STOI/SI-SDR/delta-SNR aggregate support reconcile; 110/110 tests,
-  research-plan validation and project guard pass. Sample-level paired
-  uncertainty remains pending.
+  research-plan validation and project guard pass. The later matrix run closed
+  sample-level paired uncertainty.
 - reviewer teacher-waveform-plus-mask WB run
   `20260801-review-twave-mask-wb-s0-a1` early-stopped at epoch 42, selected
   epoch 34 on `val_select`, and then evaluated all 824 WB test pairs. Its
@@ -520,8 +520,8 @@ metric/reference profile matches the run profile
   `9fff83cfef541c3046e7b8588eedf065813e4f9bb888c9d4cc23a924e6d1d356`.
   Aggregate PESQ-WB 3.056460, STOI 0.929191, SI-SDR 8.717301 dB and
   delta-SNR -0.463088 dB independently reconcile; 110/110 tests,
-  research-plan validation and project guard pass. Sample-level paired
-  uncertainty remains pending.
+  research-plan validation and project guard pass. The later matrix run closed
+  sample-level paired uncertainty.
 - first reviewer NB clean-only attempt `20260801-review-clean-nb-s0-a1`
   failed before training at epoch/global step `0/0`. Native source-frame
   counts selected 8-kHz windows using 16-kHz coordinates, so resampled items
@@ -535,3 +535,74 @@ metric/reference profile matches the run profile
   pass with batch size 8 and four workers at exact shape `[8, 16000]`; the
   complete suite passes 113/113. The real `campaign.py validate` entry point,
   research-plan validator, architecture source hashes and project guard pass.
+- clean-commit N-CLEAN smoke `20260801-review-clean-nb-smoke-s0-a2` completed
+  one epoch and 16 CUDA optimizer steps from commit `f69da47`. Both bounded
+  validation splits used NB/8-kHz references and PESQ-NB, test remained
+  unread, no teacher cache was loaded, and the restricted checkpoint and
+  campaign-summary hashes reconcile. The complete 113/113 suite,
+  research-plan validator and project guard pass before the full launch. The
+  prior smoke `...-a1` is retained as an orchestration interruption after its
+  training epoch, not as a code or scientific failure.
+- full reviewer NB clean-only run `20260801-review-clean-nb-s0-a2`
+  early-stopped at epoch 43 after eight non-improving evaluations and selected
+  epoch 35 exclusively on `val_select` PESQ-NB. Final `val_rank` and
+  `val_select` completed before the test began. All 824 test pairs used the
+  NB/8-kHz clean reference and PESQ-NB, yielding PESQ 3.344523, STOI 0.934739,
+  SI-SDR 18.094036 dB and delta-SNR 9.752861 dB. The 43-row history, clean
+  commit `f69da47`, exact command/config, manifest hashes, result-summary hash
+  `2703d228928ffe7baac4a596abde85d3b63c1be856c7753c226a8da5ae51b4d9`
+  and restricted checkpoint SHA-256
+  `6e0c69c2f484e5e7ab6a90779e98ae3bf77ab0fad4d40dcb70a2fb1da921cf7d`
+  reconcile. The complete 113/113 suite, real campaign entry point,
+  research-plan validation, architecture hashes, diff check and project guard
+  pass. Sample-level aggregate regeneration and paired uncertainty run
+  `20260801-review-matrix-uncertainty-s0-a1` subsequently passed its independent
+  audit.
+- reporting-only matrix run `20260801-review-matrix-uncertainty-s0-a1`
+  independently regenerated sample metrics for A-CLEAN, A-TWAVE, A-MASK,
+  A-TWAVE-MASK, reused A-COMPLETE, N-CLEAN and reused N-COMPLETE, then bound
+  the three validated baseline CSVs. All ten CSVs contain the same 824 unique
+  pair IDs per matching bandwidth, their means reproduce the historical
+  aggregates within `1e-6`, and all seven selected checkpoints have bound
+  hashes. Forty-eight rows (12 declared comparisons x 4 metrics) of
+  deterministic 10,000-draw paired bootstrap recompute exactly; no WB/NB
+  cross-band comparison exists. The summary SHA-256 is
+  `f0874cfbaf1f5a7f8e1d4b155c2872dc36649e9350f30b67a75d3f9af79a898b`
+  and paired-bootstrap CSV SHA-256 is
+  `593211d0360d4ad8a60a448874d7d03489a41e9b83a805b950054708ff3e0f39`.
+  These utterance-paired intervals do not estimate across-seed training
+  variability.
+- R4 future-dependency regression builds both canonical causal-max profiles,
+  perturbs only samples at and after a hop-aligned cutoff, and verifies exact
+  output equality before `cutoff - win_length/2`. The output changes within
+  the immediately following boundary region, establishing a meaningful
+  160-sample WB and 80-sample NB bound, both exactly 10 ms. Focused model/I-O
+  tests pass 14/14 and the complete suite passes 114/114. The real
+  `campaign.py validate` entry point, research-plan validator, architecture
+  source hashes, `git diff --check` and project guard also pass. This is an
+  offline operator dependency test; stateful chunk equivalence, framework
+  buffering and end-to-end device latency remain explicitly unmeasured.
+- R8 analytical complexity audit reconciles the fixed teacher and both
+  students from their audited architecture dimensions and parameter counts.
+  Decimal FP32/INT8 weight-only bounds are 7.582/1.896 MB for the teacher,
+  2.418/0.604 MB for WB and 2.056/0.514 MB for NB. Neural-core arithmetic is
+  118.02M, 60.22M and 51.21M MAC/s respectively. The exact recurrent-state-only
+  FP32 counts are 6.400 kB for the two-layer bidirectional teacher LSTM
+  (hidden and cell, both directions) and 1.920 kB for either three-layer
+  student GRU. The audit does not convert these lower bounds into peak memory:
+  the current whole-waveform centered STFT/iSTFT path materializes tensors that
+  scale with batch and utterance length, and no target-device runtime, latency,
+  energy, quantized export or backend workspace has been measured.
+- R9--R11 publication package validation produced
+  repository-root `MetricGAN_IEEE_Review_Response_Evidence_Pack.docx` with SHA-256
+  `16a7e5bf722291757ea545406590776489056921dc2d275a1a6df310d0276169`.
+  The pack contains 14 point-by-point responses, bandwidth-separated audited
+  tables, all 48 paired-bootstrap rows, three figures, article-ready wording,
+  foundational references, provenance and explicit limitations. Microsoft
+  Word rendered 15 pages; every page was visually inspected without clipping,
+  overlap or broken tables. Privacy scanning found no machine-local identity,
+  path, host, IP, mount or credential content; metadata creator fields are
+  empty. The accessibility audit reports zero high-severity findings. The
+  complete suite passes 114/114; campaign and research-plan validation,
+  `git diff --check` and project guard with zero issues also pass. The original
+  article/PDF was not edited.
