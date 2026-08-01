@@ -9,7 +9,12 @@ from typing import Iterable, Sequence
 import torch
 from torch.utils.data import Dataset
 
-from .audio import load_audio_num_frames, load_mono_audio, load_mono_audio_window
+from .audio import (
+    crop_or_pad,
+    load_audio_num_frames,
+    load_mono_audio,
+    load_mono_audio_window,
+)
 
 
 @dataclass(frozen=True)
@@ -94,9 +99,14 @@ class VoiceBankDemandDataset(Dataset):
         cached = self._frame_cache.get(key)
         if cached is not None:
             return cached
-        num_frames, _ = load_audio_num_frames(path)
-        self._frame_cache[key] = int(num_frames)
-        return int(num_frames)
+        num_frames, source_sr = load_audio_num_frames(path)
+        if source_sr <= 0:
+            raise ValueError(f"Invalid sample rate {source_sr} for {path}")
+        target_frames = (
+            int(num_frames) * int(self.sample_rate) + int(source_sr) - 1
+        ) // int(source_sr)
+        self._frame_cache[key] = target_frames
+        return target_frames
 
     def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor]:
         row = self.rows[idx]
@@ -121,8 +131,11 @@ class VoiceBankDemandDataset(Dataset):
         else:
             noisy, _ = load_mono_audio(row.noisy, self.sample_rate)
             clean, _ = load_mono_audio(row.clean, self.sample_rate)
-            pad = segment - total
-            noisy = torch.nn.functional.pad(noisy, (0, pad))
-            clean = torch.nn.functional.pad(clean, (0, pad))
+
+        # Resampling can round the target length at the boundary. Enforce the
+        # fixed training contract after loading so every item collates to the
+        # exact target-rate segment length.
+        noisy = crop_or_pad(noisy, segment)
+        clean = crop_or_pad(clean, segment)
 
         return noisy, clean

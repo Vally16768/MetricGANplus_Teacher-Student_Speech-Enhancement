@@ -166,6 +166,15 @@ the next epoch rather than repeating the completed epoch.
 | student WB | 16 kHz WB | the paired clean file loaded at 16 kHz | `wb` | same 16 kHz aligned pair |
 | student NB | 8 kHz NB | the same paired clean identity loaded at 8 kHz | `nb` | same 8 kHz aligned pair |
 
+Training segment lengths and random offsets are always expressed in the
+selected profile's target-sample-rate coordinates. Native audio frame counts
+are converted to target-rate counts before crop selection, and each loaded
+noisy/clean tensor is finally cropped or zero-padded to the exact declared
+`segment_len`. This preserves the existing WB path while ensuring that
+16-kHz VoiceBank sources collate uniformly for the NB/8-kHz student. The
+change affects data loading only: model parameters, checkpoint compatibility,
+objective definitions and evaluation protocols are unchanged.
+
 `evaluate_manifest` emits `bandwidth`, `reference_bandwidth`, `sample_rate` and
 `pesq_mode`. A mismatch stops evaluation. WB and NB PESQ values are reported in
 separate columns/figures and are not pooled.

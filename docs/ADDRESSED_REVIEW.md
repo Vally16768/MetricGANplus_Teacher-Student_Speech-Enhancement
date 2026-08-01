@@ -10,7 +10,7 @@ experiment is not an addressed criticism.
 | Reviewer concern | Current assessment | Action/evidence | Article change | Status |
 |---|---|---|---|---|
 | Distillation benefit not isolated | Valid major concern | Run the frozen WB loss-component matrix in `.agents/REVIEW_REVISION_TODO.md` | Add an ablation table and restrict causal attribution to measured contrasts | in progress |
-| NB teacher has privileged >4-kHz information | Valid information mismatch | Matched-input teacher reference completed on 824 pairs; NB clean-only student still required | Rewrite target-generation text and limitations | in progress |
+| NB teacher has privileged >4-kHz information | Valid information mismatch | Matched-input teacher reference completed on 824 pairs; first NB clean-only attempt failed before training and its validated target-rate loader fix awaits a clean snapshot | Rewrite target-generation text and limitations | in progress |
 | Reported 16-ms lookahead | Incorrect mathematical dependency | Correct model contract to 10 ms and add numerical dependency/streaming validation; distinguish library buffering | Replace all 16-ms claims and Table V entries | pending |
 | NB results lack baselines | Valid major concern | Current-protocol noisy NB and matched-input teacher reference are validated; clean-only NB remains | Expand current-results table within NB protocol | in progress |
 | One seed | Valid major concern retained by scope decision | Additional complete-model seeds were explicitly removed from the active plan; sample-level evidence remains available for paired utterance bootstrap only | State that training variability is unknown; do not report across-seed mean or standard deviation | open limitation |
@@ -54,6 +54,37 @@ These rows must not be compared across PESQ modes. The matched-input teacher
 removes access to frequencies above 4 kHz at its input, but it is not a
 dedicated narrowband model and does not replace the pending clean-only NB
 student ablation.
+
+## Completed ablation evidence awaiting matrix-level uncertainty
+
+The completed WB seed-0 review cells below used the same frozen splits,
+architecture, optimizer policy and checkpoint-selection protocol. A-CLEAN
+completed 50 epochs and selected epoch 45; A-TWAVE early-stopped at epoch 40
+and selected epoch 32; A-MASK early-stopped at epoch 39 and selected epoch 31;
+A-TWAVE-MASK early-stopped at epoch 42 and selected epoch 34. The untouched
+824-pair test was evaluated only after selection in each run.
+
+| Cell | Protocol | Pairs | PESQ | STOI | SI-SDR (dB) | Delta SNR (dB) |
+|---|---|---:|---:|---:|---:|---:|
+| A-CLEAN, seed 0 | WB, 16 kHz, PESQ-WB | 824 | 2.5517 | 0.9350 | 17.9958 | 9.6458 |
+| A-TWAVE, seed 0 | WB, 16 kHz, PESQ-WB | 824 | 3.0389 | 0.9278 | 8.7718 | -0.4849 |
+| A-MASK, seed 0 | WB, 16 kHz, PESQ-WB | 824 | 3.0529 | 0.9288 | 8.6783 | -0.4990 |
+| A-TWAVE-MASK, seed 0 | WB, 16 kHz, PESQ-WB | 824 | 3.0565 | 0.9292 | 8.7173 | -0.4631 |
+
+The result-summary hash, restricted checkpoint metadata and aggregate metric
+support reconcile, and the repository validation suite passes. These are four
+completed new WB cells, but paired sample-level confidence intervals must be
+produced before article-ready causal language is finalized. The complete D1
+WB row is reused from the promoted seed-0 package.
+
+The first N-CLEAN run, `20260801-review-clean-nb-s0-a1`, failed at epoch and
+global step `0/0`, before any optimizer update. Its 16-kHz source lengths were
+mixed with 8-kHz crop coordinates, producing unequal batch tensors during
+default collation. The failed directory is preserved as implementation
+evidence and contains no scientific result. A focused target-rate loader fix
+now passes short/long NB, default-collation, WB-preservation and real-manifest
+batch checks; N-CLEAN still requires a new clean committed snapshot and a new
+immutable run ID.
 
 ## Article-ready corrections supported without new training
 

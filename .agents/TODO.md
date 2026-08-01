@@ -88,4 +88,8 @@ The teacher-search line remains closed at T16. Reviewer-requested student
 ablations, current-protocol baselines, paired utterance uncertainty, streaming
 analysis and publication corrections are tracked exclusively in
 `.agents/REVIEW_REVISION_TODO.md`. Additional complete-model seeds are outside
-the active scope and remain a publication limitation.
+the active scope and remain a publication limitation. The four new WB seed-0
+ablation cells are complete and audited. N-CLEAN is the only remaining new
+training cell; its first attempt failed before an optimizer step, and
+downstream review work is blocked until the validated target-rate loader fix
+is committed and launched from a new clean snapshot.

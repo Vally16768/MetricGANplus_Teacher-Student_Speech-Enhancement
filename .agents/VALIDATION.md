@@ -489,3 +489,49 @@ metric/reference profile matches the run profile
   hashes and PESQ/STOI/SI-SDR/delta-SNR means independently reconciled within
   `1e-6`, test was not a selection input, 110/110 tests passed and the project
   guard reported zero issues.
+- reviewer clean-only WB run `20260730-review-clean-wb-s0-a1` completed the
+  declared 50-epoch policy, selected epoch 45 on `val_select`, and read the
+  824-pair WB test only after selection. The result-summary hash, restricted
+  checkpoint metadata, manifest support and PESQ/STOI/SI-SDR/delta-SNR
+  aggregate metadata reconcile; 110/110 tests, research-plan validation and
+  project guard pass. Sample-level paired uncertainty remains pending and the
+  generic seven-cell `audit-run` command is not applicable to this one-cell
+  review package.
+- reviewer teacher-waveform-only WB run
+  `20260731-review-twave-wb-s0-a1` early-stopped at epoch 40, selected epoch 32
+  on `val_select`, and then evaluated all 824 WB test pairs. The
+  result-summary hash, 40-row history, restricted checkpoint metadata and
+  PESQ/STOI/SI-SDR/delta-SNR aggregate support reconcile; 110/110 tests,
+  research-plan validation and project guard pass. Sample-level paired
+  uncertainty remains pending.
+- reviewer ERB-mask-only WB run `20260731-review-mask-wb-s0-a3`
+  early-stopped at epoch 39, selected epoch 31 on `val_select`, and then
+  evaluated all 824 WB test pairs. The result-summary and checkpoint hashes,
+  39-row history, frozen source contracts, restricted checkpoint metadata and
+  PESQ/STOI/SI-SDR/delta-SNR aggregate support reconcile; 110/110 tests,
+  research-plan validation and project guard pass. Sample-level paired
+  uncertainty remains pending.
+- reviewer teacher-waveform-plus-mask WB run
+  `20260801-review-twave-mask-wb-s0-a1` early-stopped at epoch 42, selected
+  epoch 34 on `val_select`, and then evaluated all 824 WB test pairs. Its
+  campaign summary SHA-256 is
+  `038fd152bf4b3c0bae1debe33358c9ba237af600d01b1c719531b7e63cde64af`
+  and selected checkpoint SHA-256 is
+  `9fff83cfef541c3046e7b8588eedf065813e4f9bb888c9d4cc23a924e6d1d356`.
+  Aggregate PESQ-WB 3.056460, STOI 0.929191, SI-SDR 8.717301 dB and
+  delta-SNR -0.463088 dB independently reconcile; 110/110 tests,
+  research-plan validation and project guard pass. Sample-level paired
+  uncertainty remains pending.
+- first reviewer NB clean-only attempt `20260801-review-clean-nb-s0-a1`
+  failed before training at epoch/global step `0/0`. Native source-frame
+  counts selected 8-kHz windows using 16-kHz coordinates, so resampled items
+  had unequal lengths and default collation raised `Trying to resize storage
+  that is not resizable`. The immutable attempt contains no optimizer step or
+  scientific result and must not be resumed or reused.
+- target-rate dataset regression validation covers 16-kHz source to 8-kHz
+  target conversion for short and long pairs, uniform default collation at
+  `[batch, segment_len]`, and unchanged WB native-rate alignment. All three
+  focused tests pass. Eight real NB batches from the 9,754-row manifest also
+  pass with batch size 8 and four workers at exact shape `[8, 16000]`; the
+  complete suite passes 113/113. The real `campaign.py validate` entry point,
+  research-plan validator, architecture source hashes and project guard pass.
